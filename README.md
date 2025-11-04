@@ -120,6 +120,14 @@ You’ll be presented with a **Ribbon-based UI** with tabs:
 
 ---
 
+## Data?
+Free hyperspectral core scanning data can be downloaded from a number of sources, including:  
+[Geological Survey Ireland](https://www.gsi.ie/en-ie/data-and-maps/Pages/Bedrock.aspx#Hyper)  
+[Alberta Energy Regulator](https://experience.arcgis.com/experience/1167cc6050f142bdb14a3a6c58e0f584/#data_s=id%3AdataSource_1-186dd8a4977-layer-6%3A724)
+
+
+---
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 (GPL-3.0).  
