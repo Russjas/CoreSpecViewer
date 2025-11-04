@@ -108,8 +108,8 @@ You’ll be presented with a **Ribbon-based UI** with tabs:
 
 ## License
 
--This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.  
--Because it depends on **PyQt5**, redistribution and derivative works must also comply with GPL v3 terms.**
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0).  
+Because it depends on PyQt5, redistribution and derivative works must also comply with GPL v3 terms.
 ---
 
 ## Author
