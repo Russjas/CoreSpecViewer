@@ -51,14 +51,22 @@ You’ll be presented with a **Ribbon-based UI** with tabs:
 - **Raw:** open and process Specim Lumo directories  
 - **Masking:** apply masks, refine and unwrap core regions  
 - **Visualise:** correlate features, view extracted products, and inspect spectral data  
-- **Libraries:** explore spectral databases (SQLite/ECOSTRESS compatible)
+- **Libraries:** explore spectral databases (SQLite/ECOSTRESS compatible).  
+  A subset of the ECOSTRESS spectral library, containing only mineral spectra, is included.  
+  **Reference:**  
+  Meerdink, S. K., Hook, S. J., Roberts, D. A., & Abbott, E. A. (2019).  
+  *The ECOSTRESS spectral library version 1.0.*  
+  *Remote Sensing of Environment*, **230**, 111196.  
+  https://doi.org/10.1016/j.rse.2019.05.015
+
 
 ---
 
 ## Key Features
 
 ### Data Handling
-- Automatic recognition of `.hdr`, `.npy`, `.npz`, `.json`, and `.jpg` datasets
+- Automatic recognition of `.hdr`, `.npy`, `.npz`, `.json`, and `.jpg` datasets.  
+  Most data handling is wrapped around a [Spectral Python (SPy)](https://www.spectralpython.net/) backbone.
 - Seamless integration between raw Specim data and processed reflectance cubes
 - Automatic memory mapping for large datasets
 
@@ -66,7 +74,13 @@ You’ll be presented with a **Ribbon-based UI** with tabs:
 - Reflectance correction via `reflect_correct`
 - Band selection based on SNR (`bands_from_snr`)
 - Savitzky–Golay smoothing and continuum removal (`process`)
-- Feature extraction and correlation mapping
+- Feature extraction and correlation mapping.  
+  Feature extraction leverages the powerful [_hylite_](https://github.com/hifexplo/hylite) package.  
+  **Reference:**  
+  Thiele, S. T., Lorenz, S., Kirsch, M., Acosta, I., Tusa, L., Hermann, E., Möckel, R., & Gloaguen, R. (2021).  
+  *Multi-scale, multi-sensor data integration for automated 3-D geological mapping.*  
+  *Ore Geology Reviews*, **136**, 104252.  
+  https://doi.org/10.1016/j.oregeorev.2021.104252
 
 ### GUI & Interaction
 - Matplotlib-powered RGB and spectral viewers
@@ -110,6 +124,7 @@ You’ll be presented with a **Ribbon-based UI** with tabs:
 
 This project is licensed under the GNU General Public License v3.0 (GPL-3.0).  
 Because it depends on PyQt5, redistribution and derivative works must also comply with GPL v3 terms.
+
 ---
 
 ## Author
