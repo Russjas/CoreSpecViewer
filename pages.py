@@ -14,10 +14,13 @@ import os, sys
 import numpy as np
 from PyQt5.QtWidgets import (QSplitter, QVBoxLayout, QTableWidgetItem,QTableWidget,
                              QApplication, QWidget, QToolBar, QPushButton, QFileDialog,
-                             QTableView, QMessageBox, QDialog, QLabel)
+                             QTableView, QMessageBox, QInputDialog, QComboBox)
+
 from PyQt5.QtCore import Qt, QModelIndex
 from PyQt5.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
-from util_windows import SpectralImageCanvas, ImageCanvas2D, InfoTable, SpectrumWindow, busy_cursor
+from util_windows import (SpectralImageCanvas, ImageCanvas2D, 
+                          InfoTable, SpectrumWindow, busy_cursor,
+                          IdSetFilterProxy)
 from tool_dispatcher import ToolDispatcher
 import tools as t
 # Optional: your data classes (kept as forward references – pass instances from the controller)
@@ -369,8 +372,7 @@ class VisualisePage(BasePage):
         return cid
     
 import sqlite3
-# --- Configuration Based on Schema Inspection ---
-DEFAULT_DATABASE_FILE = "models/minerals_ecostress.db"
+
 
 # In the 'samples' table (which is displayed in the QTableView):
 ID_COLUMN_INDEX = 0   # Column containing SampleID (used for the lookup)
@@ -390,7 +392,7 @@ BLOB_DTYPE = '<f4'
 class LibraryPage(BasePage):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("PyQt5 SQLite Viewer")
+        self.setWindowTitle("CoreSpecViewer")
         self.setGeometry(100, 100, 1000, 600)
         self.current_obj = None
         # State
@@ -399,6 +401,7 @@ class LibraryPage(BasePage):
         self.db = QSqlDatabase()   # placeholder; real one is created in open_database()
         self.model = None
         self.collection_ids = set()
+        self.collections: dict[str, set[int]] = {}
         self.exemplars = {}
     
 # =============================================================================
@@ -406,19 +409,30 @@ class LibraryPage(BasePage):
         self.layout().insertWidget(0, header)   # put header above the splitter
          
         btn_open  = QPushButton("Open DB…", self); header.addWidget(btn_open)
+        btn_filter = QPushButton("Filter to current band range", self);header.addWidget(btn_filter)
+        btn_filter.setToolTip("Show only spectra that fully cover the current object's band range")
+
         btn_add   = QPushButton("Add Selected → Collection", self); header.addWidget(btn_add)
         btn_save  = QPushButton("Save Collection as DB…", self); header.addWidget(btn_save)
         btn_clear = QPushButton("Clear Collection", self); header.addWidget(btn_clear)
         btn_exemplars = QPushButton("Select Exemplars", self); header.addWidget(btn_exemplars)
         btn_correlate = QPushButton("Correlate", self);header.addWidget(btn_correlate)
-         
+        
+        
+        btn_filter.clicked.connect(self.filter_to_current_bands)
+            
         btn_open.clicked.connect(self.open_database_dialog)
         btn_add.clicked.connect(self.add_selected_to_collection)
-        btn_save.clicked.connect(self.save_collection_as_db)
+        btn_save.clicked.connect(lambda: self.save_collection_as_db(None))
         btn_clear.clicked.connect(self.clear_collection)
         btn_exemplars.clicked.connect(self.get_collection_exemplars)
         btn_correlate.clicked.connect(self.correlate)
-
+        self.view_selector = QComboBox(self); header.addWidget(self.view_selector)
+        self.view_selector.currentTextChanged.connect(self._on_view_changed)
+        
+        
+        
+        
         # Left pane = the table
         self.table_view = QTableView(self)
         self.table_view.setSortingEnabled(True)
@@ -426,25 +440,73 @@ class LibraryPage(BasePage):
         self.table_view.setSelectionMode(QTableView.ExtendedSelection)
         self.table_view.doubleClicked.connect(self.handle_double_click)
         self._add_left(self.table_view)
-
-        if os.path.exists(DEFAULT_DATABASE_FILE):
-            self.open_database(DEFAULT_DATABASE_FILE)
+        
+        self._proxy = IdSetFilterProxy(ID_COLUMN_INDEX, parent=self)
+        self.table_view.setModel(self._proxy)
+        
+        db_path = self._find_default_database()
+        
+        if db_path is not None and os.path.exists(db_path):
+            self.open_database(db_path)
         else:
             QMessageBox.information(self, "Open a database",
                                     "No default database found. Click 'Open DB…' to select a file.")
+     
+    def _on_view_changed(self, text: str):
+       if text == "Opened database":
+           self._proxy.set_allowed_ids(None)
+       elif text in self.collections.keys():
+           self._proxy.set_allowed_ids(self.collections.get(text))
+       else:
+           self._proxy.set_allowed_ids(None)
+    def _refresh_collection_selector(self):
+        """Refresh the 'Show:' selector entries."""
+        sel = self.view_selector
+        if sel is None:
+            return
+        current = sel.currentText()
+        sel.blockSignals(True)
+        sel.clear()
+        sel.addItem("Opened database")
+        for name in sorted(self.collections.keys()):
+            sel.addItem(name)
+        # try to preserve previous choice if still valid
+        idx = sel.findText(current)
+        sel.setCurrentIndex(idx if idx >= 0 else 0)
+        sel.blockSignals(False)
+    
+    @staticmethod
+    def _find_default_database(search_dir: str = '.', pattern: str = ".db") -> str:
+        
+        """
+        Return the first matching .db file found under search_dir (recursive).
+        Keep this pure (no UI) so it's easy to test.
+        """
+        for root, _, files in os.walk(search_dir):
+            for f in files:
+                if f.lower().endswith(pattern):
+                    return os.path.join(root, f)
+        # Fall back to current working directory as a secondary search
+        for root, _, files in os.walk(os.getcwd()):
+            for f in files:
+                if f.lower().endswith(pattern):
+                    return os.path.join(root, f)
+        return None
         
     def handle_double_click(self, index: QModelIndex):
         """
         Handles the double-click event. Retrieves SampleID and Name.
         """
+        
         if index.isValid():
+            m = self.table_view.model()
             # 1. Get the SampleID (key for the spectra table)
-            id_index = self.model.index(index.row(), ID_COLUMN_INDEX)
-            sample_id = self.model.data(id_index)
+            id_index = m.index(index.row(), ID_COLUMN_INDEX)
+            sample_id = m.data(id_index)
             
             # 2. Get the Name for the plot title
-            name_index = self.model.index(index.row(), NAME_COLUMN_INDEX)
-            item_name = self.model.data(name_index)
+            name_index = m.index(index.row(), NAME_COLUMN_INDEX)
+            item_name = m.data(name_index)
             
             if sample_id is None:
                 QMessageBox.warning(self, "Error", "Could not retrieve SampleID.")
@@ -463,19 +525,20 @@ class LibraryPage(BasePage):
                                  f"Too many spectra selected for single correlation\nCreate a collection for min id from exemplars")
             return
         
-        sample_id = (ids[0])
+        sample_id = int(ids[0])
         
         # --- Get the mineral name from the selected row (fallback to DB) ---
         mineral_name = "Unknown"
         sel = self.table_view.selectionModel()
+        m = self.table_view.model()
         if sel is not None:
             # Prefer rows selected in the ID column; otherwise any selected row
             rows = {ix.row() for ix in sel.selectedRows(ID_COLUMN_INDEX)} or \
                    {ix.row() for ix in sel.selectedRows()}
             if rows:
                 r = next(iter(rows))
-                name_idx = self.model.index(r, NAME_COLUMN_INDEX)
-                val = self.model.data(name_idx)
+                name_idx = m.index(r, NAME_COLUMN_INDEX)
+                val = m.data(name_idx)
                 if val:
                     mineral_name = str(val)
          
@@ -519,21 +582,12 @@ class LibraryPage(BasePage):
                 return
         
         
-        # Add a new ImageCanvas2D for correlation
         corr_canvas = ImageCanvas2D()
         
-        # USE NEW FLEXIBLE METHOD:
-        # 1. Use the new helper to create, wrap, connect, and add the widget.
         self.corr_wrapper = self._add_closable_widget(
             raw_widget=corr_canvas, 
             title=f"Correlation"
         )
-        
-        # 2. Display the data using the *original* canvas reference
-        # corr_canvas.show_rgb(...)
-        #self.corr = ImageCanvas2D()
-       # self._add_right(self.corr)
-        #self.right_canvas.show_rgb(t.quick_corr(self.current_obj, x_data*1000, y_data))
         with busy_cursor('correlating...', self):
             corr_canvas.show_rgb(t.quick_corr(self.current_obj, x_data*1000, y_data))
             
@@ -582,12 +636,13 @@ class LibraryPage(BasePage):
         title = f"Spectra for: {item_name} (ID: {sample_id})"
         if self.spec_win is None:
             self.spec_win = SpectrumWindow(self)
-        f"Spectra for: {item_name} (ID: {sample_id})"
+        
         self.spec_win.plot_spectrum(x_data*1000, y_data, title)
      
     def _selected_sample_ids(self):
         """Return list of SampleID values from selected rows."""
-        if self.model is None:
+        m = self.table_view.model()
+        if m is None:
             return []
         sel = self.table_view.selectionModel()
         if sel is None:
@@ -597,45 +652,66 @@ class LibraryPage(BasePage):
         rows = {ix.row() for ix in sel.selectedRows(ID_COLUMN_INDEX)} or {ix.row() for ix in sel.selectedRows()}
         ids = []
         for r in rows:
-            idx = self.model.index(r, ID_COLUMN_INDEX)
-            val = self.model.data(idx)
-            if val is not None:
-                ids.append(val)
+            idx = m.index(r, ID_COLUMN_INDEX)
+            val = m.data(idx)
+            try:
+                ids.append(int(val))
+            except (TypeError, ValueError):
+                pass
         return ids
     
+
     def add_selected_to_collection(self):
         ids = self._selected_sample_ids()
         if not ids:
             QMessageBox.information(self, "No Selection", "Select one or more rows first.")
             return
-        before = len(self.collection_ids)
-        self.collection_ids.update(ids)
-        added = len(self.collection_ids) - before
+        name = self._prompt_collection_name("Add to collection")
+        if not name:
+            return
+        coll = self.collections.setdefault(name, set())
+        before = len(coll)
+        coll.update(ids)
+        added = len(coll) - before
+        self._refresh_collection_selector()
         QMessageBox.information(self, "Added to Collection",
-                                f"Added {added} new items.\nCollection size: {len(self.collection_ids)}")
-    
+                                f"Added {added} new items to '{name}'.\nSize now: {len(coll)}")
+        
     def clear_collection(self):
-        self.collection_ids.clear()
-        QMessageBox.information(self, "Cleared", "Collection is now empty.")   
+        name = self._choose_existing_collection("Delete collection")
+        if not name:
+            return
+        if QMessageBox.question(self, "Confirm delete",
+                                f"Delete collection '{name}'? This cannot be undone.") != QMessageBox.Yes:
+            return
+        self.collections.pop(name, None)
+        QMessageBox.information(self, "Deleted", f"Collection '{name}' removed.")  
+        self._refresh_collection_selector()
      
-    def save_collection_as_db(self):
-        if not self.collection_ids:
-            QMessageBox.information(self, "Empty Collection", "No items in the collection to save.")
+    def save_collection_as_db(self, key: str | None = None):
+        if key is None:
+            key = self._choose_existing_collection("Save collection as DB")
+        if not key:
+            return
+        ids_set = self.collections.get(key, set())
+        if not ids_set:
+            QMessageBox.information(self, "Empty Collection", f"No items in collection '{key}'.")
             return
     
         out_path, _ = QFileDialog.getSaveFileName(self, "Save new SQLite DB", "", "SQLite DB (*.db);;All Files (*)")
         if not out_path:
             return
-        src_path = self.db_path or DEFAULT_DATABASE_FILE
+    
+        src_path = self.db_path
         try:
             self._export_subset_db(
                 src_path=src_path,
                 dst_path=out_path,
-                sample_ids=list(self.collection_ids),
-                samples_table= SAMPLE_TABLE_NAME,
-                spectra_table=SPECTRA_TABLE_NAME,  # "spectra"
-                spectra_fk_col="SampleID",         # FK/Join column in spectra
-                samples_pk_col=self._column_name_by_index(SAMPLE_TABLE_NAME, ID_COLUMN_INDEX)  # usually "SampleID"
+                sample_ids=list(ids_set),
+                samples_table=SAMPLE_TABLE_NAME,
+                spectra_table=SPECTRA_TABLE_NAME,
+                spectra_fk_col="SampleID",
+                samples_pk_col=self._column_name_by_index(SAMPLE_TABLE_NAME, ID_COLUMN_INDEX)
             )
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", f"Could not save DB:\n{e}")
@@ -643,21 +719,14 @@ class LibraryPage(BasePage):
     
         QMessageBox.information(self, "Saved",
                                 f"New database written to:\n{out_path}\n\n"
-                                f"{len(self.collection_ids)} items saved.")
-    
-    
+                                f"{len(ids_set)} items saved from '{key}'.")
+        
     def _column_name_by_index(self, table_name: str, col_index: int) -> str:
         """
         Resolve a column name from the model header (safer than hardcoding).
         Falls back to PRAGMA if needed.
         """
-        # Try the Qt model header first (works for visible columns in self.model)
-        if table_name == SAMPLE_TABLE_NAME:
-            name = self.model.headerData(col_index, Qt.Horizontal)
-            if name:
-                return str(name)
-    
-        # Fallback: PRAGMA
+        
         q = QSqlQuery(self.db)
         if not q.exec_(f"PRAGMA table_info({table_name});"):
             raise RuntimeError(q.lastError().text())
@@ -799,13 +868,16 @@ class LibraryPage(BasePage):
             QSqlDatabase.removeDatabase(conn_name)
             return
     
-        self.table_view.setModel(self.model)
+        self._proxy.setSourceModel(self.model)
         self.table_view.resizeColumnsToContents()
         self.db_path = path
         self.setWindowTitle(f"PyQt5 SQLite Viewer: {os.path.basename(path)}")
     
         # Reset per-DB state
         self.collection_ids.clear()
+        self.collections.clear()  
+        self._proxy.set_allowed_ids(None)
+        self._refresh_collection_selector()
         if self.spec_win:
             self.spec_win.close()
             self.spec_win = None
@@ -818,9 +890,9 @@ class LibraryPage(BasePage):
         return q.next()
     
     def _close_current_db(self):
-        # Detach model from view so Qt can safely drop the connection
-        if hasattr(self, "table_view") and self.table_view is not None:
-            self.table_view.setModel(None)
+        # keep proxy on the view; drop only the source model
+        if hasattr(self, "_proxy") and self._proxy is not None:
+            self._proxy.setSourceModel(None)
     
         if hasattr(self, "model") and self.model is not None:
             self.model.deleteLater()
@@ -831,49 +903,49 @@ class LibraryPage(BasePage):
             if self.db.isOpen():
                 self.db.close()
             QSqlDatabase.removeDatabase(conn_name)
-    
     def teardown(self):
         # any per-teardown cleanup (close SpectrumWindow, etc.)
         if self.spec_win:
             self.spec_win.close()
             self.spec_win = None
         super().teardown()
-        if self.db.isOpen():
-            self.db.close()
+        
             
-    def get_collection_exemplars(self):
-        
+    def get_collection_exemplars(self, key: str | None = None):
         """
-        Read currently selected SampleIDs from self.collection_ids,
-        fetch (Name, XData, YData) from Spectra table, return a list of dicts:
-          {"label": "<Name or ID>", "x_nm": 1D float array (nm), "y": 1D float array}
+        Build exemplar spectra dict for a named collection.
+        Returns: dict[int, (label:str, x_nm:1D np.ndarray, y:1D np.ndarray)]
         """
-        
-        if not self.db.isOpen() or not self.collection_ids:
-            return []
-        
-        ids = list(self.collection_ids)
-        
-        # Map SampleID -> Name
+        if not self.db.isOpen():
+            return {}
+    
+        if key is None:
+            key = self._choose_existing_collection("Select collection for exemplars")
+        if not key:
+            return {}
+    
+        ids = list(self.collections.get(key, set()))
+        if not ids:
+            QMessageBox.information(self, "Empty Collection", f"No items in collection '{key}'.")
+            return {}
+    
+        # Map SampleID -> Name (same logic as before)
         id_to_name = {}
         q = QSqlQuery(self.db)
         placeholders = ",".join("?" for _ in ids)
-        
         q.prepare(f"SELECT SampleID, Name FROM {SAMPLE_TABLE_NAME} WHERE SampleID IN ({placeholders})")
         for v in ids: q.addBindValue(int(v))
         if q.exec_():
             while q.next():
                 id_to_name[int(q.value(0))] = str(q.value(1))
-                print('id_to_name', id_to_name)
     
-        exemplars = []
+        exemplars = {}
         q2 = QSqlQuery(self.db)
         q2.prepare(f"SELECT SampleID, {WAVELENGTH_BLOB_COL}, {REFLECTANCE_BLOB_COL} "
                    f"FROM {SPECTRA_TABLE_NAME} WHERE SampleID IN ({placeholders})")
         for v in ids: q2.addBindValue(int(v))
-    
         if not q2.exec_():
-            return []
+            return {}
     
         while q2.next():
             sid = int(q2.value(0))
@@ -882,14 +954,92 @@ class LibraryPage(BasePage):
                 continue
             x = np.frombuffer(bytes(x_bytes), dtype=BLOB_DTYPE)
             y = np.frombuffer(bytes(y_bytes), dtype=BLOB_DTYPE)
-            # Your DB stores µm; your viewer multiplies by 1000 for plotting → convert to nm here
             x_nm = (x * 1000.0).astype(np.float32)
+            exemplars[sid] = (id_to_name.get(sid, f"ID{sid}"), x_nm, y.astype(np.float32))
     
-            self.exemplars[sid] = (id_to_name.get(sid, f"ID{sid}"),   x_nm, y.astype(np.float32))      
+        # Option A: keep per-collection cache
+        if not hasattr(self, "exemplars_by_collection"):
+            self.exemplars_by_collection = {}
+        self.exemplars_by_collection[key] = exemplars
     
-        print(self.exemplars)
-        return self.exemplars
-        
+        return exemplars
+    
+    def _prompt_collection_name(self, title="Collection name", allow_new=True):
+        names = sorted(self.collections.keys())
+        if names and allow_new:
+            # Let user pick existing or type new
+            name, ok = QInputDialog.getItem(self, title, "Choose collection (or type a new name):",
+                                            names, 0, True)  # editable combo
+        else:
+            name, ok = QInputDialog.getText(self, title, "Enter collection name:")
+        if not ok or not name.strip():
+            return None
+        return name.strip()
+    
+    def _choose_existing_collection(self, title="Select collection"):
+        names = sorted(self.collections.keys())
+        if not names:
+            QMessageBox.information(self, "No collections", "Create a collection first via 'Add Selected → Collection'.")
+            return None
+        if len(names) == 1:
+            return names[0]
+        name, ok = QInputDialog.getItem(self, title, "Collections:", names, 0, False)
+        return name if ok else None
+
+    def filter_to_current_bands(self):
+        """
+        Build/refresh a special in-memory collection '__filtered__' containing SampleIDs
+        whose spectral XData fully covers the current_obj.bands range.
+        Applies the proxy filter to show only those rows.
+        """
+        # Guards
+        print(type(self.db))
+        if not self.db.isOpen():
+            QMessageBox.information(self, "No database", "Open a spectral library first.")
+            return
+        if self.current_obj is None or getattr(self.current_obj, "bands", None) is None:
+            QMessageBox.information(self, "No bands", "Load a processed box so current bands are known.")
+            return
+    
+        # target range: current_obj.bands is in nm → convert to µm to compare with XData
+        bands_nm = np.asarray(self.current_obj.bands, dtype=float)
+        if bands_nm.size == 0 or np.all(np.isnan(bands_nm)):
+            QMessageBox.information(self, "No bands", "Current bands are empty.")
+            return
+        target_min_um = float(np.nanmin(bands_nm)) / 1000.0
+        target_max_um = float(np.nanmax(bands_nm)) / 1000.0
+    
+        ok_ids = set()
+        q = QSqlQuery(self.db)
+        # We must scan XData blobs to get min/max per spectrum
+        if not q.exec_(f"SELECT SampleID, {WAVELENGTH_BLOB_COL} FROM {SPECTRA_TABLE_NAME}"):
+            QMessageBox.critical(self, "SQL Error", f"Failed to read spectra XData.\n{q.lastError().text()}")
+            return
+    
+        with busy_cursor("Filtering by bands…", self):
+            while q.next():
+                sid = int(q.value(0))
+                x_bytes = q.value(1)
+                if x_bytes is None:
+                    continue
+                try:
+                    x_um = np.frombuffer(bytes(x_bytes), dtype=BLOB_DTYPE)
+                except Exception:
+                    continue
+                if x_um.size == 0:
+                    continue
+    
+                # require complete overlap
+                if np.nanmin(x_um) <= target_min_um and np.nanmax(x_um) >= target_max_um:
+                    ok_ids.add(sid)
+    
+        self.collections["in range"] = ok_ids
+        self._refresh_collection_selector()
+        self._on_view_changed("in range")
+    
+        count = len(ok_ids)
+        rng = f"{np.nanmin(bands_nm):.1f}–{np.nanmax(bands_nm):.1f} nm"
+        QMessageBox.information(self, "Filtered", f"{count} spectra cover {rng}.")
 
 # --- Application Entry Point ---
 if __name__ == "__main__":

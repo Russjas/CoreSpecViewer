@@ -29,7 +29,6 @@ feature_keys = [
     '4670W', '4920W', '4000V_NARROWW', '4000shortW', '2950BW'
 ]
 
-# build one QAction per key
 
 class MainRibbonController(QMainWindow):
     """
@@ -41,7 +40,8 @@ class MainRibbonController(QMainWindow):
     """
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Core Scanning — Ribbon")
+        
+        self.setWindowTitle("CoreSpecViewer")
         self.resize(1400, 900)
 
         # --- Data shared across modes (filled as user works) ---

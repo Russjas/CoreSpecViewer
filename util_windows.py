@@ -7,7 +7,7 @@ Created on Tue Oct  7 12:11:50 2025
 
 
 import numpy as np
-from PyQt5.QtCore import Qt, QObject, pyqtSignal
+from PyQt5.QtCore import Qt, QObject, pyqtSignal, QSortFilterProxyModel
 from PyQt5.QtWidgets import (QApplication,
     QMainWindow, QWidget, QVBoxLayout, QTableWidget,
     QTableWidgetItem, QLineEdit, QDialog, QDialogButtonBox,
@@ -51,7 +51,34 @@ def post_dataset_ref(box: str, kind: str, path: str):
     
     BUS.dataset_discovered.emit({"box": box, "kind": kind, "path": path})
 
+class IdSetFilterProxy(QSortFilterProxyModel):
+    """
+    Show only rows whose SampleID (at id_col) is in allowed_ids.
+    If allowed_ids is None or empty, show all rows.
+    """
+    def __init__(self, id_col: int, allowed_ids: set = None, parent=None):
+        super().__init__(parent)
+        self._id_col = int(id_col)
+        self._allowed = set(allowed_ids) if allowed_ids else None
+        self.setDynamicSortFilter(True)
 
+    def set_allowed_ids(self, ids: set | None):
+        self._allowed = set(ids) if ids else None
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row, source_parent):
+        if not self._allowed:
+            return True
+        src = self.sourceModel()
+        if src is None:
+            return True
+        idx = src.index(source_row, self._id_col, source_parent)
+        val = src.data(idx, Qt.DisplayRole)
+        try:
+            sid = int(val)
+        except (TypeError, ValueError):
+            return False
+        return sid in self._allowed
 
 def two_choice_box(text, left_choice_text, right_choice_text):
     m = QMessageBox()
