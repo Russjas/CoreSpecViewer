@@ -1,0 +1,27 @@
+# Ignore generated or large media files
+gifs/
+*.gif
+
+# ignore environmemt file
+*.yml
+
+# Ignore Python build and environment files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+
+# Ignore virtual environment folders
+.env/
+venv/
+.venv/
+
+# Ignore IDE/project metadata
+.vscode/
+.idea/
+
+# Ignore OS junk files
+.DS_Store
+Thumbs.db
