@@ -5,6 +5,16 @@ It provides an integrated interface for **Specim Lumo** raw exports, **processed
 
 ---
 
+| Workflow Stage | Demonstration |
+|----------------|----------------|
+| **Open and process Specim Lumo data** | ![Open workflow](gifs/Open_workflow.gif) |
+| **Mask and unwrap core regions** | ![Mask to unwrap](gifs/Mask_to_unwrap.gif) |
+| **Feature extraction and visualization** | ![Visualise](gifs/Visualise.gif) |
+| **Spectral library browsing and exemplar selection** | ![Library use](gifs/Library_use.gif) |
+
+> Each GIF illustrates one major part of the CoreSpecViewer workflow: open → mask → analyse → compare.
+
+
 ## Overview
 
 This repository implements a complete desktop framework for hyperspectral core scanning workflows, combining:
