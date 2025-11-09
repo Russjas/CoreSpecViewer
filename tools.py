@@ -6,7 +6,7 @@ Created on Wed Oct 22 11:33:11 2025
 """
 from pathlib import Path
 import numpy as np
-from objects import ProcessedObject, RawObject
+from objects import ProcessedObject, RawObject, Dataset
 import spectral_functions as sf
 from PIL import Image
 
@@ -183,15 +183,74 @@ def run_feature_extraction(obj, key):
     obj.add_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
     
-
-
-
-
-
-
 def quick_corr(obj, x, y):
     res_y = sf.resample_spectrum(x, y, obj.bands)
     return np.ma.masked_array(sf.numpy_pearson(obj.savgol_cr, sf.cr(res_y)), mask = obj.mask)
+
+# --- Mineral map (winner-takes-all Pearson) -------------------------------
+def _colorize_indexed(class_idx: np.ndarray, labels: list[str]):
+    """Return RGB image (uint8) and a color table aligned to labels."""
+    import matplotlib
+    tab = matplotlib.colormaps['tab20']
+    K = max(int(class_idx.max()) + 1, len(labels))
+    colors = np.array([tab(i % 20)[:3] for i in range(K)], dtype=np.float32)
+    colors_rgb = (colors * 255).astype(np.uint8)  # (K,3)
+    rgb = colors_rgb[class_idx]                   # (H,W,3) uint8
+    return rgb, colors_rgb
+
+
+
+def wta_min_map(obj, exemplars, coll_name):
+    """
+    Compute a winner-takes-all Pearson class index and best-corr map.
+
+    Parameters
+    ----------
+    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    use_cr : bool
+        If True, continuum-removes each exemplar to match obj.savgol_cr.
+
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    coll_name = coll_name.replace('_', '')
+    key_prefix = f"MinMap{coll_name}"
+    data = obj.savgol_cr
+    bands_nm = obj.bands
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index = sf.numpy_pearson_stackexemplar_threshed(data, exemplar_stack)
+    
+    def _stage(key: str, ext: str, data):
+        ds = Dataset(
+            base=obj.basename,
+            key=key,
+            path=str(obj.root_dir) + '/' +  f"{str(obj.basename)}_{key}{ext}",
+            suffix=key,
+            ext=ext,
+            data=data
+        )
+        obj.temp_datasets[key] = ds
+        return key
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+    legend_key = f"{key_prefix}LEGEND"
+    idx_key   = _stage(f"{key_prefix}INDEX",  ".npy",  index.astype(np.int16))
+    legend_key = _stage(f"{key_prefix}LEGEND",  ".json",  legend)
+    
+    return obj
+
 
      
     

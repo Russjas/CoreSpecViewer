@@ -308,7 +308,7 @@ class MainRibbonController(QMainWindow):
         or not self.current_obj.metadata.get('core depth start')
         or not self.current_obj.metadata.get('core depth stop')
         ):
-            dlg = MetadataDialog(self.raw.metadata, parent=self)
+            dlg = MetadataDialog(self.current_obj.metadata, parent=self)
             if dlg.exec() == QDialog.Accepted:
                 result = dlg.get_result()
                 self.current_obj.metadata['borehole id'] = result['hole']
@@ -404,12 +404,15 @@ class MainRibbonController(QMainWindow):
         
         
     def act_vis_correlation(self, kind: str):
-        if not self.po:
+        if self.current_obj.is_raw:
             QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
             return
-        p = self._active_page()
-        # TODO: run correlation → show in right_canvas, update table
-        QMessageBox.information(self, "Correlation", f"Ran correlation: {kind}")
+        exemplars, coll_name = self.lib_page.get_collection_exemplars()
+        with busy_cursor('correlation...', self):
+            self.current_obj = t.wta_min_map(self.current_obj, exemplars, coll_name)
+        
+        self.set_current_conditions()
+        self.update_display()
 
     
 

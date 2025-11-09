@@ -383,11 +383,7 @@ class ProcessedObject:
 
     def has(self, key: str):
         """Return True if the dataset key exists (with valid ndarray data)."""
-        if key in self.temp_datasets and isinstance(self.temp_datasets[key].data, np.ndarray):
-             return key in self.datasets
-        if key in self.datasets and isinstance(self.datasets[key].data, np.ndarray):
-            return key in self.datasets
-        return key in self.datasets
+        return (key in self.temp_datasets) or (key in self.datasets)
 
     def has_temp(self, key):
         """Check if a temporary dataset exists for the specified key."""
@@ -395,6 +391,8 @@ class ProcessedObject:
 
     def __getitem__(self, key):
         """Return the Dataset object for the given key."""
+        if key in self.temp_datasets:
+            return self.temp_datasets[key]
         return self.datasets[key]
 
     def get_data(self, key: str):

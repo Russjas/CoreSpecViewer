@@ -23,8 +23,7 @@ from util_windows import (SpectralImageCanvas, ImageCanvas2D,
                           IdSetFilterProxy)
 from tool_dispatcher import ToolDispatcher
 import tools as t
-# Optional: your data classes (kept as forward references – pass instances from the controller)
-# from objects import RawObject, ProcessedObject
+
 
 
 class BasePage(QWidget):
@@ -99,13 +98,9 @@ class BasePage(QWidget):
         wrapper.closed.connect(self.remove_widget) 
         
         # Add the wrapper to the splitter
-        # Note: We do *not* set self._right or self._third here, as this is a secondary view
+        
         self._splitter.addWidget(wrapper)
         
-        # Optional: Set the initial size policy for the new widget
-        # wrapper.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        
-        # Return the wrapper for external reference, if needed
         return wrapper
         
 
@@ -198,6 +193,7 @@ class VisualisePage(BasePage):
         
         self._mpl_cids = []  # store mpl connection ids if you add them
         self._sync_lock = False
+        
     def activate(self):
         super().activate()
         
@@ -233,6 +229,7 @@ class VisualisePage(BasePage):
             self.dispatcher.set_right_click(_right_click, temporary=False)
             
             self._set_cache()
+            
     def teardown(self):
         super().teardown()
         # Disconnect any mpl events you added in activate()
@@ -243,10 +240,33 @@ class VisualisePage(BasePage):
                 except Exception:
                     pass
             self._mpl_cids.clear()
-    
-    def update(self, key = 'mask'):
+
+        
+    def update(self, key=None):
         self.left_canvas.show_rgb(self.current_obj.savgol, self.current_obj.bands)
+        
+        
+    
+        # Mineral map branch
+        if key.endswith("INDEX"):
+            legend_key = key[:-5] + "LEGEND"  # replace 'INDEX' with 'LEGEND'
+            index = self.current_obj.get_data(key)
+            legend = None
+            # robust legend fetch: prefer temp, else permanent
+            if self.current_obj.has(legend_key):
+                legend = self.current_obj[legend_key].data
+    
+            if index is not None and getattr(index, "ndim", 0) == 2 and legend:
+                self.right_canvas._show_index_with_legend(index, legend)
+                return
+    
+        # Fallback for everything else
         self.right_canvas.show_rgb(self.current_obj.get_data(key))
+        
+     
+    
+    
+    
     
     def _on_row_activated(self, row: int, col: int):
         """
@@ -263,13 +283,7 @@ class VisualisePage(BasePage):
         if not key:
             return
     
-        # Defensive: show whatever the dataset is (2D, RGB, or false-colour from 3D+)
-        try:
-            data = self.current_obj.get_data(key)
-        except Exception:
-            return
-
-        self.right_canvas.show_rgb(data)
+        self.update(key=key)
         
     def add_to_cache(self, key: str):
         if not key:
@@ -963,7 +977,7 @@ class LibraryPage(BasePage):
             self.exemplars_by_collection = {}
         self.exemplars_by_collection[key] = exemplars
     
-        return exemplars
+        return exemplars, key
     
     def _prompt_collection_name(self, title="Collection name", allow_new=True):
         names = sorted(self.collections.keys())

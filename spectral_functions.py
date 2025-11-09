@@ -1136,10 +1136,25 @@ def detect_slice_rectangles_robust(
     crop_slice = (slice(y, y + h), slice(x, x + w))
     return image[crop_slice], crop_slice
     
+ 
+@jit(nopython=True)
+def numpy_pearson_stackexemplar_threshed(data, exemplar_stack):
+    num = exemplar_stack.shape[0]
+    coeffs = np.zeros((data.shape[0], data.shape[1]))
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            c_list = np.zeros((num))
+            for n in range(num):
+                c_list[n] = np.corrcoef(data[i,j], exemplar_stack[n])[1,0]
+            if np.max(c_list) > 0.7:
+                coeffs[i,j] = np.argmax(c_list)
+            else:
+                coeffs[i,j] = -999
+    return coeffs
     
-    
-    
-    
+
+def pearsons_vectorised(data, exemplar_stack):
+    pass
     
     
     
