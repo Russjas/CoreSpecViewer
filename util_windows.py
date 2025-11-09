@@ -18,7 +18,9 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationTool
 from matplotlib.figure import Figure
 from matplotlib.widgets import RectangleSelector
+from matplotlib.patches import Patch
 import matplotlib
+
 my_map = matplotlib.colormaps['viridis']
 my_map.set_bad('black')
 
@@ -165,6 +167,7 @@ class ImageCanvas2D(QWidget):
             self.ax.imshow(rgb, cmap=my_map, origin="upper", vmin = np.min(rgb), vmax = np.max(rgb))
         
         elif len(shp) == 3 and shp[2] == 3:
+            rgb = image
             self.ax.clear()
             self.ax.imshow(rgb, origin="upper")
         
@@ -187,6 +190,93 @@ class ImageCanvas2D(QWidget):
         self.show()
         return self
 
+    def _show_index_with_legend(self, index_2d: np.ndarray, legend: list[dict]):
+        """
+        Render an indexed mineral map with a discrete legend.
+    
+        legend items contain ONLY:
+            {"index": int, "label": str}
+        Colors are generated deterministically from matplotlib's tab20.
+        """
+        if index_2d.ndim != 2:
+            raise ValueError("index_2d must be a 2-D integer array of class indices.")
+    
+        H, W = index_2d.shape
+        if H == 0 or W == 0:
+            self.ax.clear(); self.ax.set_axis_off(); self.canvas.draw(); return
+    
+        # ---- normalize legend (index->label), dedup by index (last wins)
+        idx_to_label = {}
+        for row in legend or []:
+            try:
+                idx = int(row.get("index"))
+                lab = str(row.get("label", f"class {idx}"))
+                idx_to_label[idx] = lab
+            except Exception:
+                continue
+    
+        # ---- decide K from actual indices present (ignore negatives)
+        present = np.unique(index_2d[index_2d >= 0])
+        if present.size == 0:
+            self.ax.clear(); self.ax.set_axis_off(); self.canvas.draw(); return
+        max_idx = int(present.max())
+        K = max_idx + 1
+    
+        # ---- build labels array for 0..K-1 (fallback to "class i" if missing)
+        labels = [idx_to_label.get(i, f"class {i}") for i in range(K)]
+    
+        # ---- deterministic colors from tab20
+        cmap = matplotlib.colormaps.get("tab20") or matplotlib.colormaps["tab10"]
+        colors_rgb = (np.array([cmap(i % 20)[:3] for i in range(K)]) * 255).astype(np.uint8)  # (K,3)
+    
+        # ---- make RGB image; treat negatives as transparent-ish background
+        idx_img = index_2d.copy()
+        neg_mask = idx_img < 0
+        idx_img = np.clip(idx_img, 0, K - 1)
+        rgb = colors_rgb[idx_img]
+        if neg_mask.any():
+            # paint negatives light gray (or leave as-is if you prefer)
+            rgb[neg_mask] = np.array([220, 220, 220], dtype=np.uint8)
+    
+        # ---- draw
+        self.ax.clear()
+        self.ax.imshow(rgb, origin="upper")
+        self.ax.set_axis_off()
+    
+        # ---- legend includes only classes actually present (>=0) in the image
+        present = np.unique(idx_img[~neg_mask])
+        handles = [Patch(facecolor=(colors_rgb[i]/255.0), edgecolor='k', label=labels[i])
+                   for i in present.tolist()]
+        if handles:
+            
+    
+        
+            # make space on the right
+            self.canvas.figure.subplots_adjust(right=0.80)  # ~20% for legend
+            leg = self.ax.legend(
+                handles=handles,
+                loc="upper left",
+                bbox_to_anchor=(1.01, 1.00),
+                borderaxespad=0.0,
+                frameon=True,
+                framealpha=0.9,
+                fontsize=9,
+                handlelength=1.8,
+                handletextpad=0.6,
+            )
+        
+    
+        if leg:
+            leg.set_title("Mineral", prop={"size": 9})
+            leg.set_draggable(True)  # users can move it if they want
+    
+        self.canvas.draw_idle()
+    
+    
+    
+    
+    
+        self.canvas.draw()
 
 class SpectralImageCanvas(QWidget):
     def __init__(self, parent=None):
