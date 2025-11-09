@@ -235,7 +235,7 @@ class MainRibbonController(QMainWindow):
                 self.set_current_conditions()
                 self.update_display()
             finally:
-                p.dispatcher.clear()
+                p.dispatcher.clear_all_temp()
         p.dispatcher.set_rect(_on_rect)
         p.left_canvas.start_rect_select()
 
@@ -345,7 +345,7 @@ class MainRibbonController(QMainWindow):
                 self.set_current_conditions()
                 self.update_display()
             finally:
-                p.dispatcher.clear()
+                p.dispatcher.clear_all_temp()
         p.dispatcher.set_rect(_on_rect)
         p.left_canvas.start_rect_select()
 
@@ -364,7 +364,7 @@ class MainRibbonController(QMainWindow):
                 self.set_current_conditions()
                 self.update_display()
             finally:
-                p.dispatcher.clear()
+                p.dispatcher.clear_all_temp()
         p.dispatcher.set_single_click(handle_point_click)
         
         
@@ -392,7 +392,7 @@ class MainRibbonController(QMainWindow):
         with busy_cursor('unwrapping...', self):
             self.current_obj = t.unwrapped_output(self.current_obj)
         self.set_current_conditions()
-        self.update_display()
+        self.update_display(key='DholeAverage')
 
     # -------- VISUALISE actions --------
     def run_feature_extraction(self, key):

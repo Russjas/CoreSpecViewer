@@ -230,7 +230,7 @@ class VisualisePage(BasePage):
                     self.spec_win = SpectrumWindow(self)
                 title = "CR Spectrum Viewer"
                 self.spec_win.plot_spectrum(self.current_obj.bands, spec, title=title)
-            self.dispatcher.set_right_click(_right_click)
+            self.dispatcher.set_right_click(_right_click, temporary=False)
             
             self._set_cache()
     def teardown(self):
@@ -270,6 +270,7 @@ class VisualisePage(BasePage):
             return
 
         self.right_canvas.show_rgb(data)
+        
     def add_to_cache(self, key: str):
         if not key:
             return

@@ -228,7 +228,7 @@ class SpectralImageCanvas(QWidget):
 
     # -------- Double-click → spectrum (per-canvas window) --------
     def on_image_click(self, event):
-        print('fired')
+        
         if event.inaxes is not self.ax or event.xdata is None or event.ydata is None:
             return
         if getattr(self.toolbar, "mode", "") or self.rect_selector is not None:

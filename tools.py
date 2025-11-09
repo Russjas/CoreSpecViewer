@@ -30,7 +30,7 @@ def load(path):
 
 
 def crop(obj, y_min, y_max, x_min, x_max):
-    print('OBJECT TYPE', type(obj))
+    
     """
     Generic, window-agnostic spatial crop.
 
