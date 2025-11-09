@@ -145,7 +145,7 @@ class MainRibbonController(QMainWindow):
         self.ribbon.add_tab('Visualise', [
             
             ("menu",   "Correlation", [
-                ("Pearson (template)", lambda: self.act_vis_correlation("pearson")),
+                ("MineralMap (Winner-takes-all)", lambda: self.act_vis_correlation("pearson")),
                 ("Other…",            lambda: self.act_vis_correlation("other")),
             ]),
             ("menu",   "Features", self.extract_feature_list),
