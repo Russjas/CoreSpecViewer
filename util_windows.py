@@ -244,9 +244,35 @@ class ImageCanvas2D(QWidget):
         self.ax.set_axis_off()
     
         # ---- legend includes only classes actually present (>=0) in the image
-        present = np.unique(idx_img[~neg_mask])
-        handles = [Patch(facecolor=(colors_rgb[i]/255.0), edgecolor='k', label=labels[i])
-                   for i in present.tolist()]
+        valid = ~neg_mask
+        present = np.unique(idx_img[valid])
+        if present.size > 0:
+            # counts per index across the displayed image
+            counts = np.bincount(idx_img[valid].ravel(), minlength=K)
+            # sort present indices by count desc (stable tie-break on index asc)
+            present_sorted = sorted(present.tolist(), key=lambda i: (-int(counts[i]), int(i)))
+
+            total = int(valid.sum())
+            def _pct(i):  # percentage as 0–100 with 1 decimal
+                return (counts[i] / total * 100.0) if total > 0 else 0.0
+
+            handles = [
+                Patch(
+                    facecolor=(colors_rgb[i] / 255.0),
+                    edgecolor='k',
+                    label=f"{labels[i]} — {int(counts[i])} px ({_pct(i):.1f}%)"
+                )
+                for i in present_sorted
+            ]
+        else:
+            handles = []
+        
+        
+        
+        
+        #present = np.unique(idx_img[~neg_mask])
+        #handles = [Patch(facecolor=(colors_rgb[i]/255.0), edgecolor='k', label=labels[i])
+        #           for i in present.tolist()]
         if handles:
             
     

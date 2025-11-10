@@ -145,7 +145,8 @@ class MainRibbonController(QMainWindow):
         self.ribbon.add_tab('Visualise', [
             
             ("menu",   "Correlation", [
-                ("MineralMap (Winner-takes-all)", lambda: self.act_vis_correlation("pearson")),
+                ("MineralMap (numpy)", lambda: self.act_vis_correlation("numpy")),
+                ("MineralMap (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors")),
                 ("Other…",            lambda: self.act_vis_correlation("other")),
             ]),
             ("menu",   "Features", self.extract_feature_list),
@@ -409,7 +410,7 @@ class MainRibbonController(QMainWindow):
             return
         exemplars, coll_name = self.lib_page.get_collection_exemplars()
         with busy_cursor('correlation...', self):
-            self.current_obj = t.wta_min_map(self.current_obj, exemplars, coll_name)
+            self.current_obj = t.wta_min_map(self.current_obj, exemplars, coll_name, kind)
         
         self.set_current_conditions()
         self.update_display()

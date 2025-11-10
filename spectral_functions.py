@@ -1141,6 +1141,7 @@ def detect_slice_rectangles_robust(
 def numpy_pearson_stackexemplar_threshed(data, exemplar_stack):
     num = exemplar_stack.shape[0]
     coeffs = np.zeros((data.shape[0], data.shape[1]))
+    confidence = np.zeros((data.shape[0], data.shape[1]))
     for i in range(data.shape[0]):
         for j in range(data.shape[1]):
             c_list = np.zeros((num))
@@ -1148,17 +1149,146 @@ def numpy_pearson_stackexemplar_threshed(data, exemplar_stack):
                 c_list[n] = np.corrcoef(data[i,j], exemplar_stack[n])[1,0]
             if np.max(c_list) > 0.7:
                 coeffs[i,j] = np.argmax(c_list)
+                confidence[i,j] = np.max(c_list)
+                
             else:
                 coeffs[i,j] = -999
-    return coeffs
+                confidence[i,j] = np.max(c_list)
+    return coeffs, confidence
     
 
-def pearsons_vectorised(data, exemplar_stack):
-    pass
-    
-    
-    
-    
+# =============================================================================
+# #TODO decide on which
+# def mineral_map_wta(data, exemplar_stack):
+#     """
+#     this is the GPT version for me to test
+#     Compute a winner-takes-all Pearson class index and best-corr map.
+# 
+#     Parameters
+#     ----------
+#     obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+#     exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+#         Usually from LibraryPage.get_collection_exemplars().
+#     use_cr : bool
+#         If True, continuum-removes each exemplar to match obj.savgol_cr.
+# 
+#     Returns
+#     -------
+#     class_idx : (H,W) int32
+#     best_corr : (H,W) float32
+#     labels    : list[str]
+#     """
+#     H, W, B = data.shape
+# 
+#     # z-score bank and pixels (Pearson via dot-product)
+#     bank = exemplar_stack - exemplar_stack.mean(axis=1, keepdims=True)
+#     bank /= np.maximum(bank.std(axis=1, keepdims=True), 1e-8)
+# 
+#     X = data.reshape(-1, B).astype(np.float32)
+#     X -= X.mean(axis=1, keepdims=True)
+#     X /= np.maximum(X.std(axis=1, keepdims=True), 1e-8)
+# 
+#     corr = X @ bank.T                  # (N,K)
+#     corr = corr.reshape(H, W, -1)
+# 
+#     class_idx = np.argmax(corr, axis=2).astype(np.int32)
+#     best_corr = np.take_along_axis(corr, class_idx[..., None], axis=2)[..., 0].astype(np.float32)
+#     return class_idx, best_corr
+# 
+# =============================================================================
+def mineral_map_wta(data, exemplar_stack, thresh=0.70, invalid_value=-999):
+    """
+    Vectorized winner-takes-all Pearson to match np.corrcoef semantics.
+
+    data:            (H, W, B) float
+    exemplar_stack:  (K, B)    float
+    Returns:
+        class_idx: (H, W) int32  (=-999 for low confidence)
+        best_corr: (H, W) float32  Pearson r in [-1, 1]
+    """
+    H, W, B = data.shape
+    K = exemplar_stack.shape[0]
+
+    # --- z-score with sample std (ddof=1) to match np.corrcoef
+    # data -> (N, B)
+    X = data.reshape(-1, B).astype(np.float32)
+    X_mean = X.mean(axis=1, keepdims=True)
+    X_std  = X.std(axis=1, ddof=1, keepdims=True)
+    X_std  = np.where(X_std < 1e-12, 1e-12, X_std)
+    Xz = (X - X_mean) / X_std                              # (N, B)
+
+    # exemplars -> (K, B)
+    E = exemplar_stack.astype(np.float32)
+    E_mean = E.mean(axis=1, keepdims=True)
+    E_std  = E.std(axis=1, ddof=1, keepdims=True)
+    E_std  = np.where(E_std < 1e-12, 1e-12, E_std)
+    Ez = (E - E_mean) / E_std                              # (K, B)
+
+    # --- Pearson matrix: divide by (B-1) to match corrcoef scaling
+    corr = (Xz @ Ez.T) / max(B - 1, 1)                    # (N, K), in [-1, 1]
+    best_corr = corr.max(axis=1)
+    idx = corr.argmax(axis=1).astype(np.int32)
+
+    # --- apply threshold like your nested loops
+    idx = np.where(best_corr >= thresh, idx, invalid_value).astype(np.int32)
+
+    return idx.reshape(H, W), best_corr.reshape(H, W).astype(np.float32)
+
+def mineral_map_wta_strict(data, exemplar_stack, thresh=0.70, invalid_value=-999):
+    """
+    Vectorized WTA Pearson that replicates np.corrcoef semantics:
+      - float64 math
+      - sample std (ddof=1)
+      - divide by (B-1)
+      - produces NaN where corrcoef would (zero-variance vectors)
+      - applies threshold like the loop: <= thresh -> -999
+    Returns (class_idx: int32 (H,W), best_corr: float32 (H,W))
+    """
+    H, W, B = data.shape
+    K = exemplar_stack.shape[0]
+
+    X = data.reshape(-1, B).astype(np.float64)   # (N,B)
+    E = exemplar_stack.astype(np.float64)        # (K,B)
+
+    # Means & sample std (ddof=1)
+    X_mean = X.mean(axis=1, keepdims=True)
+    E_mean = E.mean(axis=1, keepdims=True)
+    X_std  = X.std(axis=1, ddof=1, keepdims=True)
+    E_std  = E.std(axis=1, ddof=1, keepdims=True)
+
+    # Zero-variance masks (these produce NaN in corrcoef)
+    X_zero = (X_std == 0)                         # (N,1)
+    E_zero = (E_std == 0)                         # (K,1)
+
+    # z-scores; where std==0, leave as 0 then we will set NaNs via masks later
+    Xz = (X - X_mean) / np.where(X_std == 0, 1, X_std)
+    Ez = (E - E_mean) / np.where(E_std == 0, 1, E_std)
+
+    # Pearson matrix with (B-1) divisor to match corrcoef scaling
+    corr = (Xz @ Ez.T) / max(B - 1, 1)           # (N,K) float64
+
+    # Inject NaNs where corrcoef would be NaN (zero variance in either vector)
+    if X_zero.any():
+        corr[X_zero[:, 0], :] = np.nan
+    if E_zero.any():
+        corr[:, E_zero[:, 0]] = np.nan
+
+    # Best corr and argmax with NaN-aware handling
+    best_corr = np.nanmax(corr, axis=1)          # (N,)
+    # For rows that are all-NaN, nanargmax would error; handle explicitly
+    all_nan = np.isnan(best_corr)
+    idx = np.empty_like(best_corr, dtype=np.int32)
+    if (~all_nan).any():
+        idx[~all_nan] = np.nanargmax(corr[~all_nan], axis=1).astype(np.int32)
+    if all_nan.any():
+        idx[all_nan] = invalid_value
+
+    # Apply threshold exactly like the loop (> 0.70 keeps, else -999)
+    keep = best_corr > float(thresh)
+    idx = np.where(keep, idx, invalid_value).astype(np.int32)
+
+    return idx.reshape(H, W), best_corr.reshape(H, W).astype(np.float32)   
+
     
     
     

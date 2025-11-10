@@ -26,3 +26,10 @@ venv/
 .DS_Store
 Thumbs.db
 *.pyc
+__pycache__/objects.cpython-311.pyc
+__pycache__/pages.cpython-311.pyc
+__pycache__/spectral_functions.cpython-311.pyc
+__pycache__/tool_dispatcher.cpython-311.pyc
+__pycache__/tools.cpython-311.pyc
+__pycache__/util_windows.cpython-311.pyc
+*.pyc

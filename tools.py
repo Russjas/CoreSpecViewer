@@ -200,7 +200,7 @@ def _colorize_indexed(class_idx: np.ndarray, labels: list[str]):
 
 
 
-def wta_min_map(obj, exemplars, coll_name):
+def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     """
     Compute a winner-takes-all Pearson class index and best-corr map.
 
@@ -231,7 +231,10 @@ def wta_min_map(obj, exemplars, coll_name):
     if not bank:
         raise ValueError("No exemplars provided.")
     exemplar_stack = np.vstack(bank)
-    index = sf.numpy_pearson_stackexemplar_threshed(data, exemplar_stack)
+    if mode == 'numpy':
+        index, confidence = sf.numpy_pearson_stackexemplar_threshed(data, exemplar_stack)
+    else:
+        index, confidence = sf.mineral_map_wta_strict(data, exemplar_stack)
     
     def _stage(key: str, ext: str, data):
         ds = Dataset(
@@ -245,15 +248,16 @@ def wta_min_map(obj, exemplars, coll_name):
         obj.temp_datasets[key] = ds
         return key
     legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
-    legend_key = f"{key_prefix}LEGEND"
-    idx_key   = _stage(f"{key_prefix}INDEX",  ".npy",  index.astype(np.int16))
-    legend_key = _stage(f"{key_prefix}LEGEND",  ".json",  legend)
+    
+    idx_key   = _stage(f"{key_prefix}{mode}INDEX",  ".npy",  index.astype(np.int16))
+    legend_key = _stage(f"{key_prefix}{mode}LEGEND",  ".json",  legend)
+    confidence_key = _stage(f'{key_prefix}{mode}CONF', '.npy', confidence)
     
     return obj
 
 
-     
-    
+
+   
 
 
 
