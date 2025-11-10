@@ -240,6 +240,9 @@ class VisualisePage(BasePage):
                 except Exception:
                     pass
             self._mpl_cids.clear()
+        self.cache.clear()
+        self.table.setRowCount(0)
+        self.table.setHorizontalHeaderItem(0, QTableWidgetItem("Cached Products"))
 
         
     def update(self, key=None):
@@ -918,6 +921,7 @@ class LibraryPage(BasePage):
             if self.db.isOpen():
                 self.db.close()
             QSqlDatabase.removeDatabase(conn_name)
+            
     def teardown(self):
         # any per-teardown cleanup (close SpectrumWindow, etc.)
         if self.spec_win:

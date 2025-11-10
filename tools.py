@@ -64,12 +64,13 @@ def crop(obj, y_min, y_max, x_min, x_max):
 
             if isinstance(src, np.ndarray) and src.ndim > 1:
                 cropped = src[y_min:y_max, x_min:x_max, ...]
+                cropped_copy = np.array(cropped)
                 if obj.has_temp(key):
                     # keep the same wrapper; just update data
-                    obj.temp_datasets[key].data = cropped
+                    obj.temp_datasets[key].data = cropped_copy
                 else:
                     # first temp for this key
-                    obj.add_temp_dataset(key, cropped)
+                    obj.add_temp_dataset(key, cropped_copy)
         return obj
 
     else:
@@ -105,12 +106,13 @@ def crop_auto(obj):
 
             if isinstance(src, np.ndarray) and src.ndim > 1:
                 cropped = src[slicer]
+                cropped_copy = np.array(cropped)
                 if obj.has_temp(key):
                     # keep the same wrapper; just update data
-                    obj.temp_datasets[key].data = cropped
+                    obj.temp_datasets[key].data = cropped_copy
                 else:
                     # first temp for this key
-                    obj.add_temp_dataset(key, cropped)
+                    obj.add_temp_dataset(key, cropped_copy)
         return obj
 
 
@@ -215,7 +217,7 @@ def unwrapped_output(obj):
     return obj
 
 def run_feature_extraction(obj, key): 
-    pos, dep, feat_mask = sf.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key)
+    pos, dep, feat_mask = sf.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'QUAD')
     obj.add_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
     obj.add_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
@@ -292,7 +294,30 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     
     return obj
 
-
+def kmeans_caller(obj, clusters = 5, iters = 50):
+    H,W,B = obj.savgol.shape
+    data = obj.savgol_cr
+    mask = obj.mask.astype(bool)
+    valid_mask = ~mask
+    valid_mask &= np.isfinite(data).all(axis=2)
+    valid_mask &= ~np.isnan(data).any(axis=2)
+    # 2) flatten & extract valid pixels
+    flat = data.reshape(-1, B)
+    vm = valid_mask.ravel()
+    idx = np.nonzero(vm)[0]
+    X = flat[idx]  
+    #spectral demands 3d array
+    X_3d = X.reshape(-1, 1, B)
+    img, classes = sf.kmeans_spectral_wrapper(X_3d, clusters, iters)
+    img = np.squeeze(img)  # (N_valid,)
+    # 4) rebuild labels to (H, W)
+    labels_full = np.full(flat.shape[0], -1, dtype=int)
+    labels_full[idx] = img
+    clustered_map = labels_full.reshape(H, W)
+    
+    obj.add_dataset(f'kmeans-{clusters}-{iters}INDEX', clustered_map, '.npy')
+    obj.add_dataset(f'kmeans-{clusters}-{iters}CLUSTERS', classes, '.npy')
+    return obj
 
    
 

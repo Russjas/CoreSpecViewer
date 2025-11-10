@@ -144,7 +144,7 @@ class MainRibbonController(QMainWindow):
         
         
         self.ribbon.add_tab('Visualise', [
-            
+            ("button", "Quick Cluster", self.act_kmeans),
             ("menu",   "Correlation", [
                 ("MineralMap (numpy)", lambda: self.act_vis_correlation("numpy")),
                 ("MineralMap (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors")),
@@ -242,9 +242,6 @@ class MainRibbonController(QMainWindow):
         p.left_canvas.start_rect_select()
 
     def automatic_crop(self):
-        if not self.current_obj.is_raw:
-            QMessageBox.information(self, "Auto crop", "Auto crop only works on raw data (for now)")
-            return
         with busy_cursor('cropping...', self):
             self.current_obj = t.crop_auto(self.current_obj)
         self.set_current_conditions()
@@ -430,7 +427,38 @@ class MainRibbonController(QMainWindow):
         self.set_current_conditions()
         self.update_display()
 
-    
+    def act_kmeans(self):
+        # Prompt for clusters
+        clusters, ok1 = QInputDialog.getInt(
+            self,
+            "KMeans Clustering",
+            "Enter number of clusters:",
+            value=5,          # default
+            min=1,
+            max=50
+        )
+        
+        # If cancelled, abort
+        if not ok1:
+            return
+        # Prompt for iterations
+        iters, ok2 = QInputDialog.getInt(
+            self,
+            "KMeans Clustering",
+            "Enter number of iterations:",
+            value=50,         # default
+            min=1,
+            max=1000
+        )
+        
+        if not ok2:
+            return
+        
+        with busy_cursor('unwrapping...', self):
+            self.current_obj = t.kmeans_caller(self.current_obj)
+        self.set_current_conditions()
+        
+        self.update_display(key=f'kmeans-{clusters}-{iters}INDEX')
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -1290,8 +1290,10 @@ def mineral_map_wta_strict(data, exemplar_stack, thresh=0.70, invalid_value=-999
     return idx.reshape(H, W), best_corr.reshape(H, W).astype(np.float32)   
 
     
-    
-    
+def kmeans_spectral_wrapper(data, clusters, iters):
+    m, c = sp.kmeans(data, clusters, iters)
+    return m, c
+
     
     
     

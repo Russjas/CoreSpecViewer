@@ -88,6 +88,7 @@ class Dataset:
     suffix: str
     ext: str
     data: object = None
+    _memmap_ref: Union[np.memmap, None] = field(default=None, compare=False)
     def __post_init__(self):
         """Normalize the path and automatically load data if the file exists."""
         self.path = Path(self.path)
@@ -98,6 +99,15 @@ class Dataset:
         if self.path.is_file() and self.data is None:
             self.load_dataset()
 
+    def close_handle(self) -> None:
+        """
+        Explicitly close any outstanding memmap file handle to release the OS lock.
+        Attempt to fix an annoying save bug
+        """
+        if self._memmap_ref is not None:
+            
+            self._memmap_ref.close()
+            self._memmap_ref = None
 
     def load_dataset(self):
         """
@@ -113,7 +123,11 @@ class Dataset:
 
         if self.ext == '.npy':
             # memmap keeps memory footprint low; disable pickle for safety
-            self.data = np.load(self.path, mmap_mode='r', allow_pickle=False)
+            data = np.load(self.path, mmap_mode='r', allow_pickle=False)
+            # store a reference to the memmap to explicitly close later
+            if isinstance(self.data, np.memmap):
+                self._memmap_ref = data
+            self.data = data
 
         # JSON: read text then parse (your original line had args in the wrong order)
         elif self.ext == '.json':
@@ -160,6 +174,7 @@ class Dataset:
         
         
         elif self.ext == '.npy':
+            self.close_handle()
             if isinstance(self.data, np.memmap):
                 if not new:
                     return
