@@ -257,7 +257,7 @@ class VisualisePage(BasePage):
                 legend = self.current_obj[legend_key].data
     
             if index is not None and getattr(index, "ndim", 0) == 2 and legend:
-                self.right_canvas._show_index_with_legend(index, legend)
+                self.right_canvas._show_index_with_legend(index, self.current_obj.mask, legend)
                 return
     
         # Fallback for everything else

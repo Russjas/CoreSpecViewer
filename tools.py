@@ -9,6 +9,7 @@ import numpy as np
 from objects import ProcessedObject, RawObject, Dataset
 import spectral_functions as sf
 from PIL import Image
+from matplotlib.path import Path as mpl_path
 
 def load(path):
     """
@@ -149,6 +150,42 @@ def mask_point(obj, mode, y, x):
             obj.add_temp_dataset('mask')
         obj.mask[:, x] = 1
         return obj
+
+def mask_polygon(obj, vertices_rc):
+    """
+    Given polygon vertices in (row, col) image indices, set outside to 1 (masked).
+    Creates/updates a temp 'mask' dataset.
+
+    - If no mask exists, starts from zeros.
+    - Keeps interior as-is (commonly 0), sets outside to 1.
+    """
+    if obj.is_raw:
+        H, W = obj.get_display_reflectance().shape[:2]
+    else:
+        H, W = obj.savgol.shape[:2]
+
+    # ensure temp mask exists (0=keep, 1=masked)
+    if not obj.has_temp('mask'):
+        z = np.zeros((H, W), dtype=np.uint8)
+        obj.add_temp_dataset('mask', data=z)
+
+    poly = np.asarray(vertices_rc, dtype=float)
+    if poly.ndim != 2 or poly.shape[1] != 2 or poly.shape[0] < 3:
+        return obj  # ignore bad polygons
+
+    rr = np.arange(H)
+    cc = np.arange(W)
+    grid_c, grid_r = np.meshgrid(cc, rr)           # (H,W)
+    pts = np.column_stack([grid_c.ravel(), grid_r.ravel()])  # (H*W,2) in (x=col, y=row)
+    inside = mpl_path(poly[:, ::-1]).contains_points(pts)        # flip to (x,y)
+    inside = inside.reshape(H, W)
+
+    # outside = ~inside  -> set to 1
+    m = obj.mask if obj.has_temp('mask') else obj.datasets['mask'].data
+    m[~inside] = 1
+
+    return obj
+
 
 def improve_mask(obj):
     if not obj.has_temp('mask'):

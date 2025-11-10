@@ -125,6 +125,7 @@ class MainRibbonController(QMainWindow):
             ("button", "Enhance mask", lambda: self.act_mask_point('enhance')),
             ("button", "Mask line", lambda: self.act_mask_point('line')),
             ("button", "Mask region", self.act_mask_rect),
+            ("button", "Freehand mask region", self.act_mask_polygon),
             ("button", "Improve", self.act_mask_improve),
             
             ("button", "Calc stats", self.act_mask_calc_stats),
@@ -293,7 +294,7 @@ class MainRibbonController(QMainWindow):
         self.current_obj.update_root_dir(dest)  # rewires every dataset path to the chosen folder
         try:
             with busy_cursor('saving...', self):
-                self.current_obj.save_all()
+                self.current_obj.save_all(new=True)
         except Exception as e:
             QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
             return
@@ -374,6 +375,20 @@ class MainRibbonController(QMainWindow):
         self.set_current_conditions()
         self.update_display()
        
+    def act_mask_polygon(self):
+        p = self._active_page()
+        if not p or not p.dispatcher or self.current_obj is None:
+            return
+    
+        def _on_finish(vertices_rc):
+            
+            self.current_obj = t.mask_polygon(self.current_obj, vertices_rc)
+            self.set_current_conditions()
+            self.update_display()
+            p.dispatcher.clear_all_temp()
+        p.dispatcher.set_polygon(_on_finish, temporary=True)
+        p.left_canvas.start_polygon_select()
+    
     
     def act_mask_calc_stats(self):
         if self.current_obj.is_raw:

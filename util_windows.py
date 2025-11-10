@@ -17,7 +17,7 @@ from contextlib import contextmanager
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationTool
 from matplotlib.figure import Figure
-from matplotlib.widgets import RectangleSelector
+from matplotlib.widgets import RectangleSelector, PolygonSelector
 from matplotlib.patches import Patch
 import matplotlib
 
@@ -111,10 +111,6 @@ class InfoTable(QWidget):
         self.table.setHorizontalHeaderLabels(["File", "Type"])
         self.table.horizontalHeader().setStretchLastSection(True)
 
-        # Fixed dropdown rows
-        #self.fixed_input_rows = ["File Reference"]
-        
-
         layout = QVBoxLayout(self)
         layout.addWidget(self.table)
         
@@ -190,7 +186,7 @@ class ImageCanvas2D(QWidget):
         self.show()
         return self
 
-    def _show_index_with_legend(self, index_2d: np.ndarray, legend: list[dict]):
+    def _show_index_with_legend(self, index_2d: np.ndarray, mask: np.ndarray, legend: list[dict]):
         """
         Render an indexed mineral map with a discrete legend.
     
@@ -232,11 +228,13 @@ class ImageCanvas2D(QWidget):
         # ---- make RGB image; treat negatives as transparent-ish background
         idx_img = index_2d.copy()
         neg_mask = idx_img < 0
+        neg_mask[mask==1] = 1
         idx_img = np.clip(idx_img, 0, K - 1)
         rgb = colors_rgb[idx_img]
         if neg_mask.any():
             # paint negatives light gray (or leave as-is if you prefer)
-            rgb[neg_mask] = np.array([220, 220, 220], dtype=np.uint8)
+            rgb[neg_mask] = np.array([0, 0, 0], dtype=np.uint8)
+        
     
         # ---- draw
         self.ax.clear()
@@ -266,18 +264,9 @@ class ImageCanvas2D(QWidget):
             ]
         else:
             handles = []
-        
-        
-        
-        
-        #present = np.unique(idx_img[~neg_mask])
-        #handles = [Patch(facecolor=(colors_rgb[i]/255.0), edgecolor='k', label=labels[i])
-        #           for i in present.tolist()]
+
         if handles:
-            
-    
-        
-            # make space on the right
+           # make space on the right
             self.canvas.figure.subplots_adjust(right=0.80)  # ~20% for legend
             leg = self.ax.legend(
                 handles=handles,
@@ -290,19 +279,12 @@ class ImageCanvas2D(QWidget):
                 handlelength=1.8,
                 handletextpad=0.6,
             )
-        
-    
         if leg:
             leg.set_title("Mineral", prop={"size": 9})
             leg.set_draggable(True)  # users can move it if they want
     
         self.canvas.draw_idle()
-    
-    
-    
-    
-    
-        self.canvas.draw()
+
 
 class SpectralImageCanvas(QWidget):
     def __init__(self, parent=None):
@@ -319,7 +301,12 @@ class SpectralImageCanvas(QWidget):
         # Single and right click wiring
         self.on_single_click = None         # callable(y, x) -> None
         self.on_right_click  = None         # callable(y, x) -> None
+        
+        # polygon selector
+        self._poly_selector = None
+        self.on_polygon_finished = None 
 
+        # UI elements
         layout = QVBoxLayout(self)
         self.fig = Figure(figsize=(8, 4))
         self.ax = self.fig.add_subplot(111)
@@ -344,10 +331,12 @@ class SpectralImageCanvas(QWidget):
 
     # -------- Double-click → spectrum (per-canvas window) --------
     def on_image_click(self, event):
-        
+        print(self._poly_selector)
         if event.inaxes is not self.ax or event.xdata is None or event.ydata is None:
             return
         if getattr(self.toolbar, "mode", "") or self.rect_selector is not None:
+            return
+        if getattr(self, "_poly_selector", None) is not None:
             return
         if event.xdata is None or event.ydata is None:
             return
@@ -372,7 +361,51 @@ class SpectralImageCanvas(QWidget):
         if event.button == 1 and callable(self.on_single_click):
             self.on_single_click(r, c)
     
+    # polygon selection methods
+    def start_polygon_select(self):
+        
+        self.cancel_rect_select()
+        self.cancel_polygon_select()
     
+        def _on_select(verts):
+            # verts is [(x,y), ...] in data coords
+            print("[canvas] _on_select called; verts:", len(verts))
+            print("[canvas] on_polygon_finished is", self.on_polygon_finished)
+            if callable(self.on_polygon_finished):
+                v_rc = [(int(round(y)), int(round(x))) for (x, y) in verts]
+                self.on_polygon_finished(v_rc)
+            self.cancel_polygon_select()
+            self.canvas.draw()
+    
+        self._poly_selector = PolygonSelector(
+        self.ax,
+        onselect=_on_select,
+        useblit=True,
+        props=dict(color="orange", alpha=0.9, linewidth=1.5),
+        handle_props=dict(marker="o", markersize=4,
+                          mec="k", mfc="orange", alpha=0.9),
+        grab_range=5,
+        draw_bounding_box=False,
+    )
+        
+        
+        self.canvas.widgetlock(self._poly_selector)
+        self.canvas.draw()
+        
+    def cancel_polygon_select(self):
+        print("[canvas] cancel_polygon_select()")
+        """Tear down an active polygon tool, if any."""
+        if self._poly_selector is not None:
+            try:
+                self.canvas.widgetlock.release(self._poly_selector)
+            except Exception:
+                pass
+            try:
+                self._poly_selector.disconnect_events()
+                self._poly_selector = None
+            except Exception:
+                self._poly_selector = None
+        
     
     
     # -------- Rectangle selection: start/cancel, callback, polling --------
