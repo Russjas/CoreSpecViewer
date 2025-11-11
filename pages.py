@@ -322,7 +322,7 @@ class VisualisePage(BasePage):
         if self.current_obj is not None and not self.current_obj.is_raw:
             try:
                 table_title = f'{self.current_obj.metadata["borehole id"]} {self.current_obj.metadata["box number"]}'
-            except KeyError:
+            except:
                 table_tite = 'Cached products'
         self.table.setHorizontalHeaderItem(0, QTableWidgetItem(table_title))
     

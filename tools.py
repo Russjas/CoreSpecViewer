@@ -115,8 +115,55 @@ def crop_auto(obj):
                     obj.add_temp_dataset(key, cropped_copy)
         return obj
 
+def discover_lumo_directories(root_dir: Path) -> list[Path]:
+    """
+    Recursively discover all subdirectories under `root_dir`.
+    Excludes capture and metadata subdirectories inside lumo parent directories
+    to avoid double processing.
+
+    Parameters
+    ----------
+    root_dir : Path
+        A pathlib.Path object representing the starting directory.
+
+    Returns
+    -------
+    list[Path]
+        A sorted list of absolute Path objects including the root itself.
+    """
+    if not root_dir.is_dir():
+        raise NotADirectoryError(f"{root_dir} is not a valid directory.")
+
+    # Use rglob('*') for recursive traversal, filtering for directories only
+    dirs = [root_dir.resolve()]  # include the root
+    try:
+        for p in root_dir.rglob('*'):
+                if p.is_dir():
+                    rel = p.relative_to(root_dir).as_posix().lower()
+                    if "capture" not in rel and 'metadata' not in rel and "calibrations" not in rel:
+                        dirs.append(p.resolve())
+    except PermissionError:
+        pass  
+
+    
+    return sorted(set(dirs))
 
 
+
+def process_multibox(src, dest):
+    src = Path(src)
+    sub_dir_list = discover_lumo_directories(src)
+    for box in sub_dir_list:
+        print(box)
+        try:
+            raw = RawObject.from_Lumo_directory(box)
+        except ValueError:
+            print('Not a lumo directory')
+            continue
+        cropped = crop_auto(raw)
+        PO = cropped.process()
+        PO.update_root_dir(dest)
+        PO.save_all()
 
 def reset(obj):
     if obj.is_raw:
@@ -319,8 +366,11 @@ def kmeans_caller(obj, clusters = 5, iters = 50):
     obj.add_dataset(f'kmeans-{clusters}-{iters}CLUSTERS', classes, '.npy')
     return obj
 
-   
+if __name__ == "__main__":
+    PO = ProcessedObject.from_path('D:/Multi_process_test_2/24_7_clonminch_39_161m55_166m09_2025-10-31_11-27-59_metadata.json')
 
+        
+    
 
 
     

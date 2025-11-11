@@ -938,5 +938,4 @@ class HoleObject:
         else:
             raise TypeError(f"Unsupported key type: {type(key).__name__}")
 
-
  

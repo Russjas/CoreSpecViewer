@@ -20,6 +20,8 @@ from objects import RawObject, ProcessedObject
 import tools as t
 from tools import load, crop, reset, mask_rect, mask_point, improve_mask
 from PyQt5.QtGui import QIcon
+import multi_box
+from context import CurrentContext
 feature_keys = [
     '1400W', '1480W', '1550W', '1760W', '1850W',
     '1900W', '2080W', '2160W', '2200W', '2250W',
@@ -74,8 +76,10 @@ class MainRibbonController(QMainWindow):
         self.undo_act = QAction("Undo", self)
         self.undo_act.setShortcut("Ctrl+Z")
         self.undo_act.triggered.connect(self.undo_unsaved)
-
-        everpresents = [self.open_act, self.save_act, self.save_as_act, self.undo_act]
+        
+        self.multibox_act = QAction("Process Raw Multibox", self)
+        self.multibox_act.triggered.connect(self.process_multi_raw)
+        everpresents = [self.open_act, self.multibox_act, self.save_act, self.save_as_act, self.undo_act]
 
         self.ribbon.add_global_actions(everpresents)
         
@@ -224,6 +228,10 @@ class MainRibbonController(QMainWindow):
                
         self.set_current_conditions()
         self.update_display()
+    
+    def process_multi_raw(self):
+        multi_box.run_multibox_dialog(self)
+        
 
     def crop_current_image(self):
         p = self._active_page()
@@ -317,7 +325,7 @@ class MainRibbonController(QMainWindow):
         
         try:
             with busy_cursor('processing...', self):
-                self.current_obj = self.current_obj.process()  # placeholder
+                self.current_obj = self.current_obj.process() 
             
         except Exception as e:
             QMessageBox.warning(self, "Process", f"Failed to process/save: {e}")
