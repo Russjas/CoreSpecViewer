@@ -637,6 +637,23 @@ class RawObject:
         """Return the file path registered under the specified role key."""
         return self.files[key]
 
+from datetime import datetime
+
+def combine_timestamp(meta: dict) -> datetime | None:
+    """
+    Combine 'time' and 'date' fields in metadata into a datetime object.
+    Returns None if either part is missing or invalid.
+    """
+    date_str = meta.get("date")
+    time_str = meta.get("time")
+
+    if not (date_str and time_str):
+        return None
+
+    try:
+        return datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return None
 
 
 @dataclass
@@ -663,7 +680,7 @@ class HoleObject:
     hole_meta : dict[int, dict]
         Per-box metadata map, keyed by box number.
     boxes : dict[int, ProcessedObject]
-        Processed objects keyed by their box number.
+        metadata filepaths for ProcessedObjects keyed by their box number.
     """
     hole_id: str
     root_dir: Path
@@ -704,118 +721,75 @@ class HoleObject:
         except Exception as e:
             raise ValueError(f"Cannot extract 'borehole id' from metadata: {e}")
 
-        # Search the parent directory for all processed files
         root = obj.root_dir
+        
+        return cls.build_from_parent_dir(root, hole_id)
+        
+            
+    @classmethod
+    def build_from_parent_dir(cls, path, hole_id=''):
+        root = Path(path)
         boxes = {}
         box_nums = []
+        hole_meta = {}
+        hole_ids = []
+        
 
+        
+        for fp in sorted(root.glob("*.json")):
+            meta = json.loads(fp.read_text(encoding="utf-8"))
+            h_id = meta.get("borehole id")
+            if h_id is not None:
+                hole_ids.append(str(h_id))
+        if not (hole_id and str(hole_id).strip()):
+            if hole_ids:
+                hole_id = Counter(hole_ids).most_common(1)[0][0]
+            else:
+                raise ValueError(f"No JSON in {root} contained a 'borehole id'.")
+                
+        new_hole = cls.new(hole_id=hole_id,
+        root_dir=root,
+        )
+        
+        
+        print(hole_id)
         for fp in sorted(root.glob("*.json")):  # any metadata file signals a box
             try:
                 po = ProcessedObject.from_path(fp)
+                new_hole.add_box(po)
                 if (
                     "metadata" in po.datasets
                     and po.datasets["metadata"].data.get("borehole id") == hole_id
                 ):
-                    boxes[int(po.metadata['box number'])] = po
-
-                    # attempt to extract box number if available in metadata
-                    box_num = po.metadata['box number']
-                    box_nums.append(int(box_num))
+                    box_num_raw = meta.get("box number", 0)
+                    try:
+                        box_num = int(box_num_raw)
+                    except Exception:
+                        continue
+    
+                    boxes[box_num] = po
+                    hole_meta[box_num] = dict(meta)   # store per-box metadata
+                    box_nums.append(box_num)
+                    
             except Exception:
                 continue
 
-        # Fall back if numbering not found
-        if not box_nums:
-            box_nums = [0]
+        new_hole.first_box = min(box_nums)
+        new_hole.last_box = max(box_nums)
+        new_hole.num_box = len(boxes)
 
-        first_box = min(box_nums)
-        last_box = max(box_nums)
-        num_box = len(boxes)
-
-        # Collate all box-level metadata for convenience
-        hole_meta = {bn: po.metadata for bn, po in boxes.items()}
-
-        return cls(
-            hole_id=hole_id,
-            root_dir=root,
-            num_box=num_box,
-            first_box=first_box,
-            last_box=last_box,
-            hole_meta=hole_meta,
-            boxes=boxes,
-        )
-    def save_hole(self):
-        """
-        Persist a JSON manifest describing this hole to `<hole_id>_hole.json`.
-
-        The manifest records the hole identity, box numbering summary, a dump of
-        per-box metadata, and the on-disk location of each ProcessedObject.
-        """
-        manifest = {
-            "hole_id": self.hole_id,
-            "num_box": self.num_box,
-            "first_box": self.first_box,
-            "last_box": self.last_box,
-            "hole_meta": self.hole_meta,
-            "boxes": {
-                str(k): str(v.root_dir) for k, v in self.boxes.items()
-            },
-        }
+        return new_hole
     
-        manifest_path = self.root_dir / f"{self.hole_id}_hole.json"
-        manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-        return manifest_path
 
     @classmethod
-    def load_from_disk(cls, path):
-        """
-        Reconstruct a HoleObject from a saved manifest JSON.
-
-        Parameters
-        ----------
-        path : str | Path
-            Path to a previously written `<hole_id>_hole.json` manifest.
-
-        Returns
-        -------
-        HoleObject
-            Instance with ProcessedObjects rehydrated from the recorded directories.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the specified manifest file does not exist.
-        """
-        path = Path(path)
-        if not path.is_file():
-            raise FileNotFoundError(f"Cannot find hole manifest: {path}")
-    
-        data = json.loads(path.read_text(encoding="utf-8"))
-        hole_id = data["hole_id"]
-        root = path.parent
-        boxes = {}
-    
-        # Rebuild each ProcessedObject from its saved directory
-        for k, v in data.get("boxes", {}).items():
-            box_path = Path(v)
-            try:
-                po = ProcessedObject.from_path(next(box_path.glob("*.json")))
-                boxes[int(k)] = po
-            except Exception:
-                continue
-    
-        return cls(
-            hole_id=hole_id,
-            root_dir=root,
-            num_box=data["num_box"],
-            first_box=data["first_box"],
-            last_box=data["last_box"],
-            hole_meta=data.get("hole_meta", {}),
-            boxes=boxes,
-        )
-    
-    @classmethod
-    def new(cls, obj = None):
+    def new(cls, 
+            hole_id="",
+            root_dir=Path("."),
+            num_box=0,
+            first_box=0,
+            last_box=0,
+            hole_meta={},
+            boxes={}):
         """
         Factory for a brand-new, empty HoleObject or one inferred from a box.
 
@@ -825,18 +799,16 @@ class HoleObject:
             If provided, behaves like `build_from_box(obj)`. If omitted, an
             empty scaffold is returned.
         """
-        if obj is None:
-            return cls(
-                hole_id="",
-                root_dir=Path("."),
-                num_box=0,
-                first_box=0,
-                last_box=0,
-                hole_meta={},
-                boxes={}
+        return cls(
+                hole_id=hole_id,
+                root_dir=root_dir,
+                num_box=num_box,
+                first_box=first_box,
+                last_box=last_box,
+                hole_meta=hole_meta,
+                boxes=boxes
             )
-        else:
-            return cls.build_from_box(obj)
+        
     
     def add_box(self, obj):
         """
@@ -878,13 +850,20 @@ class HoleObject:
         if not getattr(self, "root_dir", None) or str(self.root_dir) == ".":
             self.root_dir = obj.root_dir
     
-        # Avoid accidental duplicate collisions
+        # Handle re-scans that are preserved in directories   
         if box_num in self.boxes and self.boxes[box_num].basename != obj.basename:
-            raise ValueError(f"Box number {box_num} already present with a different dataset ('{self.boxes[box_num].basename}').")
+            in_hole_time = combine_timestamp(self.boxes[box_num].metadata)
+            new_box_time = combine_timestamp(meta)
+            if new_box_time > in_hole_time:
+                self.boxes[box_num] = obj
+                self.hole_meta[box_num] = meta
+            else:
+                return
+            
     
         # Insert/replace
-        self.boxes[box_num] = obj
-        self.hole_meta[box_num] = meta
+        
+        
     
         # Update counters
         keys = sorted(self.boxes.keys())
@@ -960,3 +939,5 @@ if __name__ == "__main__":
     for p, n in hits:
         print(f"{p.name:25}  {n} hits")
     print(f"\nTotal: {count} occurrences across {len(hits)} files")
+if __name__ == '__main__':
+    test = HoleObject.build_from_parent_dir('D:/Multi_process_test/')
