@@ -174,10 +174,11 @@ class Dataset:
         
         
         elif self.ext == '.npy':
-            self.close_handle()
+            
             if isinstance(self.data, np.memmap):
                 if not new:
                     return
+            self.close_handle()
             np.save(self.path, self.data)
     
         elif self.ext == '.json':
@@ -475,7 +476,7 @@ class RawObject:
     def __post_init__(self):
         """On initialization, populate metadata and compute reflectance."""
         self.get_metadata()
-        self.get_reflectance()
+        self.get_reflectance(QAQC=False)
         
         
     def get_metadata(self):
@@ -568,11 +569,12 @@ class RawObject:
         self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=QAQC)
         return self.reflectance, self.snr
 
-    def get_reflectance(self):
+    def get_reflectance(self, QAQC=False):
         """Return or compute the reflectance cube (without QA/QC)."""
         if getattr(self, "reflectance", None) is None:
             self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=False)
         return self.reflectance
+    
     def get_false_colour(self, bands=None):
         """Generate a false-colour RGB composite for visualization."""
         if hasattr(self, "reflectance") and self.reflectance is not None:
@@ -917,5 +919,25 @@ class HoleObject:
         else:
             raise TypeError(f"Unsupported key type: {type(key).__name__}")
 
+ #%%
+if __name__ == "__main__":
+    import pathlib, re
+    
+    root = pathlib.Path(__file__).parent
+    #pattern = re.compile(r"\bcurrent_obj\b")
+    pattern = re.compile(r"set_current_conditions")  # literal substring
+    count = 0
+    hits = []
+    
+    for path in root.rglob("*.py"):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        matches = list(pattern.finditer(text))
+        if matches:
+            hits.append((path, len(matches)))
+            count += len(matches)
+    
+    for p, n in hits:
+        print(f"{p.name:25}  {n} hits")
+    print(f"\nTotal: {count} occurrences across {len(hits)} files")
 if __name__ == '__main__':
     test = HoleObject.build_from_parent_dir('D:/Multi_process_test/')

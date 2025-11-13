@@ -10,7 +10,15 @@ from objects import ProcessedObject, RawObject, Dataset
 import spectral_functions as sf
 from PIL import Image
 from matplotlib.path import Path as mpl_path
+import config
 
+def get_config():
+    return sf.con_dict  
+
+def modify_config(key, value):
+    config.set_value(key, value)
+    
+    
 def load(path):
     """
     Load a RawObject or ProcessedObject depending on path type.
