@@ -46,7 +46,7 @@ import builtins
 import xml.etree.ElementTree as ET 
 from PIL import Image
 import spectral_functions as sf
-from typing import Iterator, Tuple, List, Union, Optional
+from typing import Iterator, Tuple, List, Union, Optional, Dict
 @dataclass
 class Dataset:
     """
@@ -174,11 +174,10 @@ class Dataset:
         
         
         elif self.ext == '.npy':
-            
+            self.close_handle()
             if isinstance(self.data, np.memmap):
                 if not new:
                     return
-            self.close_handle()
             np.save(self.path, self.data)
     
         elif self.ext == '.json':
@@ -432,6 +431,12 @@ class ProcessedObject:
         """Reload all datasets from disk."""
         for ds in self.datasets.values():
             ds.load_dataset()
+            
+    def build_thumbs(self):
+        for ds in self.datasets.values:
+            if ds.ext != '.npy':
+                continue
+            
 
 SPECIM_LUMO_REQUIRED = {
     "data head":    "{id}.hdr",
@@ -476,7 +481,7 @@ class RawObject:
     def __post_init__(self):
         """On initialization, populate metadata and compute reflectance."""
         self.get_metadata()
-        self.get_reflectance(QAQC=False)
+        self.get_reflectance()
         
         
     def get_metadata(self):
@@ -569,12 +574,11 @@ class RawObject:
         self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=QAQC)
         return self.reflectance, self.snr
 
-    def get_reflectance(self, QAQC=False):
+    def get_reflectance(self):
         """Return or compute the reflectance cube (without QA/QC)."""
         if getattr(self, "reflectance", None) is None:
             self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=False)
         return self.reflectance
-    
     def get_false_colour(self, bands=None):
         """Generate a false-colour RGB composite for visualization."""
         if hasattr(self, "reflectance") and self.reflectance is not None:
@@ -658,256 +662,155 @@ def combine_timestamp(meta: dict) -> datetime | None:
 
 @dataclass
 class HoleObject:
-    """
-    Aggregates a set of ProcessedObject boxes that belong to the same borehole.
-
-    Construction is metadata-driven: boxes are grouped by the `borehole id`
-    found in each box's `metadata` dataset. The object tracks numbering
-    (first/last box index) and provides a simple manifest for persistence.
-
-    Attributes
-    ----------
-    hole_id : str
-        Borehole identifier shared by constituent boxes.
-    root_dir : Path
-        Directory where processed box datasets reside.
-    num_box : int
-        Number of boxes detected for this hole.
-    first_box : int
-        Minimum box index.
-    last_box : int
-        Maximum box index.
-    hole_meta : dict[int, dict]
-        Per-box metadata map, keyed by box number.
-    boxes : dict[int, ProcessedObject]
-        metadata filepaths for ProcessedObjects keyed by their box number.
-    """
     hole_id: str
     root_dir: Path
     num_box: int
     first_box: int
     last_box: int
-    hole_meta: dict = field(default_factory=dict)
-    boxes: dict = field(default_factory=dict)
+    hole_meta: Dict[int, dict] = field(default_factory=dict)
+    boxes: Dict[int, "ProcessedObject"] = field(default_factory=dict)
 
     @classmethod
     def build_from_box(cls, obj):
-        """
-        Create a HoleObject starting from a single processed box (or its path).
-
-        Parameters
-        ----------
-        obj : ProcessedObject | str | Path
-            Either a ProcessedObject instance or a path to one of its files.
-
-        Returns
-        -------
-        HoleObject
-            Instance containing all boxes in the directory with the same
-            `borehole id` as the seed object.
-
-        Raises
-        ------
-        ValueError
-            If the `borehole id` cannot be extracted from the seed box.
-        """
         if not isinstance(obj, ProcessedObject):
             obj = ProcessedObject.from_path(obj)
-
-        # Extract hole ID from metadata
         try:
-            meta = obj.metadata
-            hole_id = meta["borehole id"]
+            hole_id = obj.metadata["borehole id"]
         except Exception as e:
             raise ValueError(f"Cannot extract 'borehole id' from metadata: {e}")
+        return cls.build_from_parent_dir(obj.root_dir, hole_id)
 
-        root = obj.root_dir
-        
-        return cls.build_from_parent_dir(root, hole_id)
-        
-            
     @classmethod
-    def build_from_parent_dir(cls, path, hole_id=''):
+    def build_from_parent_dir(cls, path, hole_id: str = ""):
         root = Path(path)
-        boxes = {}
-        box_nums = []
-        hole_meta = {}
-        hole_ids = []
-        
 
-        
+        # ---- PASS 1: read JSON only (cheap) to detect dominant hole_id if not provided
+        hole_ids: List[str] = []
         for fp in sorted(root.glob("*.json")):
-            meta = json.loads(fp.read_text(encoding="utf-8"))
-            h_id = meta.get("borehole id")
-            if h_id is not None:
-                hole_ids.append(str(h_id))
+            try:
+                meta = json.loads(fp.read_text(encoding="utf-8"))
+                h_id = meta.get("borehole id")
+                if h_id:
+                    hole_ids.append(str(h_id))
+            except Exception:
+                continue
+
         if not (hole_id and str(hole_id).strip()):
             if hole_ids:
                 hole_id = Counter(hole_ids).most_common(1)[0][0]
             else:
                 raise ValueError(f"No JSON in {root} contained a 'borehole id'.")
-                
-        new_hole = cls.new(hole_id=hole_id,
-        root_dir=root,
-        )
-        
-        
-        print(hole_id)
-        for fp in sorted(root.glob("*.json")):  # any metadata file signals a box
+
+        # fresh, empty hole; counters will be filled by add_box
+        hole = cls.new(hole_id=hole_id, root_dir=root)
+
+        # ---- PASS 2: load only boxes; add_box will filter by hole_id & update counters
+        for fp in sorted(root.glob("*.json")):
             try:
-                po = ProcessedObject.from_path(fp)
-                new_hole.add_box(po)
-                if (
-                    "metadata" in po.datasets
-                    and po.datasets["metadata"].data.get("borehole id") == hole_id
-                ):
-                    box_num_raw = meta.get("box number", 0)
-                    try:
-                        box_num = int(box_num_raw)
-                    except Exception:
-                        continue
-    
-                    boxes[box_num] = po
-                    hole_meta[box_num] = dict(meta)   # store per-box metadata
-                    box_nums.append(box_num)
-                    
+                po = ProcessedObject.from_path(fp)  # may memmap; acceptable for matching ones
+                hole.add_box(po)                    # will skip/raise if hole_id mismatches
+            except ValueError:
+                # mismatched hole_id or bad metadata -> skip
+                continue
             except Exception:
+                # any other load error -> skip this file
                 continue
 
-        new_hole.first_box = min(box_nums)
-        new_hole.last_box = max(box_nums)
-        new_hole.num_box = len(boxes)
+        if hole.num_box == 0:
+            raise ValueError(f"No boxes in {root} matched borehole id '{hole_id}'.")
 
-        return new_hole
-    
+        return hole
 
     @classmethod
-    def new(cls, 
-            hole_id="",
-            root_dir=Path("."),
-            num_box=0,
-            first_box=0,
-            last_box=0,
-            hole_meta={},
-            boxes={}):
-        """
-        Factory for a brand-new, empty HoleObject or one inferred from a box.
-
-        Parameters
-        ----------
-        obj : ProcessedObject | str | Path | None
-            If provided, behaves like `build_from_box(obj)`. If omitted, an
-            empty scaffold is returned.
-        """
+    def new(cls,
+            hole_id: str = "",
+            root_dir: Path = Path("."),
+            num_box: int = 0,
+            first_box: int = 0,
+            last_box: int = 0,
+            hole_meta: dict | None = None,
+            boxes: dict | None = None):
         return cls(
-                hole_id=hole_id,
-                root_dir=root_dir,
-                num_box=num_box,
-                first_box=first_box,
-                last_box=last_box,
-                hole_meta=hole_meta,
-                boxes=boxes
-            )
-        
-    
-    def add_box(self, obj):
-        """
-        Insert a ProcessedObject into the hole, updating indices and metadata.
+            hole_id=hole_id,
+            root_dir=root_dir,
+            num_box=num_box,
+            first_box=first_box,
+            last_box=last_box,
+            hole_meta={} if hole_meta is None else dict(hole_meta),
+            boxes={} if boxes is None else dict(boxes),
+        )
 
-        Parameters
-        ----------
-        obj : ProcessedObject | str | Path
-            Box to add. If a path is provided, it will be resolved via
-            `ProcessedObject.from_path`.
-
-        Returns
-        -------
-        int
-            The integer box number that was added.
-
-        Raises
-        ------
-        ValueError
-            If required metadata are missing or the hole_id does not match.
-        """
+    def add_box(self, obj) -> int:
         if not isinstance(obj, ProcessedObject):
             obj = ProcessedObject.from_path(obj)
-    
-        # Pull required metadata
+
         try:
             meta = obj.metadata
             box_hole_id = meta["borehole id"]
             box_num = int(meta["box number"])
         except Exception as e:
             raise ValueError(f"Box metadata missing required fields: {e}")
-    
-        # Initialize hole_id/root_dir if empty; else validate
+
+        # initialise / validate hole_id
         if not self.hole_id:
             self.hole_id = box_hole_id
         elif self.hole_id != box_hole_id:
-            raise ValueError(f"Box hole_id '{box_hole_id}' does not match HoleObject.hole_id '{self.hole_id}'")
-    
+            raise ValueError(
+                f"Box hole_id '{box_hole_id}' does not match HoleObject.hole_id '{self.hole_id}'"
+            )
+
+        # initialise root_dir if empty
         if not getattr(self, "root_dir", None) or str(self.root_dir) == ".":
             self.root_dir = obj.root_dir
-    
-        # Handle re-scans that are preserved in directories   
-        if box_num in self.boxes and self.boxes[box_num].basename != obj.basename:
-            in_hole_time = combine_timestamp(self.boxes[box_num].metadata)
-            new_box_time = combine_timestamp(meta)
-            if new_box_time > in_hole_time:
-                self.boxes[box_num] = obj
-                self.hole_meta[box_num] = meta
-            else:
-                return
-            
-    
-        # Insert/replace
-        
-        
-    
-        # Update counters
+
+        # handle re-scans by box number
+        if box_num in self.boxes:
+            print('dup found')
+            # if same basename, treat as duplicate and ignore
+            if self.boxes[box_num].basename == obj.basename:
+                print('discarded as dup')
+                return box_num
+            # choose newer by timestamp
+            old_t = combine_timestamp(self.boxes[box_num].metadata)
+            new_t = combine_timestamp(meta)
+            if old_t and new_t and new_t <= old_t:
+                print('discarded by date')
+                return box_num  # keep existing
+            # else replace with newer
+        # INSERT / REPLACE
+        self.boxes[box_num] = obj
+        self.hole_meta[box_num] = meta
+
+        # update counters after insertion
         keys = sorted(self.boxes.keys())
         self.num_box = len(keys)
         self.first_box = keys[0] if keys else 0
-        self.last_box  = keys[-1] if keys else 0
-    
+        self.last_box = keys[-1] if keys else 0
+
         return box_num
-    
+
+    def check_for_all_keys(self, key):
+        for i in self:
+            tst = i.datasets.get(key)
+            if not tst:
+                return False
+        return True
+
     def __iter__(self) -> Iterator["ProcessedObject"]:
-        """
-        Iterate over ProcessedObjects in ascending box-number order.
-        Yields live references, so in-loop edits (e.g., adding temp datasets)
-        modify the stored objects.
-        """
         for bn in sorted(self.boxes):
             yield self.boxes[bn]
-    
+
     def iter_items(self) -> Iterator[Tuple[int, "ProcessedObject"]]:
-        """
-        Iterate as (box_number, ProcessedObject) pairs in ascending order.
-        Useful when you also need the index.
-        """
         for bn in sorted(self.boxes):
             yield bn, self.boxes[bn]
-    
+
     def __len__(self) -> int:
-        """Number of boxes currently in the hole."""
         return self.num_box
-    
+
     def __contains__(self, box_number: int) -> bool:
-        """Membership test by box number: `3 in hole`."""
         return box_number in self.boxes
-    
+
     def __getitem__(self, key: Union[int, slice, List[int]]) -> Union["ProcessedObject", List["ProcessedObject"]]:
-        """
-        Access by box number, slice of box numbers, or explicit list of numbers.
-    
-        Examples
-        --------
-        hole[3]          -> ProcessedObject for box 3
-        hole[1:4]        -> [PO for 1,2,3] (if present)
-        hole[[1, 7, 9]]  -> [PO for 1,7,9] (if present)
-        """
         if isinstance(key, int):
             return self.boxes[key]
         elif isinstance(key, slice):
@@ -919,25 +822,9 @@ class HoleObject:
         else:
             raise TypeError(f"Unsupported key type: {type(key).__name__}")
 
- #%%
-if __name__ == "__main__":
-    import pathlib, re
-    
-    root = pathlib.Path(__file__).parent
-    #pattern = re.compile(r"\bcurrent_obj\b")
-    pattern = re.compile(r"set_current_conditions")  # literal substring
-    count = 0
-    hits = []
-    
-    for path in root.rglob("*.py"):
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        matches = list(pattern.finditer(text))
-        if matches:
-            hits.append((path, len(matches)))
-            count += len(matches)
-    
-    for p, n in hits:
-        print(f"{p.name:25}  {n} hits")
-    print(f"\nTotal: {count} occurrences across {len(hits)} files")
+
 if __name__ == '__main__':
     test = HoleObject.build_from_parent_dir('D:/Multi_process_test/')
+    #%%
+    tst = test.check_for_all_keys('dhole')
+    print(tst)
