@@ -9,11 +9,11 @@ import sys
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QStackedWidget, QFileDialog, QMessageBox, QApplication, QInputDialog,
-    QDialog, QAction, QTabWidget,QSizePolicy
+    QDialog, QAction, QTabWidget,QSizePolicy,QStyle
 )
 
 from ribbon import Ribbon
-from pages import RawPage, VisualisePage, LibraryPage
+from pages import RawPage, VisualisePage, LibraryPage, AutoSettingsDialog  
 from util_windows import MetadataDialog, two_choice_box, InfoTable, busy_cursor
 
 from objects import RawObject, ProcessedObject
@@ -47,7 +47,7 @@ class MainRibbonController(QMainWindow):
         self.resize(1400, 900)
 
         # --- Data shared across modes (filled as user works) ---
-        self.current_obj = None
+        self.cxt = CurrentContext()
 
 
         # --- UI shell: ribbon + stacked pages ---
@@ -82,11 +82,14 @@ class MainRibbonController(QMainWindow):
         everpresents = [self.open_act, self.multibox_act, self.save_act, self.save_as_act, self.undo_act]
 
         self.ribbon.add_global_actions(everpresents)
-        
+        #====== non-tab buttons=================
         self.info_act = QAction("Info", self)
         self.info_act.setShortcut("Ctrl+I")
         self.info_act.triggered.connect(self.display_info)
-        self.ribbon.add_global_actions([self.info_act], pos = 'right')
+        self.settings_act = QAction("Settings", self)
+        self.settings_act.triggered.connect(self.on_settings)
+
+        self.ribbon.add_global_actions([self.info_act, self.settings_act], pos='right')
 
         # ===== Page operations
         self.tabs = QTabWidget(self)
@@ -96,11 +99,16 @@ class MainRibbonController(QMainWindow):
         self.raw_page = RawPage(self)
         self.vis_page = VisualisePage(self)
         self.lib_page = LibraryPage(self)
+        
+        self.page_list = [self.raw_page, self.vis_page, self.lib_page]
 
         self.tabs.addTab(self.raw_page, "Raw")
         self.tabs.addTab(self.vis_page, "Visualise")
         self.tabs.addTab(self.lib_page, "Libraries")
         
+        self._last_tab_idx = self.tabs.currentIndex()
+        
+        self.tabs.currentChanged.connect(self._on_tab_changed)
         outer.addWidget(self.tabs, 1)
         
         # Initial mode
@@ -156,50 +164,75 @@ class MainRibbonController(QMainWindow):
             ]),
             ("menu",   "Features", self.extract_feature_list),
             ])
-    
+        
+        
+    #======== UI methods ===============================================
     def update_display(self, key = 'mask'):
         p = self._active_page()
         if hasattr(p, "cache"):
             p.add_to_cache(key)
         p.update(key = key)    
     
-    def set_current_conditions(self):
-        for pg in (self.raw_page, self.vis_page, self.lib_page):
-            pg.current_obj = self.current_obj
-        idx_map = {"raw": 0, "mask": 1, "visualise": 2}
-        
-        if self.current_obj.is_raw:
-            idx = 0
-        else:
-            idx = 1
-        old_page = self._active_page()
-        if old_page:
-            old_page.teardown()
-        self.tabs.setCurrentIndex(idx)
-
-        new_page = self._active_page()
-        if new_page:
-            new_page.activate()
+    def _on_tab_changed(self, new_idx: int):
+        """Handles user-initiated tab changes."""
+        print('tab changed handled')  
+        # teardown old (the one that just lost focus)
+        old_idx = getattr(self, "_last_tab_idx", -1)
+        if 0 <= old_idx < self.tabs.count():
+            old = self.tabs.widget(old_idx)
+            if hasattr(old, "teardown"): old.teardown()
     
+        # activate new
+        new = self.tabs.widget(new_idx)
+        self._distribute_context()
+        if hasattr(new, "activate"): new.activate()
+        self._last_tab_idx = new_idx
+        
+    #TODO: used to be called set_current_conditions - bugs incoming!
+    def _distribute_context(self):
+      
+        for pg in self.page_list:
+            pg.cxt = self.cxt
     
     def _active_page(self):
         return self.tabs.currentWidget()
 
-    def _mode(self) -> str:
-        """Return logical mode name based on current tab index."""
-        idx = self.tabs.currentIndex()
-        return ("raw", "mask", "visualise")[idx]
+    def choose_view(self, key= 'raw'):
+        pg_idx_map = {'raw': 0, 'vis': 1, 'lib': 2}
+        new_idx = pg_idx_map[key]
+        old_idx = getattr(self, "_last_tab_idx", -1)
+        if new_idx == old_idx:
+            self._distribute_context()
+        self.tabs.setCurrentIndex(pg_idx_map[key])
+    
+
+#================= Global actions========================================
 
     def display_info(self):
         print('info button clicked')
         self.table_window = InfoTable()
-        self.table_window.set_from_dict(self.current_obj.metadata)
+        self.table_window.set_from_dict(self.cxt.metadata)
         self.table_window.setWindowTitle("Info Table")
         self.table_window.resize(400, 300)
         self.table_window.show()
-    # -------- RAW actions --------
-    def load_from_disk(self):
         
+        
+    def on_settings(self):
+        dlg = AutoSettingsDialog(self)
+        if dlg.exec_():
+            # user clicked Save; propagate lightweight refresh
+            self._distribute_context()   # keep pages in sync with any config change
+            try:
+                self.update_display()    # redraw active page safely
+            except Exception:
+                pass
+            self.statusBar().showMessage("Settings updated.", 3000)
+
+#================= Everpresent actions =====================================
+        
+        
+    def load_from_disk(self):
+        #TODO: add load methods for other data types
         clicked_button = two_choice_box( "What would you like to open?", "Processed dataset", "Raw directory")
         
         if clicked_button == 'cancel':
@@ -220,19 +253,78 @@ class MainRibbonController(QMainWindow):
                 return
         try:
             with busy_cursor('loading...', self):
-                self.current_obj = load(path)
+                loaded_obj = load(path)
+                if loaded_obj.is_raw:
+                    
+                    self.cxt.current = loaded_obj
+                    
+                    self.choose_view('raw')
+                
+                    self.update_display()
+                else:
+                    self.cxt.current = loaded_obj
+                    self.choose_view('vis')
+                    self.update_display()
         except Exception as e:
             QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}")
             return
 
-               
-        self.set_current_conditions()
-        self.update_display()
+        
     
     def process_multi_raw(self):
         multi_box.run_multibox_dialog(self)
+    
+    def save_clicked(self):
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "save", "Raw data must be processed prior to saving")
+            return
+        if self.cxt.current.has_temps:
+            test = two_choice_box('Commit changes before saving?', 'yes', 'no')
+            if test == 'left':
+                self.cxt.po.commit_temps()
+                
+        wants_prompt = True
+        if self.cxt.current.datasets:
+            wants_prompt = not any(ds.path.exists() for ds in self.cxt.po.datasets.values())
+    
+        if wants_prompt:
+            dest = QFileDialog.getExistingDirectory(self, "Choose save folder", str(self.cxt.current.root_dir))
+            if not dest:
+                return
+            self.cxt.current.update_root_dir(dest)  # rewires every dataset path to the chosen folder
+        try:
+            with busy_cursor('saving...', self):
+                self.cxt.current.save_all()
+        except Exception as e:
+            QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
+            return
+    def save_as_clicked(self):
+        if self.cxt.po is None:
+            QMessageBox.information(self, "save", "Raw data must be processed prior to saving")
+            return
+        if self.cxt.current.has_temps:
+            test = two_choice_box('Commit changes before saving?', 'yes', 'no')
+            if test == 'left':
+                self.cxt.po.commit_temps()
+                
+        dest = QFileDialog.getExistingDirectory(self, "Choose save folder", str(self.cxt.current.root_dir))
+        if not dest:
+            return
+        self.cxt.current.update_root_dir(dest)  # rewires every dataset path to the chosen folder
+        try:
+            with busy_cursor('saving...', self):
+                self.cxt.po.save_all(new=True)
+        except Exception as e:
+            QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
+            return
+    #TODO: figure out how to handle this   
+    def undo_unsaved(self):
+        self.cxt.current = reset(self.cxt.current)
+        self._distribute_context()
+        self.update_display()
         
-
+    # -------- RAW actions --------
+    
     def crop_current_image(self):
         p = self._active_page()
         if not p or not p.dispatcher or not p.left_canvas:
@@ -241,8 +333,8 @@ class MainRibbonController(QMainWindow):
         # Ask the page to collect a rectangle and pass back coords
         def _on_rect(y0, y1, x0, x1):
             try:
-                self.current_obj = crop(self.current_obj, y0, y1, x0, x1)   
-                self.set_current_conditions()
+                self.cxt.current = crop(self.cxt.current, y0, y1, x0, x1)   
+                self._distribute_context()
                 self.update_display()
             finally:
                 p.dispatcher.clear_all_temp()
@@ -251,87 +343,39 @@ class MainRibbonController(QMainWindow):
 
     def automatic_crop(self):
         with busy_cursor('cropping...', self):
-            self.current_obj = t.crop_auto(self.current_obj)
-        self.set_current_conditions()
-        self.update_display()
-
-    def undo_unsaved(self):
-        self.current_obj = reset(self.current_obj)
-        self.set_current_conditions()
+            self.cxt.current = t.crop_auto(self.cxt.current)
+        self._distribute_context()
         self.update_display()
         
-    def save_clicked(self):
-        if self.current_obj.is_raw:
-            QMessageBox.information(self, "save", "Raw data must be processed prior to saving")
-            return
-        if self.current_obj.has_temps:
-            test = two_choice_box('Commit changes before saving?', 'yes', 'no')
-            if test == 'left':
-                self.current_obj.commit_temps()
-                
-        wants_prompt = True
-        if self.current_obj.datasets:
-            wants_prompt = not any(ds.path.exists() for ds in self.current_obj.datasets.values())
-    
-        if wants_prompt:
-            dest = QFileDialog.getExistingDirectory(self, "Choose save folder", str(self.current_obj.root_dir))
-            if not dest:
-                return
-            self.current_obj.update_root_dir(dest)  # rewires every dataset path to the chosen folder
-        try:
-            with busy_cursor('saving...', self):
-                self.current_obj.save_all()
-        except Exception as e:
-            QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
-            return
-    def save_as_clicked(self):
-        if self.current_obj.is_raw:
-            QMessageBox.information(self, "save", "Raw data must be processed prior to saving")
-            return
-        if self.current_obj.has_temps:
-            test = two_choice_box('Commit changes before saving?', 'yes', 'no')
-            if test == 'left':
-                self.current_obj.commit_temps()
-                
-        dest = QFileDialog.getExistingDirectory(self, "Choose save folder", str(self.current_obj.root_dir))
-        if not dest:
-            return
-        self.current_obj.update_root_dir(dest)  # rewires every dataset path to the chosen folder
-        try:
-            with busy_cursor('saving...', self):
-                self.current_obj.save_all(new=True)
-        except Exception as e:
-            QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
-            return
-        
-    
     def process_raw(self):
-        if not self.current_obj.is_raw:
+        if not self.cxt.current.is_raw:
             QMessageBox.information(self, "Process", "Load a raw dataset first.")
             return
         if (
-        not self.current_obj.metadata.get('borehole id')
-        or not self.current_obj.metadata.get('box number')
-        or not self.current_obj.metadata.get('core depth start')
-        or not self.current_obj.metadata.get('core depth stop')
+        not self.cxt.current.metadata.get('borehole id')
+        or not self.cxt.current.metadata.get('box number')
+        or not self.cxt.current.metadata.get('core depth start')
+        or not self.cxt.current.metadata.get('core depth stop')
         ):
-            dlg = MetadataDialog(self.current_obj.metadata, parent=self)
+            dlg = MetadataDialog(self.cxt.current.metadata, parent=self)
             if dlg.exec() == QDialog.Accepted:
                 result = dlg.get_result()
-                self.current_obj.metadata['borehole id'] = result['hole']
-                self.current_obj.metadata['box number'] = result['box']
-                self.current_obj.metadata['core depth start'] = result['depth_from']
-                self.current_obj.metadata['core depth stop'] = result['depth_to']
+                self.cxt.current.metadata['borehole id'] = result['hole']
+                self.cxt.current.metadata['box number'] = result['box']
+                self.cxt.current.metadata['core depth start'] = result['depth_from']
+                self.cxt.current.metadata['core depth stop'] = result['depth_to']
         
         try:
             with busy_cursor('processing...', self):
-                self.current_obj = self.current_obj.process() 
+                print(type(self.cxt.current))
+                self.cxt.po = self.cxt.current.process() 
+                print(type(self.cxt.current))
             
         except Exception as e:
             QMessageBox.warning(self, "Process", f"Failed to process/save: {e}")
             return
 
-        self.set_current_conditions()
+        self.choose_view('vis')
         self.update_display()
         self.statusBar().showMessage("Processed saved")
         
@@ -339,7 +383,7 @@ class MainRibbonController(QMainWindow):
     # -------- MASK actions --------
 
     def act_mask_rect(self):
-        if self.current_obj.is_raw:
+        if self.cxt.current.is_raw:
             QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
             return
         p = self._active_page()
@@ -348,8 +392,8 @@ class MainRibbonController(QMainWindow):
 
         def _on_rect(y0, y1, x0, x1):
             try:
-                self.current_obj = mask_rect(self.current_obj, y0, y1, x0, x1 )
-                self.set_current_conditions()
+                self.cxt.current = mask_rect(self.cxt.current, y0, y1, x0, x1 )
+                self._distribute_context()
                 self.update_display()
             finally:
                 p.dispatcher.clear_all_temp()
@@ -357,7 +401,7 @@ class MainRibbonController(QMainWindow):
         p.left_canvas.start_rect_select()
 
     def act_mask_point(self, mode):
-        if self.current_obj.is_raw:
+        if self.cxt.current.is_raw:
             QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
             return
         p = self._active_page()
@@ -367,8 +411,8 @@ class MainRibbonController(QMainWindow):
         def handle_point_click(y, x):
             try:
                 with busy_cursor('trying mask correlation...', self):
-                    self.current_obj = mask_point(self.current_obj, mode, y, x)
-                self.set_current_conditions()
+                    self.cxt.current = mask_point(self.cxt.current, mode, y, x)
+                self._distribute_context()
                 self.update_display()
             finally:
                 p.dispatcher.clear_all_temp()
@@ -376,19 +420,19 @@ class MainRibbonController(QMainWindow):
         
         
     def act_mask_improve(self):
-        self.current_obj = improve_mask(self.current_obj)
-        self.set_current_conditions()
+        self.cxt.current = improve_mask(self.cxt.current)
+        self._distribute_context()
         self.update_display()
        
     def act_mask_polygon(self):
         p = self._active_page()
-        if not p or not p.dispatcher or self.current_obj is None:
+        if not p or not p.dispatcher or self.cxt.current is None:
             return
     
         def _on_finish(vertices_rc):
             
-            self.current_obj = t.mask_polygon(self.current_obj, vertices_rc)
-            self.set_current_conditions()
+            self.cxt.current = t.mask_polygon(self.cxt.current, vertices_rc)
+            self._distribute_context()
             self.update_display()
             p.dispatcher.clear_all_temp()
         p.dispatcher.set_polygon(_on_finish, temporary=True)
@@ -396,43 +440,43 @@ class MainRibbonController(QMainWindow):
     
     
     def act_mask_calc_stats(self):
-        if self.current_obj.is_raw:
+        if self.cxt.current.is_raw:
             QMessageBox.information(self, "Stats", "Open a processed dataset first.")
             return
-        self.current_obj = t.calc_unwrap_stats(self.current_obj)
+        self.cxt.current = t.calc_unwrap_stats(self.cxt.current)
         
-        self.set_current_conditions()
+        self._distribute_context()
         self.update_display(key = 'segments')
         
         
     def unwrap(self):
         
-        if not self.current_obj.has('stats'):
+        if not self.cxt.current.has('stats'):
             QMessageBox.warning(self, "Warning", "No stats calculated yet.")
             return
         with busy_cursor('unwrapping...', self):
-            self.current_obj = t.unwrapped_output(self.current_obj)
-        self.set_current_conditions()
+            self.cxt.current = t.unwrapped_output(self.cxt.current)
+        self._distribute_context()
         self.update_display(key='DholeAverage')
 
     # -------- VISUALISE actions --------
     def run_feature_extraction(self, key):
         print(key)
         with busy_cursor(f'extracting {key}...', self):
-            self.current_obj = t.run_feature_extraction(self.current_obj, key)
-        self.set_current_conditions()
+            self.cxt.current = t.run_feature_extraction(self.cxt.current, key)
+        self._distribute_context()
         self.update_display()
         
         
     def act_vis_correlation(self, kind: str):
-        if self.current_obj.is_raw:
+        if self.cxt.current.is_raw:
             QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
             return
         exemplars, coll_name = self.lib_page.get_collection_exemplars()
         with busy_cursor('correlation...', self):
-            self.current_obj = t.wta_min_map(self.current_obj, exemplars, coll_name, kind)
+            self.cxt.current = t.wta_min_map(self.cxt.current, exemplars, coll_name, kind)
         
-        self.set_current_conditions()
+        self.choose_view('vis')
         self.update_display()
 
     def act_kmeans(self):
@@ -462,9 +506,9 @@ class MainRibbonController(QMainWindow):
         if not ok2:
             return
         
-        with busy_cursor('unwrapping...', self):
-            self.current_obj = t.kmeans_caller(self.current_obj)
-        self.set_current_conditions()
+        with busy_cursor('clustering...', self):
+            self.cxt.current = t.kmeans_caller(self.cxt.current, clusters, iters)
+        self.choose_view('vis')
         
         self.update_display(key=f'kmeans-{clusters}-{iters}INDEX')
 
