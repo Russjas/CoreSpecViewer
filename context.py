@@ -8,10 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional, Any
-
-# forward references avoid circular imports
-if False:
-    from objects import RawObject, ProcessedObject, HoleObject
+from objects import RawObject, ProcessedObject, HoleObject
 @dataclass
 class CurrentContext:
     """
@@ -36,19 +33,66 @@ class CurrentContext:
         Name of the currently active tool (for UI/tool dispatcher).
     """
 
-    po: Optional["ProcessedObject"] = None
-    ro: Optional["RawObject"] = None
-    ho: Optional["HoleObject"] = None
-    review_log: Optional[Path] = None
-    project_root: Optional[Path] = None
+    _po: Optional["ProcessedObject"] = None
+    _ro: Optional["RawObject"] = None
+    _ho: Optional["HoleObject"] = None
+    _review_log: Optional[Path] = None
+    _project_root: Optional[Path] = None
+    active: Optional[str] = None
+    
+    #----- properties for enforcing active set on assignment
+    @property
+    def po(self): return self._po
+    
+    @po.setter
+    def po(self, obj):
+        self._po = obj
+        self.active = "po" if obj is not None else None
+
+    @property
+    def ro(self): return self._ro
+    
+    @ro.setter
+    def ro(self, obj):
+        self._ro = obj
+        self.active = "ro" if obj is not None else None
+
+    @property
+    def ho(self): return self._ho
+    
+    @ho.setter
+    def ho(self, obj):
+        self._ho = obj
+    
+    #current object can only ever be PO or RO - access point for tools that can use either        
+    @property
+    def current(self) -> Optional[Any]:
+        if self.active == "po": return self._po
+        if self.active == "ro": return self._ro
+        return None
+    
+    #current object can only ever be PO or RO - access point for tools that can use either
+    @current.setter
+    def current(self, obj):
+        if obj is None:
+            self.active = None
+            return
+        
+        is_raw = getattr(obj, "is_raw", None)
+        if is_raw is True:
+            self.ro = obj
+            return
+        if is_raw is False:
+            self.po = obj
+            return
+        
+        
+
+
     # ------------------------------------------------------------------
     # convenience properties
     # ------------------------------------------------------------------
-    @property
-    def obj(self) -> Optional[Any]:
-        """Return whichever object is currently active (PO > RO > HO)."""
-        return self.po or self.ro or self.ho
-
+    
     @property
     def has_processed(self) -> bool:
         return self.po is not None
@@ -61,40 +105,14 @@ class CurrentContext:
     def has_hole(self) -> bool:
         return self.ho is not None
 
+   
     @property
-    def summary(self) -> str:
-        """Compact human-readable summary for debug/logging."""
-        parts = []
-        if self.po:
-            parts.append(f"PO: {getattr(self.po, 'name', type(self.po).__name__)}")
-        if self.ro:
-            parts.append(f"RO: {getattr(self.ro, 'name', type(self.ro).__name__)}")
-        if self.ho:
-            parts.append(f"HO: {getattr(self.ho, 'hole_id', type(self.ho).__name__)}")
-        if self.review_log:
-            parts.append(f"log: {self.review_log.name}")
-        return " | ".join(parts) if parts else "(empty context)"
+    def metadata(self) -> Optional[dict]:
+        if self._ho is not None: return self._ho.metadata
+        if self._po is not None: return self._po.metadata
+        if self._ro is not None: return self._ro.metadata
+        return None
 
-    # ------------------------------------------------------------------
-    # simple state management
-    # ------------------------------------------------------------------
-    #TODO: This is generic, develop as I find a need for it
-    def clear(self, level: str = "all") -> None:
-        """
-        Clear parts of the context.
-
-        level = "po" clears only processed object
-        level = "ro" clears raw + processed
-        level = "ho" clears everything
-        level = "all" clears everything including review_log
-        """
-        if level in ("po", "ro", "ho", "all"):
-            self.po = None
-        if level in ("ro", "ho", "all"):
-            self.ro = None
-        if level in ("ho", "all"):
-            self.ho = None
-        if level == "all":
-            self.review_log = None
+   
 
     

@@ -12,9 +12,10 @@ Created on Wed Oct 22 09:47:46 2025
 # - VisualisePage (WorkingWindow-like)
 import os, sys
 import numpy as np
-from PyQt5.QtWidgets import (QSplitter, QVBoxLayout, QTableWidgetItem,QTableWidget,
+from PyQt5.QtWidgets import (QSplitter, QVBoxLayout, QHBoxLayout, QTableWidgetItem,QTableWidget,
                              QApplication, QWidget, QToolBar, QPushButton, QFileDialog,
-                             QTableView, QMessageBox, QInputDialog, QComboBox)
+                             QTableView, QMessageBox, QInputDialog, QComboBox,
+                             QDialog)
 
 from PyQt5.QtCore import Qt, QModelIndex
 from PyQt5.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
@@ -23,7 +24,7 @@ from util_windows import (SpectralImageCanvas, ImageCanvas2D,
                           IdSetFilterProxy)
 from tool_dispatcher import ToolDispatcher
 import tools as t
-
+from context import CurrentContext
 
 
 class BasePage(QWidget):
@@ -44,7 +45,20 @@ class BasePage(QWidget):
         lay.addWidget(self._splitter)
 
         # Data models available to the page (set by controller)
-        self.current_obj = None           # RawObject
+        self._cxt = CurrentContext()
+    
+    @property
+    def cxt(self) -> CurrentContext | None:
+        return self._cxt
+
+    @cxt.setter
+    def cxt(self, new_cxt: CurrentContext | None):
+        self._cxt = new_cxt
+
+    # all existing code can keep using self.current_obj
+    @property
+    def current_obj(self):
+        return self._cxt.current if self._cxt else None
        
 
     # --- building helpers ----------------------------------------------------
@@ -161,7 +175,7 @@ class RawPage(BasePage):
         self._add_left(SpectralImageCanvas(self))
         
 
-    def update(self, key = None):
+    def update(self, key = 'mask'):
         self.left_canvas.show_rgb(self.current_obj.get_display_reflectance(), self.current_obj.bands)
 
  
@@ -245,7 +259,7 @@ class VisualisePage(BasePage):
         self.table.setHorizontalHeaderItem(0, QTableWidgetItem("Cached Products"))
 
         
-    def update(self, key=None):
+    def update(self, key='mask'):
         self.left_canvas.show_rgb(self.current_obj.savgol, self.current_obj.bands)
         
         
@@ -323,7 +337,7 @@ class VisualisePage(BasePage):
             try:
                 table_title = f'{self.current_obj.metadata["borehole id"]} {self.current_obj.metadata["box number"]}'
             except:
-                table_tite = 'Cached products'
+                table_title = 'Cached products'
         self.table.setHorizontalHeaderItem(0, QTableWidgetItem(table_title))
     
         for k in sorted(self.cache):  # stable order
@@ -412,7 +426,7 @@ class LibraryPage(BasePage):
         super().__init__(parent)
         self.setWindowTitle("CoreSpecViewer")
         self.setGeometry(100, 100, 1000, 600)
-        self.current_obj = None
+        
         # State
         self.spec_win = None
         self.db_path = None
@@ -477,6 +491,7 @@ class LibraryPage(BasePage):
            self._proxy.set_allowed_ids(self.collections.get(text))
        else:
            self._proxy.set_allowed_ids(None)
+           
     def _refresh_collection_selector(self):
         """Refresh the 'Show:' selector entries."""
         sel = self.view_selector
@@ -1060,7 +1075,53 @@ class LibraryPage(BasePage):
         rng = f"{np.nanmin(bands_nm):.1f}–{np.nanmax(bands_nm):.1f} nm"
         QMessageBox.information(self, "Filtered", f"{count} spectra cover {rng}.")
 
-# --- Application Entry Point ---
+
+
+
+class AutoSettingsDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Settings")
+        self.resize(420, 320)
+        cfg = t.get_config()
+
+        # Build dynamic table: Key | Value
+        self.tbl = QTableWidget(len(cfg), 2)
+        self.tbl.setHorizontalHeaderLabels(["Setting", "Value"])
+        self.tbl.horizontalHeader().setStretchLastSection(True)
+
+        for row, (k, v) in enumerate(cfg.items()):
+            key_item = QTableWidgetItem(k)
+            key_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
+            val_item = QTableWidgetItem(str(v))
+            self.tbl.setItem(row, 0, key_item)
+            self.tbl.setItem(row, 1, val_item)
+
+        btn_save = QPushButton("Save")
+        btn_cancel = QPushButton("Cancel")
+        btn_save.clicked.connect(self._on_save)
+        btn_cancel.clicked.connect(self.reject)
+
+        row = QHBoxLayout()
+        row.addStretch(1)
+        row.addWidget(btn_cancel)
+        row.addWidget(btn_save)
+
+        root = QVBoxLayout(self)
+        root.addWidget(self.tbl)
+        root.addLayout(row)
+
+    def _on_save(self):
+        for r in range(self.tbl.rowCount()):
+            key = self.tbl.item(r, 0).text()
+            val = self.tbl.item(r, 1).text()
+            t.modify_config(key, val)
+        
+        self.accept()
+
+
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     viewer = LibraryPage()

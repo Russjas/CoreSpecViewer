@@ -24,19 +24,25 @@ from gfit.util import remove_hull
 import hylite
 from hylite.analyse import minimum_wavelength
 import cv2
+from config import con_dict  # live shared dict
 
 
-
-Lumo_swir_slice = slice(13, 262, None)
-Lumo_mwir_slice = slice(5, 142, None)
-Lumo_rgb_slice = slice(0,-1,None)
-stellenbosch_slice = slice(5,-5,None)
-
+def _slice_from_sensor(sensor_type: str):
+    s = sensor_type or ""
+    print(s)
+    if "SWIR" in s:
+        start, stop = con_dict["swir_slice_start"], con_dict["swir_slice_stop"]
+    elif "RGB" in s:
+        start, stop = con_dict["rgb_slice_start"], con_dict["rgb_slice_stop"]
+    elif "FX50" in s: 
+        start, stop = con_dict["mwir_slice_start"], con_dict["mwir_slice_stop"]
+    else:
+        start, stop = con_dict["default_slice_start"], con_dict["default_slice_stop"]
+    print(slice(start, stop, None))
+    return slice(start, stop, None)
 
 def read_envi_header(file):
     return envi.read_envi_header(file)
-
-
 
 def parse_lumo_metadata(xml_file):
     tree = ET.parse(xml_file)
@@ -107,7 +113,10 @@ def reflect_correct(data, white, dark):
     M, N, B = data.shape
     wmax = np.mean(white, axis=0)
     dmin = np.mean(dark, axis=0)
-    result = np.divide(np.subtract(data, dmin), np.subtract(wmax, dmin))
+    denom = np.subtract(wmax, dmin) # Calculate denominator
+
+    result = np.where(denom != 0, np.divide(np.subtract(data, dmin), denom), 0.0)
+    #result = np.divide(np.subtract(data, dmin), np.subtract(wmax, dmin))
     result[result < 0] = 0
     return result * 100
 
@@ -227,19 +236,10 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False): # TODO
     if QAQC:
         band_slice, snr = bands_from_snr(white_ref, dark_ref, snr_thresh=20.0)
     else:
-        print(header['sensor type'])
-        if 'SWIR' in header['sensor type']:
-            band_slice = Lumo_swir_slice
-            snr = None
-        elif 'RGB' in header['sensor type']:
-            band_slice = Lumo_rgb_slice
-            snr = None
-        elif 'Specim Hyperspectral Sensor' in header['sensor type']:
-            band_slice = stellenbosch_slice
-            snr = None
-        else:
-            band_slice = Lumo_mwir_slice
-            snr = None
+        sensor = header['sensor type']
+        band_slice = _slice_from_sensor(sensor)
+        snr = None
+        
         
     data  = data[:, :, band_slice]
     white = white_ref[:, :, band_slice]
@@ -253,8 +253,9 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False): # TODO
 # Actual processing funcs========================================================
 
 def process(cube):
-    
-    savgol = sc.signal.savgol_filter(cube, 10, 2)
+    win = int(con_dict["savgol_window"])
+    poly = int(con_dict["savgol_polyorder"])
+    savgol = sc.signal.savgol_filter(cube, win, poly)
     savgol_cr = remove_hull(savgol)
     mask = np.zeros((cube.shape[0], cube.shape[1]))
     return savgol, savgol_cr, mask
@@ -1007,12 +1008,6 @@ def crop_with_mask_cv2(cube, mask, margin=0, invert=False, min_area=0):
     cropped = cube[y0:y1, x0:x1, :]
     return cropped, (y0, y1, x0, x1)
 
-HERE = pathlib.Path(__file__).resolve().parent
-MODEL_PATH = HERE / "models" / "Box_picker_YOLO.pt"
-
-
-print(MODEL_PATH)
-
 def get_coords(box):
     yolo_x, yolo_y, yolo_width, yolo_height = box.xywhn[0].tolist()
     image_height, image_width = box.orig_shape
@@ -1157,45 +1152,6 @@ def numpy_pearson_stackexemplar_threshed(data, exemplar_stack):
     return coeffs, confidence
     
 
-# =============================================================================
-# #TODO decide on which
-# def mineral_map_wta(data, exemplar_stack):
-#     """
-#     this is the GPT version for me to test
-#     Compute a winner-takes-all Pearson class index and best-corr map.
-# 
-#     Parameters
-#     ----------
-#     obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
-#     exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
-#         Usually from LibraryPage.get_collection_exemplars().
-#     use_cr : bool
-#         If True, continuum-removes each exemplar to match obj.savgol_cr.
-# 
-#     Returns
-#     -------
-#     class_idx : (H,W) int32
-#     best_corr : (H,W) float32
-#     labels    : list[str]
-#     """
-#     H, W, B = data.shape
-# 
-#     # z-score bank and pixels (Pearson via dot-product)
-#     bank = exemplar_stack - exemplar_stack.mean(axis=1, keepdims=True)
-#     bank /= np.maximum(bank.std(axis=1, keepdims=True), 1e-8)
-# 
-#     X = data.reshape(-1, B).astype(np.float32)
-#     X -= X.mean(axis=1, keepdims=True)
-#     X /= np.maximum(X.std(axis=1, keepdims=True), 1e-8)
-# 
-#     corr = X @ bank.T                  # (N,K)
-#     corr = corr.reshape(H, W, -1)
-# 
-#     class_idx = np.argmax(corr, axis=2).astype(np.int32)
-#     best_corr = np.take_along_axis(corr, class_idx[..., None], axis=2)[..., 0].astype(np.float32)
-#     return class_idx, best_corr
-# 
-# =============================================================================
 def mineral_map_wta(data, exemplar_stack, thresh=0.70, invalid_value=-999):
     """
     Vectorized winner-takes-all Pearson to match np.corrcoef semantics.
