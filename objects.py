@@ -88,6 +88,7 @@ class Dataset:
     suffix: str
     ext: str
     data: object = None
+    thumb: Optional[Image] = None
     _memmap_ref: Union[np.memmap, None] = field(default=None, compare=False)
     def __post_init__(self):
         """Normalize the path and automatically load data if the file exists."""
@@ -104,9 +105,11 @@ class Dataset:
         Explicitly close any outstanding memmap file handle to release the OS lock.
         Attempt to fix an annoying save bug
         """
+        
         if self._memmap_ref is not None:
-            
-            self._memmap_ref.close()
+            mm = self._memmap_ref._mmap
+            if mm is not None:
+                mm.close()
             self._memmap_ref = None
 
     def load_dataset(self):
@@ -129,7 +132,7 @@ class Dataset:
                 self._memmap_ref = data
             self.data = data
 
-        # JSON: read text then parse (your original line had args in the wrong order)
+        
         elif self.ext == '.json':
             self.data =json.loads(self.path.read_text(encoding="utf-8"))
             
@@ -158,8 +161,6 @@ class Dataset:
         ValueError
             If no data is loaded or the file type is unsupported.
         """
-        print(self.path)
-        print(type(self.data))
         if self.data is None:
             raise ValueError("No data loaded or assigned; nothing to save.")
         
@@ -171,15 +172,21 @@ class Dataset:
                 self.path,
                 data=self.data.data,  # raw data
                 mask=self.data.mask)
-        
-        
+                    
         elif self.ext == '.npy':
-            self.close_handle()
+            # If it's a memmap and we're not creating new, just return
+            if isinstance(self.data, np.memmap) and not new:
+                return
             if isinstance(self.data, np.memmap):
-                if not new:
-                    return
+                data_copy = np.array(self.data)
+                self.close_handle()  # Now safe to close
+                self.data = data_copy  # Replace with in-memory copy
+            
+            
+            
             np.save(self.path, self.data)
-    
+            
+            
         elif self.ext == '.json':
             text = json.dumps(self.data, indent=2)
             self.path.write_text(text, encoding='utf-8')
@@ -193,25 +200,39 @@ class Dataset:
     def copy(self, data=None):
         """
         Create a shallow copy of this Dataset, optionally replacing its data.
-
-        Parameters
-        ----------
-        data : object, optional
-            Replacement data object. If omitted, the current data is shallow-copied.
-
-        Returns
-        -------
-        Dataset
-            A new Dataset instance with identical metadata and copied data.
         """
+        # Force conversion to regular array if memmap
+        if data is None:
+            if isinstance(self.data, np.memmap):
+                new_data = np.array(self.data, copy=True)
+            else:
+                new_data = self.data.copy()
+        else:
+            if isinstance(data, np.memmap):
+                new_data = np.array(data, copy=True)
+            else:
+                new_data = data.copy()
+        
         return Dataset(
             base=self.base,
             key=self.key,
             path=self.path,
             suffix=self.suffix,
             ext=self.ext,
-            data=self.data.copy() if data is None else data.copy()
+            data=new_data
         )
+    
+    
+    
+    
+    def save_thumb(self):
+        
+        if self.thumb is not None:
+            self.thumb.save(str(self.path)[:-len(self.ext)]+'thumb.jpg')
+    
+    
+            
+    
 
 @dataclass
 class ProcessedObject:
@@ -242,6 +263,8 @@ class ProcessedObject:
     root_dir: Path
     datasets: dict = field(default_factory=dict)
     temp_datasets: dict = field(default_factory=dict)
+ 
+    
 
     # ---- convenience attribute passthrough ----
     def __getattr__(self, name):
@@ -320,8 +343,11 @@ class ProcessedObject:
             b, key = cls._parse_stem_with_exception(s)
             if b is None or b != basename:
                 continue  # not part of this basename group
+            if key.endswith('thumb'):                continue
 
             ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
+            
+                
             ds = Dataset(base=basename, key=key, path=fp, suffix=key, ext=ext)
             datasets[key] = ds
 
@@ -370,12 +396,18 @@ class ProcessedObject:
     def update_dataset(self, key, data):
         """Replace the in-memory data for a given dataset key."""
         self.datasets[key].data = data
-        #self.datasets[key].save_dataset()
+
         
     def commit_temps(self):
         """Promote all temporary datasets to permanent and clear temp cache."""
         for key in self.temp_datasets.keys():
-            self.datasets[key] = self.temp_datasets[key]
+            # Close old memmap handle before replacing
+            if key in self.datasets:
+                self.datasets[key]._memmap_ref = None
+                self.datasets[key].data = None
+                del self.datasets[key]
+                self.datasets[key] = self.temp_datasets[key]
+        
         self.clear_temps()
     
     def clear_temps(self):
@@ -432,10 +464,54 @@ class ProcessedObject:
         for ds in self.datasets.values():
             ds.load_dataset()
             
-    def build_thumbs(self):
-        for ds in self.datasets.values:
-            if ds.ext != '.npy':
-                continue
+    def build_thumb(self, key):
+        if key not in self.datasets.keys():
+            return
+        ds = self.datasets[key]
+        try:
+            if ds.ext == '.npy' and ds.data.ndim > 1:
+                if key == 'mask':
+                    im = sf.mk_thumb(ds.data)
+                    self.datasets[key].thumb = im
+                else:
+                    im = sf.mk_thumb(ds.data, mask = self.mask)
+                    self.datasets[key].thumb = im
+            elif ds.ext == '.npz':
+                im = sf.mk_thumb(ds.data.data, mask = ds.data.mask)
+                self.datasets[key].thumb = im
+            else:
+                return
+        except ValueError:
+            return
+    def build_all_thumbs(self):
+        """Build thumbnails for all thumbnail-able datasets."""
+        for key, ds in self.datasets.items():
+            if ds.ext in ('.npy', '.npz'):
+                try:
+                    self.build_thumb(key)
+                except Exception:
+                    continue
+    
+    def save_all_thumbs(self):
+        """Save any in-memory thumbnails as JPEGs beside their datasets."""
+        for ds in self.datasets.values():
+            if ds.thumb is not None:
+                ds.save_thumb()
+                
+    def load_thumbs(self):
+        for key, ds in self.datasets.items():
+            if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
+                self.datasets[key].thumb = Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg')
+                
+    def load_or_build_thumbs(self):
+        for key, ds in self.datasets.items():
+            print(key)
+            if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
+                self.datasets[key].thumb = Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg')
+            else:
+                self.build_thumb(key)
+        
+            
             
 
 SPECIM_LUMO_REQUIRED = {
@@ -795,7 +871,11 @@ class HoleObject:
             if not tst:
                 return False
         return True
-
+    
+    def get_all_thumbs(self):
+        for i in self:
+            i.load_or_build_thumbs()
+    
     def __iter__(self) -> Iterator["ProcessedObject"]:
         for bn in sorted(self.boxes):
             yield self.boxes[bn]
@@ -825,6 +905,10 @@ class HoleObject:
 
 if __name__ == '__main__':
     test = HoleObject.build_from_parent_dir('D:/Multi_process_test/')
+    test.get_all_thumbs()
     #%%
-    tst = test.check_for_all_keys('dhole')
-    print(tst)
+    for i in test:
+        i.get_all_thumbs()
+   
+    
+    

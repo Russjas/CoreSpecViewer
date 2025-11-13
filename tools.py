@@ -186,6 +186,10 @@ def mask_rect(obj, ymin, ymax, xmin, xmax):
     if not obj.has_temp('mask'):
         obj.add_temp_dataset('mask')
     obj.mask[ymin:ymax, xmin:xmax] = 1
+    print(type(obj.mask))
+    print(f"Type of temp dataset object: {type(obj.temp_datasets['mask'])}")
+    print(f"Type of temp dataset data: {type(obj.temp_datasets['mask'].data)}")
+    print(f"Type via __getattr__: {type(obj.mask)}")
     return obj
 
 def mask_point(obj, mode, y, x):

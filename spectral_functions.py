@@ -9,6 +9,7 @@ import spectral as sp
 import numpy as np
 import scipy as sc
 
+
 from numba import jit
 from PIL import Image
 from datetime import datetime, date
@@ -25,7 +26,9 @@ import hylite
 from hylite.analyse import minimum_wavelength
 import cv2
 from config import con_dict  # live shared dict
-
+import matplotlib
+my_map = matplotlib.colormaps['viridis']
+my_map.set_bad('black')
 
 def _slice_from_sensor(sensor_type: str):
     s = sensor_type or ""
@@ -1250,16 +1253,119 @@ def kmeans_spectral_wrapper(data, clusters, iters):
     m, c = sp.kmeans(data, clusters, iters)
     return m, c
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+def mk_thumb(arr, baseheight=90, basewidth=800, mask=None):
+    """
+    Create a PIL thumbnail image from an array, using the same
+    visual conventions as ImageCanvas2D.show_rgb.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Shape (H, W, B), (H, W) or (H, W, 3).
+    baseheight : int
+        Max height of the thumbnail (pixels).
+    basewidth : int
+        Max width of the thumbnail (pixels).
+    mask : np.ndarray[bool], optional
+        Boolean mask of shape (H, W). True = masked (black).
+
+    Returns
+    -------
+    PIL.Image.Image
+        RGB thumbnail image, ready to save as JPEG.
+    """
+    arr = np.asarray(arr)
+
+    if arr.ndim not in (2, 3):
+        raise ValueError(f"Unsupported array shape {arr.shape}; expected 2D or 3D.")
+    if 0 in arr.shape:
+        raise ValueError(f"arr shape {arr.shape} cannot have a zero size dim")
+
+    if mask is not None:
+        mask = np.asarray(mask, dtype=bool)
+        if mask.shape != arr.shape[:2]:
+            raise ValueError(
+                f"Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}."
+            )
+    if arr.shape[0] > arr.shape[1]:
+        arr = np.flip(np.swapaxes(arr, 0, 1), axis=0)
+        if mask is not None:
+            mask = np.flip(np.swapaxes(mask, 0, 1), axis=0)
+    # ---- Convert to RGB (H, W, 3), matching ImageCanvas2D.show_rgb logic
+    if arr.ndim == 2:
+        # 2D -> use the same colormap as show_rgb (my_map, with min/max scaling)
+        a = arr.astype(float)
+        amin = np.nanmin(a)
+        amax = np.nanmax(a)
+        if amax > amin:
+            norm = (a - amin) / (amax - amin)
+        else:
+            norm = np.zeros_like(a, dtype=float)
+        rgb = my_map(norm)[..., :3]  # (H, W, 3) float in [0,1]
+
+        # scale to 0–255
+        rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
+
+    else:
+        # 3D
+        H, W, C = arr.shape
+
+        # Hyperspectral -> use the same false-colour function as the viewer
+        if C > 3:
+            fc = get_false_colour(arr)  # should return (H, W, 3)
+            fc = np.asarray(fc)
+            if fc.ndim != 3 or fc.shape[2] != 3:
+                raise ValueError("sf.get_false_colour must return an (H, W, 3) array.")
+            # handle float vs uint8
+            if np.issubdtype(fc.dtype, np.integer):
+                rgb8 = np.clip(fc, 0, 255).astype(np.uint8)
+            else:
+                # float: assume arbitrary range, normalise to [0,1]
+                vmin = np.nanmin(fc)
+                vmax = np.nanmax(fc)
+                if vmax > vmin:
+                    rgb = (fc - vmin) / (vmax - vmin)
+                else:
+                    rgb = np.zeros_like(fc, dtype=float)
+                rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
+
+        else:
+            # C == 1 or C == 3
+            a = arr
+
+            if C == 1:
+                a = np.repeat(a, 3, axis=2)
+
+            # Now a is (H, W, 3)
+            if np.issubdtype(a.dtype, np.integer):
+                # Assume uint8-style data
+                rgb8 = np.clip(a, 0, 255).astype(np.uint8)
+            else:
+                # float: we don't know the range -> normalise like imshow defaults
+                vmin = np.nanmin(a)
+                vmax = np.nanmax(a)
+                if vmax > vmin:
+                    rgb = (a - vmin) / (vmax - vmin)
+                else:
+                    rgb = np.zeros_like(a, dtype=float)
+                rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
+
+    # ---- Apply mask (masked regions = black)
+    if mask is not None:
+        rgb8[mask] = 0
+
+    # ---- Create PIL image and resize with aspect-ratio preserved
+    h, w = rgb8.shape[:2]
+    scale = min(basewidth / float(w), baseheight / float(h), 1.0)
+    new_w = max(1, int(round(w * scale)))
+    new_h = max(1, int(round(h * scale)))
+
+    im = Image.fromarray(rgb8, mode="RGB")
+    im = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    return im
+
+
     
     
     

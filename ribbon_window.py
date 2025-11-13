@@ -175,7 +175,7 @@ class MainRibbonController(QMainWindow):
     
     def _on_tab_changed(self, new_idx: int):
         """Handles user-initiated tab changes."""
-        print('tab changed handled')  
+        
         # teardown old (the one that just lost focus)
         old_idx = getattr(self, "_last_tab_idx", -1)
         if 0 <= old_idx < self.tabs.count():
@@ -294,6 +294,8 @@ class MainRibbonController(QMainWindow):
             self.cxt.current.update_root_dir(dest)  # rewires every dataset path to the chosen folder
         try:
             with busy_cursor('saving...', self):
+                self.cxt.current.build_all_thumbs()
+                self.cxt.current.save_all_thumbs()
                 self.cxt.current.save_all()
         except Exception as e:
             QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
@@ -313,6 +315,8 @@ class MainRibbonController(QMainWindow):
         self.cxt.current.update_root_dir(dest)  # rewires every dataset path to the chosen folder
         try:
             with busy_cursor('saving...', self):
+                self.cxt.current.build_all_thumbs()
+                self.cxt.current.save_all_thumbs()
                 self.cxt.po.save_all(new=True)
         except Exception as e:
             QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
@@ -367,9 +371,9 @@ class MainRibbonController(QMainWindow):
         
         try:
             with busy_cursor('processing...', self):
-                print(type(self.cxt.current))
+                
                 self.cxt.po = self.cxt.current.process() 
-                print(type(self.cxt.current))
+                
             
         except Exception as e:
             QMessageBox.warning(self, "Process", f"Failed to process/save: {e}")
