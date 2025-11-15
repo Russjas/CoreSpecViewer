@@ -156,23 +156,6 @@ def discover_lumo_directories(root_dir: Path) -> list[Path]:
     
     return sorted(set(dirs))
 
-
-
-def process_multibox(src, dest):
-    src = Path(src)
-    sub_dir_list = discover_lumo_directories(src)
-    for box in sub_dir_list:
-        print(box)
-        try:
-            raw = RawObject.from_Lumo_directory(box)
-        except ValueError:
-            print('Not a lumo directory')
-            continue
-        cropped = crop_auto(raw)
-        PO = cropped.process()
-        PO.update_root_dir(dest)
-        PO.save_all()
-
 def reset(obj):
     if obj.is_raw:
         obj.temp_reflectance = None
@@ -186,10 +169,6 @@ def mask_rect(obj, ymin, ymax, xmin, xmax):
     if not obj.has_temp('mask'):
         obj.add_temp_dataset('mask')
     obj.mask[ymin:ymax, xmin:xmax] = 1
-    print(type(obj.mask))
-    print(f"Type of temp dataset object: {type(obj.temp_datasets['mask'])}")
-    print(f"Type of temp dataset data: {type(obj.temp_datasets['mask'].data)}")
-    print(f"Type via __getattr__: {type(obj.mask)}")
     return obj
 
 def mask_point(obj, mode, y, x):
@@ -257,8 +236,8 @@ def improve_mask(obj):
 def calc_unwrap_stats(obj):
     label_image, stats = sf.get_stats_from_mask(obj.mask)
     label_image = label_image / np.max(label_image)
-    obj.add_dataset('stats', stats, '.npy')
-    obj.add_dataset('segments', label_image, '.npy')
+    obj.add_temp_dataset('stats', stats, '.npy')
+    obj.add_temp_dataset('segments', label_image, '.npy')
     
     return obj
 
@@ -268,20 +247,22 @@ def unwrapped_output(obj):
     dhole_depths = np.linspace(float(obj.metadata['core depth start']), float(obj.metadata['core depth stop']),  
                                     dhole_reflect.shape[0])
     
-    obj.add_dataset('DholeAverage', dhole_reflect.data, '.npy')
-    obj.add_dataset('DholeMask', dhole_reflect.mask, '.npy')
-    obj.add_dataset('DholeDepths', dhole_depths, '.npy')
+    obj.add_temp_dataset('DholeAverage', dhole_reflect.data, '.npy')
+    obj.add_temp_dataset('DholeMask', dhole_reflect.mask, '.npy')
+    obj.add_temp_dataset('DholeDepths', dhole_depths, '.npy')
 
 
     return obj
 
 def run_feature_extraction(obj, key): 
     pos, dep, feat_mask = sf.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'QUAD')
-    obj.add_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
-    obj.add_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
+    obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
+    obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
     
 def quick_corr(obj, x, y):
+    if obj.is_raw():
+        return None
     res_y = sf.resample_spectrum(x, y, obj.bands)
     return np.ma.masked_array(sf.numpy_pearson(obj.savgol_cr, sf.cr(res_y)), mask = obj.mask)
 
@@ -329,10 +310,7 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     if not bank:
         raise ValueError("No exemplars provided.")
     exemplar_stack = np.vstack(bank)
-    if mode == 'numpy':
-        index, confidence = sf.numpy_pearson_stackexemplar_threshed(data, exemplar_stack)
-    else:
-        index, confidence = sf.mineral_map_wta_strict(data, exemplar_stack)
+    index, confidence = sf.mineral_map_wta_strict(data, exemplar_stack)
     
     def _stage(key: str, ext: str, data):
         ds = Dataset(
@@ -347,9 +325,9 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
         return key
     legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
     
-    idx_key   = _stage(f"{key_prefix}{mode}INDEX",  ".npy",  index.astype(np.int16))
-    legend_key = _stage(f"{key_prefix}{mode}LEGEND",  ".json",  legend)
-    confidence_key = _stage(f'{key_prefix}{mode}CONF', '.npy', confidence)
+    idx_key   = _stage(f"{key_prefix}INDEX",  ".npy",  index.astype(np.int16))
+    legend_key = _stage(f"{key_prefix}LEGEND",  ".json",  legend)
+    confidence_key = _stage(f'{key_prefix}CONF', '.npy', confidence)
     
     return obj
 
@@ -374,8 +352,8 @@ def kmeans_caller(obj, clusters = 5, iters = 50):
     labels_full[idx] = img
     clustered_map = labels_full.reshape(H, W)
     
-    obj.add_dataset(f'kmeans-{clusters}-{iters}INDEX', clustered_map, '.npy')
-    obj.add_dataset(f'kmeans-{clusters}-{iters}CLUSTERS', classes, '.npy')
+    obj.add_temp_dataset(f'kmeans-{clusters}-{iters}INDEX', clustered_map, '.npy')
+    obj.add_temp_dataset(f'kmeans-{clusters}-{iters}CLUSTERS', classes, '.npy')
     return obj
 
 if __name__ == "__main__":

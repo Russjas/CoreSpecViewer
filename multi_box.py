@@ -95,10 +95,14 @@ def process_multibox(src, dest, *,
             if out_meta.exists() and not force:
                 status, msg = "skipped", "already processed"
             else:
+                #hacked away 
+                #TODO build crop guards to avoid overcropping
                 raw = RawObject.from_Lumo_directory(box)     # may raise ValueError
-                cropped = crop_auto(raw)
-                po = cropped.process()
+                #cropped = crop_auto(raw)
+                po = raw.process()
                 po.update_root_dir(dest)
+                po.build_all_thumbs()
+                po.save_all_thumbs()
                 po.save_all()
                 out_meta = str(po.datasets['metadata'].path)
                 msg = "processed ok"

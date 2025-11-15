@@ -40,18 +40,6 @@ def busy_cursor(msg=None, window=None):
         if window and hasattr(window, "statusBar"):
             window.statusBar().clearMessage()
 
-class EventBus(QObject):
-    dataset_discovered = pyqtSignal(object)  # payload: {"box": str, "kind": "raw"|"processed", "path": str}
-
-BUS = EventBus()
-
-def post_dataset_ref(box: str, kind: str, path: str):
-    
-    """Lightweight, validated emit used by child windows."""
-    if not box or kind not in ("raw", "processed") or not path:
-        return
-    
-    BUS.dataset_discovered.emit({"box": box, "kind": kind, "path": path})
 
 class IdSetFilterProxy(QSortFilterProxyModel):
     """
@@ -285,6 +273,10 @@ class ImageCanvas2D(QWidget):
     
         self.canvas.draw_idle()
 
+    def clear_memmap_refs(self):
+        """Clear any matplotlib artists that might hold data references."""
+        self.ax.clear()
+        self.canvas.draw_idle()
 
 class SpectralImageCanvas(QWidget):
     def __init__(self, parent=None):
@@ -458,6 +450,12 @@ class SpectralImageCanvas(QWidget):
             return None
         y0, y1, x0, x1 = self._last_rect
         return slice(y0, y1), slice(x0, x1)
+    def clear_memmap_refs(self):
+        """Release any memmap references held by this canvas."""
+        self.cube = None
+        self.bands = None
+        self.ax.clear()  # Also clear matplotlib artists
+        self.canvas.draw_idle()
 
 class ClosableWidgetWrapper(QWidget):
     """

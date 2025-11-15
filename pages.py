@@ -59,7 +59,8 @@ class BasePage(QWidget):
     @property
     def current_obj(self):
         return self._cxt.current if self._cxt else None
-       
+    
+          
 
     # --- building helpers ----------------------------------------------------
     def _add_left(self, w: QWidget):
@@ -143,6 +144,9 @@ class BasePage(QWidget):
             self._right = None
         elif w is self._third:
             self._third = None
+            
+    def update_display(self, key='mask'):
+        pass
     # --- accessors for the controller ---------------------------------------
     @property
     def left_canvas(self) -> SpectralImageCanvas:
@@ -175,14 +179,16 @@ class RawPage(BasePage):
         self._add_left(SpectralImageCanvas(self))
         
 
-    def update(self, key = 'mask'):
+    def update_display(self, key = 'mask'):
+        if self.current_obj is None:
+            return
         self.left_canvas.show_rgb(self.current_obj.get_display_reflectance(), self.current_obj.bands)
 
- 
+    
         
 class VisualisePage(BasePage):
     """
-    Mirrors your WorkingWindow central content:
+    Mirrors WorkingWindow central content:
       left  = SpectralImageCanvas  (master image; dbl-click spectra)
       right = ImageCanvas2D        (derived product)
       third = InfoTable            (cached products table)
@@ -196,7 +202,7 @@ class VisualisePage(BasePage):
         tbl.horizontalHeader().setStretchLastSection(True)
         self._add_third(tbl)
         
-        self._HDR_ROLE = Qt.UserRole + 1  # marks header rows
+        
                 
         self._splitter.setStretchFactor(0, 5)
         self._splitter.setStretchFactor(1, 5)
@@ -210,7 +216,10 @@ class VisualisePage(BasePage):
         
     def activate(self):
         super().activate()
-        
+        if self.current_obj is None:
+            return
+        if self.current_obj.is_raw:
+            return
         def _sync_now(src_ax, dst_ax):
             if self._sync_lock: return
             self._sync_lock = True
@@ -259,7 +268,11 @@ class VisualisePage(BasePage):
         self.table.setHorizontalHeaderItem(0, QTableWidgetItem("Cached Products"))
 
         
-    def update(self, key='mask'):
+    def update_display(self, key='mask'):
+        if self.current_obj is None:
+            return
+        if self.current_obj.is_raw:
+            return
         self.left_canvas.show_rgb(self.current_obj.savgol, self.current_obj.bands)
         
         
@@ -292,15 +305,13 @@ class VisualisePage(BasePage):
         it = self.table.item(row, 0)
         if not it:
             return
-        if it.data(self._HDR_ROLE):
-            # header row → do nothing
-            return
+        
     
         key = it.text().strip()
         if not key:
             return
     
-        self.update(key=key)
+        self.update_display(key=key)
         
     def add_to_cache(self, key: str):
         if not key:
@@ -338,6 +349,8 @@ class VisualisePage(BasePage):
                 table_title = f'{self.current_obj.metadata["borehole id"]} {self.current_obj.metadata["box number"]}'
             except:
                 table_title = 'Cached products'
+        else:
+            table_title = 'Cached products'
         self.table.setHorizontalHeaderItem(0, QTableWidgetItem(table_title))
     
         for k in sorted(self.cache):  # stable order
@@ -549,6 +562,11 @@ class LibraryPage(BasePage):
             
     def correlate(self):
         if self.current_obj is None:
+            QMessageBox.critical(self, "Selection error", 
+                                 f"You do not have a scan dataset loaded")
+        if self.current_obj.is_raw:
+            QMessageBox.critical(self, "Selection error", 
+                                 f"You cannot correlate on a raw dataset, you must process first")
             return
         ids = self._selected_sample_ids()
         if len(ids) == 0:
@@ -951,17 +969,17 @@ class LibraryPage(BasePage):
         Returns: dict[int, (label:str, x_nm:1D np.ndarray, y:1D np.ndarray)]
         """
         if not self.db.isOpen():
-            return {}
+            return {}, {}
     
         if key is None:
             key = self._choose_existing_collection("Select collection for exemplars")
         if not key:
-            return {}
+            return {}, {}
     
         ids = list(self.collections.get(key, set()))
         if not ids:
             QMessageBox.information(self, "Empty Collection", f"No items in collection '{key}'.")
-            return {}
+            return {}, {}
     
         # Map SampleID -> Name (same logic as before)
         id_to_name = {}
@@ -979,7 +997,7 @@ class LibraryPage(BasePage):
                    f"FROM {SPECTRA_TABLE_NAME} WHERE SampleID IN ({placeholders})")
         for v in ids: q2.addBindValue(int(v))
         if not q2.exec_():
-            return {}
+            return {}, {}
     
         while q2.next():
             sid = int(q2.value(0))
@@ -1124,6 +1142,6 @@ class AutoSettingsDialog(QDialog):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    viewer = LibraryPage()
+    viewer = VisualisePage()
     viewer.show()
     sys.exit(app.exec_())

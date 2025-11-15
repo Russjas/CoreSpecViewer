@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
 
 from ribbon import Ribbon
 from pages import RawPage, VisualisePage, LibraryPage, AutoSettingsDialog  
+from HolePage import HolePage
 from util_windows import MetadataDialog, two_choice_box, InfoTable, busy_cursor
 
 from objects import RawObject, ProcessedObject
@@ -62,7 +63,7 @@ class MainRibbonController(QMainWindow):
         outer.addWidget(self.ribbon, 0)
         #define everpresent actions
         # --- Create actions ---
-        self.open_act = QAction("Open", self)
+        self.open_act = QAction("Open single scan", self)
         self.open_act.setShortcut("Ctrl+O")
         self.open_act.triggered.connect(self.load_from_disk)
 
@@ -91,7 +92,7 @@ class MainRibbonController(QMainWindow):
 
         self.ribbon.add_global_actions([self.info_act, self.settings_act], pos='right')
 
-        # ===== Page operations
+        # ===== Create all pages==============================================
         self.tabs = QTabWidget(self)
         self.tabs.setTabPosition(QTabWidget.East)   # or South if you prefer
          
@@ -99,12 +100,15 @@ class MainRibbonController(QMainWindow):
         self.raw_page = RawPage(self)
         self.vis_page = VisualisePage(self)
         self.lib_page = LibraryPage(self)
+        self.hol_page = HolePage(self)
         
-        self.page_list = [self.raw_page, self.vis_page, self.lib_page]
+        self.page_list = [self.raw_page, self.vis_page, self.lib_page, self.hol_page]
 
         self.tabs.addTab(self.raw_page, "Raw")
         self.tabs.addTab(self.vis_page, "Visualise")
         self.tabs.addTab(self.lib_page, "Libraries")
+        self.tabs.addTab(self.hol_page, "Hole")
+        self.pg_idx_map = {'raw': 0, 'vis': 1, 'lib': 2, 'hol': 3}
         
         self._last_tab_idx = self.tabs.currentIndex()
         
@@ -139,39 +143,35 @@ class MainRibbonController(QMainWindow):
             ("button", "Mask region", self.act_mask_rect),
             ("button", "Freehand mask region", self.act_mask_polygon),
             ("button", "Improve", self.act_mask_improve),
-            
             ("button", "Calc stats", self.act_mask_calc_stats),
             ("button", "unwrap preview", self.unwrap)
-            
-                   
         ])
 
         # --- VISUALISE TAB ---
         self.extract_feature_list = []
         for key in feature_keys:
-            
             self.extract_feature_list.append((key, lambda _, k=key: self.run_feature_extraction(k)))
-        
-        
-        
-        
         self.ribbon.add_tab('Visualise', [
             ("button", "Quick Cluster", self.act_kmeans),
             ("menu",   "Correlation", [
-                ("MineralMap (numpy)", lambda: self.act_vis_correlation("numpy")),
                 ("MineralMap (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors")),
                 ("Other…",            lambda: self.act_vis_correlation("other")),
             ]),
             ("menu",   "Features", self.extract_feature_list),
             ])
-        
+        # --- HOLE TAB ---
+        self.ribbon.add_tab('Hole operations',[
+                            ("button", "Next", self.hole_next_box),
+                            ("button", "Return to Raw", self.hole_return_to_raw),
+                            
+                            ])
         
     #======== UI methods ===============================================
     def update_display(self, key = 'mask'):
         p = self._active_page()
         if hasattr(p, "cache"):
             p.add_to_cache(key)
-        p.update(key = key)    
+        p.update_display(key = key)    
     
     def _on_tab_changed(self, new_idx: int):
         """Handles user-initiated tab changes."""
@@ -187,8 +187,9 @@ class MainRibbonController(QMainWindow):
         self._distribute_context()
         if hasattr(new, "activate"): new.activate()
         self._last_tab_idx = new_idx
+        self.update_display()
         
-    #TODO: used to be called set_current_conditions - bugs incoming!
+    
     def _distribute_context(self):
       
         for pg in self.page_list:
@@ -198,12 +199,17 @@ class MainRibbonController(QMainWindow):
         return self.tabs.currentWidget()
 
     def choose_view(self, key= 'raw'):
-        pg_idx_map = {'raw': 0, 'vis': 1, 'lib': 2}
-        new_idx = pg_idx_map[key]
+        
+        new_idx =  self.pg_idx_map[key]
         old_idx = getattr(self, "_last_tab_idx", -1)
         if new_idx == old_idx:
             self._distribute_context()
-        self.tabs.setCurrentIndex(pg_idx_map[key])
+        
+        if old_idx==self.pg_idx_map['hol']:
+            self._distribute_context()
+            self.update_display()
+            return
+        self.tabs.setCurrentIndex(self.pg_idx_map[key])
     
 
 #================= Global actions========================================
@@ -232,7 +238,8 @@ class MainRibbonController(QMainWindow):
         
         
     def load_from_disk(self):
-        #TODO: add load methods for other data types
+        '''loads PO or RO only, HO and db are loaded from control panel on
+        thei respective games'''
         clicked_button = two_choice_box( "What would you like to open?", "Processed dataset", "Raw directory")
         
         if clicked_button == 'cancel':
@@ -254,12 +261,10 @@ class MainRibbonController(QMainWindow):
         try:
             with busy_cursor('loading...', self):
                 loaded_obj = load(path)
-                if loaded_obj.is_raw:
-                    
-                    self.cxt.current = loaded_obj
-                    
-                    self.choose_view('raw')
                 
+                if loaded_obj.is_raw:
+                    self.cxt.current = loaded_obj
+                    self.choose_view('raw')
                     self.update_display()
                 else:
                     self.cxt.current = loaded_obj
@@ -268,25 +273,46 @@ class MainRibbonController(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}")
             return
-
+        
         
     
     def process_multi_raw(self):
         multi_box.run_multibox_dialog(self)
     
+    def save_clicked_temp(self):#TODO if the save error doesnt recur this can be deleted
+
+        print('Why no changes?')
+        self.cxt.current.print_refs('before clear canvas')
+        #self._clear_all_canvas_refs()
+        self.cxt.current.print_refs('after clear canvas current')
+        self.cxt.po.print_refs('after clear canvas po')
+        #self.ref_hold = self.cxt.current.datasets['savgol']._memmap_ref
+        print('COMMITING')
+        self.cxt.po.commit_temps()
+        print('SAVING')
+        self.cxt.current.save_all()
+        self._distribute_context()
+        self.update_display()
+        
+
+        
     def save_clicked(self):
+         
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "save", "Raw data must be processed prior to saving")
             return
         if self.cxt.current.has_temps:
             test = two_choice_box('Commit changes before saving?', 'yes', 'no')
+            
             if test == 'left':
+                
                 self.cxt.po.commit_temps()
                 
+             
         wants_prompt = True
         if self.cxt.current.datasets:
             wants_prompt = not any(ds.path.exists() for ds in self.cxt.po.datasets.values())
-    
+        
         if wants_prompt:
             dest = QFileDialog.getExistingDirectory(self, "Choose save folder", str(self.cxt.current.root_dir))
             if not dest:
@@ -294,12 +320,15 @@ class MainRibbonController(QMainWindow):
             self.cxt.current.update_root_dir(dest)  # rewires every dataset path to the chosen folder
         try:
             with busy_cursor('saving...', self):
-                self.cxt.current.build_all_thumbs()
-                self.cxt.current.save_all_thumbs()
                 self.cxt.current.save_all()
+                self.update_display()
         except Exception as e:
-            QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
-            return
+           QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
+           return
+
+    
+    
+    
     def save_as_clicked(self):
         if self.cxt.po is None:
             QMessageBox.information(self, "save", "Raw data must be processed prior to saving")
@@ -321,8 +350,12 @@ class MainRibbonController(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
             return
-    #TODO: figure out how to handle this   
+        
+   
     def undo_unsaved(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         self.cxt.current = reset(self.cxt.current)
         self._distribute_context()
         self.update_display()
@@ -330,6 +363,9 @@ class MainRibbonController(QMainWindow):
     # -------- RAW actions --------
     
     def crop_current_image(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         p = self._active_page()
         if not p or not p.dispatcher or not p.left_canvas:
             return
@@ -344,14 +380,20 @@ class MainRibbonController(QMainWindow):
                 p.dispatcher.clear_all_temp()
         p.dispatcher.set_rect(_on_rect)
         p.left_canvas.start_rect_select()
-
+        
     def automatic_crop(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         with busy_cursor('cropping...', self):
             self.cxt.current = t.crop_auto(self.cxt.current)
         self._distribute_context()
         self.update_display()
         
     def process_raw(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         if not self.cxt.current.is_raw:
             QMessageBox.information(self, "Process", "Load a raw dataset first.")
             return
@@ -387,6 +429,9 @@ class MainRibbonController(QMainWindow):
     # -------- MASK actions --------
 
     def act_mask_rect(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
             return
@@ -405,6 +450,9 @@ class MainRibbonController(QMainWindow):
         p.left_canvas.start_rect_select()
 
     def act_mask_point(self, mode):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
             return
@@ -424,11 +472,17 @@ class MainRibbonController(QMainWindow):
         
         
     def act_mask_improve(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         self.cxt.current = improve_mask(self.cxt.current)
         self._distribute_context()
         self.update_display()
        
     def act_mask_polygon(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         p = self._active_page()
         if not p or not p.dispatcher or self.cxt.current is None:
             return
@@ -444,6 +498,9 @@ class MainRibbonController(QMainWindow):
     
     
     def act_mask_calc_stats(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Stats", "Open a processed dataset first.")
             return
@@ -454,6 +511,9 @@ class MainRibbonController(QMainWindow):
         
         
     def unwrap(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         
         if not self.cxt.current.has('stats'):
             QMessageBox.warning(self, "Warning", "No stats calculated yet.")
@@ -465,6 +525,9 @@ class MainRibbonController(QMainWindow):
 
     # -------- VISUALISE actions --------
     def run_feature_extraction(self, key):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         print(key)
         with busy_cursor(f'extracting {key}...', self):
             self.cxt.current = t.run_feature_extraction(self.cxt.current, key)
@@ -473,10 +536,15 @@ class MainRibbonController(QMainWindow):
         
         
     def act_vis_correlation(self, kind: str):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
             return
         exemplars, coll_name = self.lib_page.get_collection_exemplars()
+        if not exemplars or not coll_name:
+            return
         with busy_cursor('correlation...', self):
             self.cxt.current = t.wta_min_map(self.cxt.current, exemplars, coll_name, kind)
         
@@ -484,6 +552,9 @@ class MainRibbonController(QMainWindow):
         self.update_display()
 
     def act_kmeans(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
         # Prompt for clusters
         clusters, ok1 = QInputDialog.getInt(
             self,
@@ -515,6 +586,88 @@ class MainRibbonController(QMainWindow):
         self.choose_view('vis')
         
         self.update_display(key=f'kmeans-{clusters}-{iters}INDEX')
+
+    def _clear_all_canvas_refs(self):
+        """Clear memmap references from all page canvases before saving."""
+        
+        
+        for page in self.page_list:
+            # Clear left canvas (SpectralImageCanvas)
+            if hasattr(page, 'left_canvas') and hasattr(page.left_canvas, 'clear_memmap_refs'):
+                page.left_canvas.clear_memmap_refs()
+            
+            # Clear right canvas (ImageCanvas2D)
+            if hasattr(page, 'right_canvas') and hasattr(page.right_canvas, 'clear_memmap_refs'):
+                page.right_canvas.clear_memmap_refs()
+
+            # --- HOLE actions --- 
+    def hole_next_box(self):
+        if self.cxt.ho is None or self.cxt.current is None:
+            return
+        if self.cxt.current.is_raw:
+            return
+        try:
+            box_num = int(self.cxt.current.metadata.get("box number"))
+        except Exception:
+            box_num = None
+        if box_num is not None:
+            try:
+                self.cxt.current = self.cxt.ho[box_num+1]
+                self._distribute_context()
+                self.update_display()
+            except KeyError:
+                return
+        
+    def hole_return_to_raw(self):
+        if self.cxt.ho is None or self.cxt.current is None:
+            return
+        if self.cxt.current.is_raw:
+            return
+        path = QFileDialog.getExistingDirectory(
+                   self,
+                   "Select directory",
+                   "",                       
+                   QFileDialog.ShowDirsOnly  
+                   )  
+        if not path:
+            return
+        box_num = None
+        try:
+            box_num = int(self.cxt.current.metadata.get("box number"))
+        except Exception:
+            box_num = None
+            
+        try:
+            with busy_cursor('loading...', self):
+                loaded_obj = load(path)
+                if  not loaded_obj.is_raw:
+                    QMessageBox.warning(self, "Return to Raw",
+                        "Selected path is not a raw Lumo directory.")
+                    return
+                new_po = loaded_obj.process()
+                new_po.update_root_dir(self.cxt.current.root_dir)
+                new_po.build_all_thumbs()
+                new_po.save_all_thumbs()
+                if new_po.metadata.get("borehole id") != self.cxt.ho.hole_id:
+                    QMessageBox.warning(self, "Return to Raw",
+                        "The new loaded scan is from a different hole")
+                    return
+                if box_num not in self.cxt.ho.boxes:
+                    QMessageBox.warning(self, "Return to Raw",
+                             f"Box {box_num} not found in current hole.")
+                    return
+                self.cxt.ho.boxes[box_num] = new_po
+                self.cxt.ho.hole_meta[box_num] = new_po.metadata
+                
+                self.cxt.current = new_po
+                
+                self.choose_view('vis')
+                self.update_display()
+                
+        except Exception as e:
+            QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}")
+            return
+        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

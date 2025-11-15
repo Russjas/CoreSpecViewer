@@ -47,6 +47,8 @@ import xml.etree.ElementTree as ET
 from PIL import Image
 import spectral_functions as sf
 from typing import Iterator, Tuple, List, Union, Optional, Dict
+import sys, gc
+
 @dataclass
 class Dataset:
     """
@@ -89,7 +91,7 @@ class Dataset:
     ext: str
     data: object = None
     thumb: Optional[Image] = None
-    _memmap_ref: Union[np.memmap, None] = field(default=None, compare=False)
+    _memmap_ref: object = None
     def __post_init__(self):
         """Normalize the path and automatically load data if the file exists."""
         self.path = Path(self.path)
@@ -101,16 +103,18 @@ class Dataset:
             self.load_dataset()
 
     def close_handle(self) -> None:
+        print('close called')
         """
         Explicitly close any outstanding memmap file handle to release the OS lock.
         Attempt to fix an annoying save bug
         """
+        import gc, sys
         
         if self._memmap_ref is not None:
-            mm = self._memmap_ref._mmap
-            if mm is not None:
-                mm.close()
-            self._memmap_ref = None
+            print('actually closing')
+            self._memmap_ref.close()
+        gc.collect()
+        self._memmap_ref = None
 
     def load_dataset(self):
         """
@@ -129,7 +133,7 @@ class Dataset:
             data = np.load(self.path, mmap_mode='r', allow_pickle=False)
             # store a reference to the memmap to explicitly close later
             if isinstance(data, np.memmap):
-                self._memmap_ref = data
+                self._memmap_ref = data._mmap
             self.data = data
 
         
@@ -175,14 +179,11 @@ class Dataset:
                     
         elif self.ext == '.npy':
             # If it's a memmap and we're not creating new, just return
+            print(type(self.data), self.key)
             if isinstance(self.data, np.memmap) and not new:
                 return
-            if isinstance(self.data, np.memmap):
-                data_copy = np.array(self.data)
-                self.close_handle()  # Now safe to close
-                self.data = data_copy  # Replace with in-memory copy
-            
-            
+                        
+            print((self._memmap_ref is None), 'mem ref is None')
             
             np.save(self.path, self.data)
             
@@ -370,9 +371,14 @@ class ProcessedObject:
         ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
         self.datasets[key] = ds
     
-    def add_temp_dataset(self, key, data=None):
+    def add_temp_dataset(self, key, data=None, ext=".npy"):
         """Attach an in-memory dataset; not written until save_all()."""
-        self.temp_datasets[key] = self.datasets[key].copy(data=data)
+        if key in self.datasets.keys():
+            self.temp_datasets[key] = self.datasets[key].copy(data=data)
+            return
+        path = self.root_dir / f"{self.basename}_{key}{ext}"
+        ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
+        self.temp_datasets[key] = ds
         
     def update_root_dir(self, path):
         """
@@ -403,12 +409,29 @@ class ProcessedObject:
         for key in self.temp_datasets.keys():
             # Close old memmap handle before replacing
             if key in self.datasets:
+                
+                self.datasets[key].close_handle()
                 self.datasets[key]._memmap_ref = None
                 self.datasets[key].data = None
                 del self.datasets[key]
-                self.datasets[key] = self.temp_datasets[key]
-        
+                
+            self.datasets[key] = self.temp_datasets[key]
+            
         self.clear_temps()
+        
+     #TODO remove this debg func  
+    def print_refs(self, text):
+        """Promote all temporary datasets to permanent and clear temp cache."""
+        print(text)
+        for key in self.datasets:
+                import sys, gc
+                if self.datasets[key]._memmap_ref is not None:
+                    print(f"Refcount {key}: {sys.getrefcount(self.datasets[key]._memmap_ref)}")
+                    refs = gc.get_referrers(self.datasets[key]._memmap_ref)
+                    print(f"Referrers {key}: {[type(r).__name__ for r in refs]}")
+                
+                
+            
     
     def clear_temps(self):
         """Remove all temporary datasets."""
@@ -505,7 +528,7 @@ class ProcessedObject:
                 
     def load_or_build_thumbs(self):
         for key, ds in self.datasets.items():
-            print(key)
+           
             if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
                 self.datasets[key].thumb = Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg')
             else:
@@ -841,16 +864,14 @@ class HoleObject:
 
         # handle re-scans by box number
         if box_num in self.boxes:
-            print('dup found')
+            
             # if same basename, treat as duplicate and ignore
             if self.boxes[box_num].basename == obj.basename:
-                print('discarded as dup')
                 return box_num
             # choose newer by timestamp
             old_t = combine_timestamp(self.boxes[box_num].metadata)
             new_t = combine_timestamp(meta)
             if old_t and new_t and new_t <= old_t:
-                print('discarded by date')
                 return box_num  # keep existing
             # else replace with newer
         # INSERT / REPLACE

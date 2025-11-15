@@ -48,6 +48,7 @@ class CurrentContext:
     def po(self, obj):
         self._po = obj
         self.active = "po" if obj is not None else None
+        print('po changed')
 
     @property
     def ro(self): return self._ro
