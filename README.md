@@ -60,11 +60,30 @@ CoreSpecViewer provides:
 
 ---
 
-## Running the Application
+## Getting started
 
-```bash
+You will need to download and install [Miniforge](https://github.com/conda-forge/miniforge), [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) or [Anaconda](https://repo.anaconda.com/)
+
+
+
+Once installed open the Miniforge/Miniconda/Anaconda prompt window, and type
+```
+git clone https://github.com/Russjas/CoreSpecViewer.git
+```
+this will clone the repo, then
+```
+cd CoreSpecViewer
+```
+To change your working directory to the download location, then
+```
+conda env create -f environment.yml
+```
+will install all of the dependencies of CoreSpecViewer into a new environment, then
+```
+conda activate specviewenv  
 python ribbon_window.py
 ```
+will launch the application.  
 
 You will see:
 
