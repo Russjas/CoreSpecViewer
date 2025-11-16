@@ -40,7 +40,7 @@ CoreSpecViewer provides:
 
 ```
 .
-├── ribbon_window.py        # Main window, Ribbon controller
+├── CoreSpecViewer.py        # Main window, Ribbon controller
 ├── ribbon.py               # Ribbon component
 ├── pages.py                # RawPage, VisualisePage, LibraryPage
 ├── HolePage.py             # HolePage, HoleBoxTable, HoleControlPanel
