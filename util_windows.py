@@ -91,6 +91,37 @@ def two_choice_box(text, left_choice_text, right_choice_text):
         return "right"
     return "cancel"  # always explicit
 
+def choice_box(text: str, choices: list[str]) -> int | None:
+    """
+    Display a QMessageBox with an arbitrary list of choice buttons.
+    """
+    m = QMessageBox()
+    m.setWindowTitle('Choose')
+    m.setText(text)
+
+    btns = []
+
+    for label in choices:
+        btn = m.addButton(label, QMessageBox.AcceptRole)
+        btns.append(btn)
+
+    cancel_btn = m.addButton(QMessageBox.Cancel)
+    m.setEscapeButton(cancel_btn)
+
+    m.exec_()
+
+    clicked = m.clickedButton()
+
+    if clicked is cancel_btn:
+        return None
+
+    # Find which choice index was clicked
+    for i, btn in enumerate(btns):
+        if clicked is btn:
+            return i
+
+    return None  # fallback (shouldn't happen)
+
 class InfoTable(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)

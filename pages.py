@@ -182,6 +182,8 @@ class RawPage(BasePage):
     def update_display(self, key = 'mask'):
         if self.current_obj is None:
             return
+        if not self.current_obj.is_raw:
+            return
         self.left_canvas.show_rgb(self.current_obj.get_display_reflectance(), self.current_obj.bands)
 
     
@@ -275,7 +277,7 @@ class VisualisePage(BasePage):
             return
         self.left_canvas.show_rgb(self.current_obj.savgol, self.current_obj.bands)
         
-        
+        self._set_cache()
     
         # Mineral map branch
         if key.endswith("INDEX"):

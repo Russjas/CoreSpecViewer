@@ -15,9 +15,9 @@ from PyQt5.QtWidgets import (
 from ribbon import Ribbon, Groups
 from pages import RawPage, VisualisePage, LibraryPage, AutoSettingsDialog  
 from HolePage import HolePage
-from util_windows import MetadataDialog, two_choice_box, InfoTable, busy_cursor
+from util_windows import MetadataDialog, two_choice_box, choice_box,  InfoTable, busy_cursor
 
-from objects import RawObject, ProcessedObject
+from objects import RawObject, ProcessedObject, HoleObject
 import tools as t
 from tools import load, crop, reset, mask_rect, mask_point, improve_mask
 from PyQt5.QtGui import QIcon
@@ -63,7 +63,7 @@ class MainRibbonController(QMainWindow):
         outer.addWidget(self.ribbon, 0)
         #define everpresent actions
         # --- Create actions ---
-        self.open_act = QAction("Open single scan", self)
+        self.open_act = QAction("Open", self)
         self.open_act.setShortcut("Ctrl+O")
         self.open_act.triggered.connect(self.load_from_disk)
 
@@ -94,7 +94,7 @@ class MainRibbonController(QMainWindow):
 
         # ===== Create all pages==============================================
         self.tabs = QTabWidget(self)
-        self.tabs.setTabPosition(QTabWidget.East)   # or South if you prefer
+        self.tabs.setTabPosition(QTabWidget.North)   # or South if you prefer
          
 
         self.raw_page = RawPage(self)
@@ -163,8 +163,10 @@ class MainRibbonController(QMainWindow):
             ])
         # --- HOLE TAB ---
         self.ribbon.add_tab('Hole operations',[
+                            ("button", "Previous", self.hole_prev_box),
                             ("button", "Next", self.hole_next_box),
                             ("button", "Return to Raw", self.hole_return_to_raw),
+                            ("button", "Save All", self.save_all_changes)
                             
                             ])
         
@@ -243,11 +245,11 @@ class MainRibbonController(QMainWindow):
     def load_from_disk(self):
         '''loads PO or RO only, HO and db are loaded from control panel on
         thei respective games'''
-        clicked_button = two_choice_box( "What would you like to open?", "Processed dataset", "Raw directory")
+        clicked_button = choice_box( "What would you like to open?", ["Processed dataset", "Raw directory", "Hole directory"])
         
-        if clicked_button == 'cancel':
+        if clicked_button is None:
             return
-        if clicked_button == 'right':
+        if clicked_button == 1 or clicked_button == 2:
             path = QFileDialog.getExistingDirectory(
                        self,
                        "Select directory",
@@ -256,15 +258,23 @@ class MainRibbonController(QMainWindow):
                        )  
             if not path:
                 return
-        elif clicked_button == 'left':
+        elif clicked_button == 0:
             path, _ = QFileDialog.getOpenFileName(
             self, "Open JSON Metadata", "", "JSON files (*.json)")
             if not path:
                 return
         try:
             with busy_cursor('loading...', self):
-                loaded_obj = load(path)
-                
+                if clicked_button == 2:
+                    hole = HoleObject.build_from_parent_dir(path)
+                    print('hole loaded')
+                    self.cxt.ho = hole
+                    self._distribute_context()
+                    self.choose_view('hol')
+                    self.update_display()
+                    return
+                else:
+                    loaded_obj = load(path)
                 if loaded_obj.is_raw:
                     self.cxt.current = loaded_obj
                     self.choose_view('raw')
@@ -276,6 +286,8 @@ class MainRibbonController(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}")
             return
+        
+            
         
         
     
@@ -330,6 +342,7 @@ class MainRibbonController(QMainWindow):
                 self.cxt.current.save_all()
                 
                 self.cxt.current.reload_all()
+                self.cxt.current.load_thumbs()
                 self.update_display()
         except Exception as e:
            QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
@@ -626,6 +639,23 @@ class MainRibbonController(QMainWindow):
                 self.update_display()
             except KeyError:
                 return
+    
+    def hole_prev_box(self):
+        if self.cxt.ho is None or self.cxt.current is None:
+            return
+        if self.cxt.current.is_raw:
+            return
+        try:
+            box_num = int(self.cxt.current.metadata.get("box number"))
+        except Exception:
+            box_num = None
+        if box_num is not None:
+            try:
+                self.cxt.current = self.cxt.ho[box_num-1]
+                self._distribute_context()
+                self.update_display()
+            except KeyError:
+                return
         
     def hole_return_to_raw(self):
         if self.cxt.ho is None or self.cxt.current is None:
@@ -676,6 +706,29 @@ class MainRibbonController(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}")
             return
+        
+    def save_all_changes(self):
+        if self.cxt.ho is None or self.cxt.current is None:
+            return
+        
+        if self.cxt is not None and self.cxt.ho is not None:
+            with busy_cursor('Saving.....', self):
+                print('saving')
+                for po in self.cxt.ho:
+                    if po.has_temps:
+                        print(po.metadata['box number'])
+                        po.commit_temps()
+                        print('finished commit, starting thumb build')
+                        po.build_all_thumbs()
+                        print('finished thumb build, starting save')
+                        po.save_all_thumbs()
+                        print('saved thumbs')
+                        po.save_all()
+                        print('saved all, reloading')
+                        po.reload_all()
+                        po.load_thumbs()
+                self.choose_view('hol')
+                self.update_display()
         
 
 if __name__ == "__main__":

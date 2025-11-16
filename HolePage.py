@@ -89,6 +89,7 @@ class HoleBoxTable(QTableWidget):
         try:
             items = sorted(hole.iter_items(), key=lambda kv: kv[0])
         except AttributeError:
+            print('error-ed out here')
             items = sorted(hole.boxes.items(), key=lambda kv: kv[0])
 
         for row, (box_num, po) in enumerate(items):
@@ -145,9 +146,12 @@ class HoleBoxTable(QTableWidget):
     def _get_thumb_pixmap(self, po):
         po.load_thumbs()
         key = self.dataset_key
-        ds = getattr(po, "datasets", {}).get(key)
+        ds = getattr(po, "temp_datasets", {}).get(key)
         if ds is None:
-            return QPixmap()
+            ds = getattr(po, "datasets", {}).get(key)
+    
+        if ds is None or getattr(ds, "thumb", None) is None:
+           return QPixmap()
         
         if ds.thumb is None:
             try:
@@ -465,6 +469,7 @@ class HolePage(BasePage):
                         po.save_all()
                         print('saved all, reloading')
                         po.reload_all()
+                        po.load_thumbs()
                 self._refresh_from_hole()
                         
     

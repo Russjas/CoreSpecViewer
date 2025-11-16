@@ -370,15 +370,18 @@ class ProcessedObject:
         path = self.root_dir / f"{self.basename}_{key}{ext}"
         ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
         self.datasets[key] = ds
+        self.build_thumb(key)
     
     def add_temp_dataset(self, key, data=None, ext=".npy"):
         """Attach an in-memory dataset; not written until save_all()."""
         if key in self.datasets.keys():
             self.temp_datasets[key] = self.datasets[key].copy(data=data)
+            self.build_thumb(key)
             return
         path = self.root_dir / f"{self.basename}_{key}{ext}"
         ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
         self.temp_datasets[key] = ds
+        self.build_thumb(key)
         
     def update_root_dir(self, path):
         """
@@ -486,34 +489,43 @@ class ProcessedObject:
         """Reload all datasets from disk."""
         for ds in self.datasets.values():
             ds.load_dataset()
-            
+    
     def build_thumb(self, key):
-        if key not in self.datasets.keys():
-            return
-        ds = self.datasets[key]
-        try:
-            if ds.ext == '.npy' and ds.data.ndim > 1:
-                if key == 'mask':
-                    im = sf.mk_thumb(ds.data)
-                    self.datasets[key].thumb = im
-                else:
-                    im = sf.mk_thumb(ds.data, mask = self.mask)
-                    self.datasets[key].thumb = im
-            elif ds.ext == '.npz':
-                im = sf.mk_thumb(ds.data.data, mask = ds.data.mask)
-                self.datasets[key].thumb = im
-            else:
+
+        def _build_for(dataset_dict, key):
+            ds = dataset_dict.get(key)
+            if ds is None:
                 return
-        except ValueError:
-            return
+    
+            try:
+                if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
+                    if key == "mask":
+                        im = sf.mk_thumb(ds.data)
+                    else:
+                        im = sf.mk_thumb(ds.data, mask=self.mask)
+                    ds.thumb = im
+    
+                elif ds.ext == ".npz":
+                    im = sf.mk_thumb(ds.data.data, mask=ds.data.mask)
+                    ds.thumb = im
+    
+                else:
+                    return
+    
+            except ValueError:
+                return
+    
+        _build_for(self.datasets, key)
+        _build_for(self.temp_datasets, key)    
+
+
     def build_all_thumbs(self):
         """Build thumbnails for all thumbnail-able datasets."""
-        for key, ds in self.datasets.items():
-            if ds.ext in ('.npy', '.npz'):
-                try:
-                    self.build_thumb(key)
-                except Exception:
-                    continue
+        for key in self.datasets.keys()|self.temp_datasets.keys():
+            try:
+                self.build_thumb(key)
+            except Exception:
+                continue
     
     def save_all_thumbs(self):
         """Save any in-memory thumbnails as JPEGs beside their datasets."""
