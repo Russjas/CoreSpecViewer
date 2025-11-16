@@ -37,7 +37,7 @@ class HoleBoxTable(QTableWidget):
     Configurable table showing ProcessedObjects in a HoleObject.
     Supported column keys: 'box', 'thumb', (future: 'depth', etc.)
     """
-    box_selected = pyqtSignal(int)
+    
     def __init__(self, page: "HolePage", parent=None, columns=None, dataset_key='savgol'):
         self.columns = columns or ["box", "thumb"]
         self._page = page
@@ -78,9 +78,7 @@ class HoleBoxTable(QTableWidget):
             else:
                 hdr.setSectionResizeMode(idx, hdr.ResizeToContents)
 
-        self.currentCellChanged.connect(self._on_current_cell_changed)
-
-    # ------------------------------------------------------------------
+  # ------------------------------------------------------------------
     def populate_from_hole(self):
         
         self.setRowCount(0)
@@ -181,24 +179,7 @@ class HoleBoxTable(QTableWidget):
         if self.cxt is not None and self.cxt.ho is not None:
             self.populate_from_hole()  
 
-    # ------------------------------------------------------------------
-    def _on_current_cell_changed(self, r, c, pr, pc):
-        if r < 0:
-            return
-        # Find the "box" column if it exists
-        if "box" not in self.columns:
-            return
-        box_col = self.columns.index("box")
-        item = self.item(r, box_col)
-        if item is None:
-            return
-        box_num = item.data(Qt.UserRole)
-        if box_num is not None:
-            try:
-                self.box_selected.emit(int(box_num))
-            except Exception:
-                pass
-
+    
 class HoleControlPanel(QWidget):
     """
     Narrow side panel for hole-level controls.
@@ -348,7 +329,9 @@ class HolePage(BasePage):
                 showing the savgol thumbnail and box number.
     Right/third panels can be added later (downhole plots, metadata, etc.).
     """
+    changeView = pyqtSignal(str)
     def __init__(self, parent=None):
+        
         super().__init__(parent)
         
         # Replace the default left canvas with our box table
@@ -360,6 +343,7 @@ class HolePage(BasePage):
         self._add_third(self._control_panel)
         # When a row is selected, update the CurrentContext.po
         self._box_table.cellDoubleClicked.connect(self._on_box_selected)
+        self._box_table.cellClicked.connect(self._on_box_clicked)        
            
         btn_open  = QPushButton("Open hole dataset", self)
         self._control_panel.layout.addWidget(btn_open)
@@ -436,8 +420,32 @@ class HolePage(BasePage):
         po = ho.boxes.get(box_num)
         if po is None:
             return
-        # This will also update .current via CurrentContext logic
+        
         self.cxt.current = po
+        self.changeView.emit('vis')
+        
+    def _on_box_clicked(self, row: int, column: int):
+        """
+        Called when the user selects a different row in the box table.
+        Sets CurrentContext.po to the corresponding ProcessedObject, if present.
+        """
+        if self.cxt is None or self.cxt.ho is None:
+            return
+        box_num_item = self._box_table.item(row, 0)
+        if not box_num_item:
+            return
+        box_num = box_num_item.text()
+        try:
+            box_num = int(box_num)
+        except ValueError:
+            return
+        ho = self.cxt.ho
+        po = ho.boxes.get(box_num)
+        if po is None:
+            return
+        
+        self.cxt.current = po
+        
     
     def save_changes(self):
         print('this called')
@@ -449,9 +457,14 @@ class HolePage(BasePage):
                     if po.has_temps:
                         print(po.metadata['box number'])
                         po.commit_temps()
+                        print('finished commit, starting thumb build')
                         po.build_all_thumbs()
+                        print('finished thumb build, starting save')
                         po.save_all_thumbs()
+                        print('saved thumbs')
                         po.save_all()
+                        print('saved all, reloading')
+                        po.reload_all()
                 self._refresh_from_hole()
                         
     
