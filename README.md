@@ -81,7 +81,7 @@ conda env create -f environment.yml
 will install all of the dependencies of CoreSpecViewer into a new environment, then
 ```
 conda activate specviewenv  
-python ribbon_window.py
+python CoreSpecViewer.py
 ```
 will launch the application.  
 
