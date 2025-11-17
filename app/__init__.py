@@ -50,15 +50,4 @@ Advanced users and plugins can import specific layers, e.g.:
     from app.interface import tools
     from app.ui import VisualisePage
 """
-from . import config, ui, interface, models, spectral
-from .main import MainRibbonController, main
 
-__all__ = [
-    "config",
-    "ui",
-    "interface",
-    "models",
-    "spectral",
-    "MainRibbonController",
-    "main",
-]
