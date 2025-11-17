@@ -370,7 +370,7 @@ class ProcessedObject:
         path = self.root_dir / f"{self.basename}_{key}{ext}"
         ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
         self.datasets[key] = ds
-        self.build_thumb(key)
+        
     
     def add_temp_dataset(self, key, data=None, ext=".npy"):
         """Attach an in-memory dataset; not written until save_all()."""

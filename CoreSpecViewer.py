@@ -23,6 +23,7 @@ from tools import load, crop, reset, mask_rect, mask_point, improve_mask
 from PyQt5.QtGui import QIcon
 import multi_box
 from context import CurrentContext
+from CatalogueWindow import CatalogueWindow
 feature_keys = [
     '1400W', '1480W', '1550W', '1760W', '1850W',
     '1900W', '2080W', '2160W', '2200W', '2250W',
@@ -49,7 +50,7 @@ class MainRibbonController(QMainWindow):
 
         # --- Data shared across modes (filled as user works) ---
         self.cxt = CurrentContext()
-
+        self._catalogue_window = None
 
         # --- UI shell: ribbon + stacked pages ---
         central = QWidget(self)
@@ -84,13 +85,15 @@ class MainRibbonController(QMainWindow):
 
         self.ribbon.add_global_actions(everpresents)
         #====== non-tab buttons=================
+        self.cat_open = QAction('Catalogue Window')
+        self.cat_open.triggered.connect(self.show_cat)
         self.info_act = QAction("Info", self)
         self.info_act.setShortcut("Ctrl+I")
         self.info_act.triggered.connect(self.display_info)
         self.settings_act = QAction("Settings", self)
         self.settings_act.triggered.connect(self.on_settings)
 
-        self.ribbon.add_global_actions([self.info_act, self.settings_act], pos='right')
+        self.ribbon.add_global_actions([self.cat_open, self.info_act, self.settings_act], pos='right')
 
         # ===== Create all pages==============================================
         self.tabs = QTabWidget(self)
@@ -218,6 +221,24 @@ class MainRibbonController(QMainWindow):
 
 #================= Global actions========================================
 
+    def show_cat(self):
+        if self._catalogue_window is None:
+            self._catalogue_window = CatalogueWindow(
+                parent=self,
+                name_filters=["*.json", "*.hdr"],
+            )
+
+            self._catalogue_window.fileActivated.connect(
+                self.on_catalogue_activated
+            )
+            self._catalogue_window.dirActivated.connect(
+                self.on_catalogue_activated
+            )
+
+        self._catalogue_window.show()
+        self._catalogue_window.raise_()
+        self._catalogue_window.activateWindow()
+
     def display_info(self):
         print('info button clicked')
         self.table_window = InfoTable()
@@ -240,7 +261,34 @@ class MainRibbonController(QMainWindow):
             self.statusBar().showMessage("Settings updated.", 3000)
 
 #================= Everpresent actions =====================================
-        
+    def on_catalogue_activated(self, path):
+        if not path:
+            return
+        try:
+            loaded_obj = load(path)
+            if loaded_obj.is_raw:
+                self.cxt.current = loaded_obj
+                self.choose_view('raw')
+                self.update_display()
+            else:
+                self.cxt.current = loaded_obj
+                self.choose_view('vis')
+                self.update_display()
+            return
+        except Exception as e:
+            print(path,e)
+            try:
+                hole = HoleObject.build_from_parent_dir(path)
+                print('hole loaded')
+                self.cxt.ho = hole
+                self._distribute_context()
+                self.choose_view('hol')
+                self.update_display()
+                return
+            except Exception as e:
+                print(path,e)
+                return
+            
         
     def load_from_disk(self):
         '''loads PO or RO only, HO and db are loaded from control panel on
@@ -323,9 +371,7 @@ class MainRibbonController(QMainWindow):
                 
                 self.cxt.po.commit_temps()
                 
-                self.cxt.po.build_all_thumbs()
                 
-                self.cxt.po.save_all_thumbs()
                 
              
         wants_prompt = True
@@ -340,7 +386,8 @@ class MainRibbonController(QMainWindow):
         try:
             with busy_cursor('saving...', self):
                 self.cxt.current.save_all()
-                
+                self.cxt.po.build_all_thumbs()
+                self.cxt.po.save_all_thumbs()
                 self.cxt.current.reload_all()
                 self.cxt.current.load_thumbs()
                 self.update_display()
@@ -395,9 +442,10 @@ class MainRibbonController(QMainWindow):
         # Ask the page to collect a rectangle and pass back coords
         def _on_rect(y0, y1, x0, x1):
             try:
-                self.cxt.current = crop(self.cxt.current, y0, y1, x0, x1)   
-                self._distribute_context()
-                self.update_display()
+                with busy_cursor('cropping...', self):
+                    self.cxt.current = crop(self.cxt.current, y0, y1, x0, x1)   
+                    self._distribute_context()
+                    self.update_display()
             finally:
                 p.dispatcher.clear_all_temp()
         p.dispatcher.set_rect(_on_rect)
