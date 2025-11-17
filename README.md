@@ -140,8 +140,8 @@ If you want full spectral-library functionality:
 
 ### Summary
 
-Clone + Conda (recommended): includes DB, best for full workflow and development  
-pip install: no DB included, best for quick testing and clean environments
+Clone + Conda (recommended): includes DB, best for full workflow and development.    
+pip install: no DB included, best for quick testing and clean environments.  
 You will see:
 
 - A **Ribbon** (Raw / Masking / Visualise / Hole)
