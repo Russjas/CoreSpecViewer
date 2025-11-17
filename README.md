@@ -74,31 +74,74 @@ CoreSpecViewer/
 ```
 ---
 
-## Getting started
+## Getting Started
 
-You will need to download and install [Miniforge](https://github.com/conda-forge/miniforge), [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main) or [Anaconda](https://repo.anaconda.com/)
+You will need to download and install one of:  
+- [Miniforge](https://github.com/conda-forge/miniforge),  
+- [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/main),  
+- [Anaconda](https://repo.anaconda.com/)
 
 
+There are two ways to run CoreSpecViewer:
 
-Once installed open the Miniforge/Miniconda/Anaconda prompt window, and type
-```
-git clone https://github.com/Russjas/CoreSpecViewer.git
-```
-this will clone the repo, then
-```
-cd CoreSpecViewer
-```
-To change your working directory to the download location, then
-```
-conda env create -f environment.yml
-```
-will install all of the dependencies of CoreSpecViewer into a new environment, then
-```
-conda activate specviewenv  
-python CoreSpecViewer.py
-```
-will launch the application.  
+- Clone the repo and create the Conda environment
+- Lightweight pip install – quick testing, but no spectral library database is included
 
+### Option 1 — Conda and clone (recommended)
+
+In the Miniforge/Miniconda/Anaconda prompt window:
+
+Clone the repository:
+```
+    git clone https://github.com/Russjas/CoreSpecViewer.git
+```
+```
+    cd CoreSpecViewer
+```
+
+Create the Conda environment:
+```
+    conda env create -f environment.yml
+```
+```
+    conda activate specviewenv
+```
+
+Launch the application:
+
+    python CoreSpecViewer.py
+
+This setup includes all required resources, including the spectral library database.
+
+### Option 2 — Quick Install via pip (no DB included)
+
+For quick testing or running the viewer in a clean environment:
+```
+    pip install git+https://github.com/Russjas/CoreSpecViewer.git
+```
+```
+    corespecviewer
+```
+Important: The spectral library database is not shipped with the pip package.
+
+- Only the application code is included.
+- The LibraryPage will display a warning on launch (missing DB).
+- All core processing and visualisation tools still function:
+  - opening raw and processed datasets
+  - masking, cropping, processing
+  - visualisation workflows
+  - hole and box navigation
+
+If you want full spectral-library functionality:
+
+1. Download the database from the GitHub repository (resources directory).
+2. Place it anywhere on your system.
+3. Use the OpenDB button on the Library page.
+
+### Summary
+
+Clone + Conda (recommended): includes DB, best for full workflow and development  
+pip install: no DB included, best for quick testing and clean environments
 You will see:
 
 - A **Ribbon** (Raw / Masking / Visualise / Hole)
