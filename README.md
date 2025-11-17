@@ -9,12 +9,12 @@ The system is designed for geoscientists and hyperspectral imaging specialists, 
 
 | Workflow Stage | Demonstration |
 |----------------|---------------|
-| **Open and process Specim Lumo data** | ![Open workflow](gifs/Open_workflow.gif) |
-| **Mask and unwrap regions** | ![Mask to unwrap](gifs/Mask_to_unwrap.gif) |
-| **Feature extraction & visualisation** | ![Visualise](gifs/Visualise.gif) |
-| **Spectral library browsing** | ![Library use](gifs/Library_use.gif) |
-| **Full hole visualisation** | ![Full hole](gifs/Full_hole.gif) |
-| **Multi-box procession** | ![Multi-box](gifs/multi_box.gif) |
+| **Open and process Specim Lumo data** | ![Open workflow](resources/gifs/Open_workflow.gif) |
+| **Mask and unwrap regions** | ![Mask to unwrap](gifs/resources/Mask_to_unwrap.gif) |
+| **Feature extraction & visualisation** | ![Visualise](resources/gifs/Visualise.gif) |
+| **Spectral library browsing** | ![Library use](resources/gifs/Library_use.gif) |
+| **Full hole visualisation** | ![Full hole](resources/gifs/Full_hole.gif) |
+| **Multi-box procession** | ![Multi-box](resources/gifs/multi_box.gif) |
 
 > Each GIF illustrates one major part of the CoreSpecViewer workflow: open → mask → analyse → compare.
 

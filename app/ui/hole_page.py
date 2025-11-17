@@ -4,33 +4,23 @@ Created on Fri Nov 14 11:37:13 2025
 
 @author: russj
 """
-from PyQt5.QtWidgets import QAbstractItemView
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import QSize, pyqtSignal
-from PIL import ImageQt
 
-from PyQt5.QtWidgets import QHeaderView, QAbstractItemView, QGridLayout, QLabel
-from PyQt5.QtCore import QSize
-from PyQt5.QtGui import QPixmap
-from objects import HoleObject, ProcessedObject
 
-import os, sys
+
+import sys
 import numpy as np
-from PyQt5.QtWidgets import (QSplitter, QVBoxLayout, QHBoxLayout, QTableWidgetItem,QTableWidget,
-                             QApplication, QWidget, QToolBar, QPushButton, QFileDialog,
-                             QTableView, QMessageBox, QInputDialog, QComboBox,
-                             QDialog, QFormLayout)
 
-from PyQt5.QtCore import Qt, QModelIndex
-from PyQt5.QtSql import QSqlDatabase, QSqlTableModel, QSqlQuery
-from util_windows import (SpectralImageCanvas, ImageCanvas2D, 
-                          InfoTable, SpectrumWindow, busy_cursor,
-                          IdSetFilterProxy, two_choice_box)
-from tool_dispatcher import ToolDispatcher
-import tools as t
-from context import CurrentContext
-from pages import BasePage
+from PyQt5.QtCore import QSize, pyqtSignal, Qt
 from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtWidgets import (QVBoxLayout, QTableWidgetItem,QTableWidget,
+                             QApplication, QWidget, QPushButton, QFileDialog,
+                             QComboBox, QFormLayout, QLabel, QAbstractItemView)
+
+
+from ..models import HoleObject
+from .util_windows import busy_cursor, ImageCanvas2D
+from .base_page import BasePage
+
 
 class HoleBoxTable(QTableWidget):
     """
@@ -462,9 +452,9 @@ class HolePage(BasePage):
                         print(po.metadata['box number'])
                         po.commit_temps()
                         print('finished commit, starting thumb build')
-                        po.build_all_thumbs()
+                        #po.build_all_thumbs()
                         print('finished thumb build, starting save')
-                        po.save_all_thumbs()
+                        #po.save_all_thumbs()
                         print('saved thumbs')
                         po.save_all()
                         print('saved all, reloading')

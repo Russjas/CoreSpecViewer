@@ -1,8 +1,14 @@
-from util_windows import SpectralImageCanvas
 
 
 
 class ToolDispatcher:
+    """
+   Lightweight router for canvas events.
+
+   Accepts any canvas object that exposes the expected callback registration
+   API (set_click_callback, set_rect_callback, etc.). It does not depend on
+   Qt or SpectralImageCanvas directly.
+   """
     def __init__(self, canvas):
         self.canvas = canvas
         # permanent

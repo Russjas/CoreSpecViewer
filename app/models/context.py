@@ -4,11 +4,17 @@ Created on Tue Nov 11 13:28:04 2025
 
 @author: russj
 """
-from __future__ import annotations
-from dataclasses import dataclass, asdict
+
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Any
-from objects import RawObject, ProcessedObject, HoleObject
+
+from .raw_object import RawObject
+from .processed_object import ProcessedObject
+from .hole_object import HoleObject
+
+
+
 @dataclass
 class CurrentContext:
     """
@@ -25,8 +31,6 @@ class CurrentContext:
         The currently loaded raw dataset.
     ho : HoleObject | None
         The currently loaded hole-level dataset.
-    review_log : Path | None
-        Path to a batch-processing log or database.
     project_root : Path | None
         Optional project-level root directory.
     active_tool : str | None
@@ -87,9 +91,6 @@ class CurrentContext:
             self.po = obj
             return
         
-        
-
-
     # ------------------------------------------------------------------
     # convenience properties
     # ------------------------------------------------------------------

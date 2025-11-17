@@ -10,15 +10,15 @@ from pathlib import Path
 from datetime import datetime
 import csv, threading, traceback
 
-
-from objects import RawObject
-from tools import discover_lumo_directories,crop_auto
-
-
 from PyQt5.QtCore import QObject, pyqtSignal, QRunnable, QThreadPool
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QFileDialog
 )
+
+
+from ..models.raw_object import RawObject
+from ..interface.tools import discover_lumo_directories, crop_auto
+
 
 
 # ----------------------------
