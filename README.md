@@ -229,30 +229,6 @@ A major feature enabling hole‑level interpretation.
 
 ---
 
-## Repository Structure
-
-```
-.
-├── ribbon_window.py        # Main window, Ribbon controller
-├── ribbon.py               # Ribbon component
-├── pages.py                # RawPage, VisualisePage, LibraryPage
-├── HolePage.py             # HolePage, HoleBoxTable, HoleControlPanel
-│
-├── objects.py              # RawObject, ProcessedObject, HoleObject
-├── context.py              # CurrentContext shared across app
-├── tools.py                # Masking, cropping, feature maps, helpers
-├── spectral_functions.py   # Reflectance correction, smoothing, CR, peaks
-├── multi_box.py            # Batch processing of many raw boxes
-├── tool_dispatcher.py      # Safe GUI event routing for canvas tools
-├── util_windows.py         # Canvas widgets, dialogs, busy cursor, tables
-├── config.py               # Numeric/config parameters
-│
-├── gifs/                   # Demo GIFs used in README
-└── README.md
-```
-
----
-
 ## Extending the Application
 
 The modular design allows you to:
