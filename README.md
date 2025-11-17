@@ -37,27 +37,41 @@ CoreSpecViewer provides:
 ---
 
 ## Repository Structure
-
 ```
-.
-├── CoreSpecViewer.py        # Main window, Ribbon controller
-├── ribbon.py               # Ribbon component
-├── pages.py                # RawPage, VisualisePage, LibraryPage
-├── HolePage.py             # HolePage, HoleBoxTable, HoleControlPanel
+CoreSpecViewer/
+├─ CoreSpecViewer.py             # Thin launcher
+|
+├─ resources/                    # Spectral library and demo GIFs
 │
-├── objects.py              # RawObject, ProcessedObject, HoleObject
-├── context.py              # CurrentContext shared across app
-├── tools.py                # Translation layer between the data model and the spectral functions
-├── spectral_functions.py   # Reflectance correction, smoothing, CR, peaks
-├── multi_box.py            # Batch processing of many raw boxes
-├── tool_dispatcher.py      # Safe GUI event routing for canvas tools
-├── util_windows.py         # Canvas widgets, dialogs, busy cursor, tables
-├── config.py               # Numeric/config parameters
-│
-├── gifs/                   # Demo GIFs used in README
-└── README.md
+├─ app/                          # Main application package
+│  ├─ main.py                    # Main Qt application entrypoint
+│  ├─ config.py                  # User/application configuration
+│  │
+│  ├─ interface/                 # Ribbon, toolbars, QAction wiring, dialogs
+│  │  ├─ tools.py                # Translation layer: data model → spectral functions
+│  │  └─ tool_dispatcher.py      # Safe GUI event routing for canvas tools
+│  │
+│  ├─ models/                    # Data layer: core objects + context
+│  │  ├─ dataset.py              # Generic dataset container
+│  │  ├─ processed_object.py     # ProcessedObject
+│  │  ├─ raw_object.py           # RawObject
+│  │  ├─ hole_object.py          # HoleObject
+│  │  └─ context.py              # CurrentContext shared across the app
+│  │
+│  ├─ ui/                        # Qt pages (Raw, Visualise, Library, Hole, etc.)
+│  │  ├─ base_page.py            # BasePage inherited by specific page classes
+│  │  ├─ hole_page.py            # HolePage
+│  │  ├─ raw_page.py             # RawPage
+│  │  ├─ lib_page.py             # LibraryPage
+│  │  ├─ vis_page.py             # VisualisePage
+│  │  ├─ catalogue_window.py     # File browser window
+│  │  ├─ ribbon.py               # Ribbon component
+│  │  ├─ multi_box.py            # Multi-box automated processing
+│  │  └─ util_windows.py         # Canvas widgets, dialogs, busy cursor, tables
+│  │
+│  └─ spectral/                  # Spectral maths, IO
+│     └─ spectral_functions.py   # Continuum removal, Pearson, feature extraction
 ```
-
 ---
 
 ## Getting started
@@ -212,30 +226,6 @@ A major feature enabling hole‑level interpretation.
   - `.po` — ProcessedObject  
   - `.ho` — HoleObject  
   - `.active` — which object is currently primary  
-
----
-
-## Repository Structure
-
-```
-.
-├── ribbon_window.py        # Main window, Ribbon controller
-├── ribbon.py               # Ribbon component
-├── pages.py                # RawPage, VisualisePage, LibraryPage
-├── HolePage.py             # HolePage, HoleBoxTable, HoleControlPanel
-│
-├── objects.py              # RawObject, ProcessedObject, HoleObject
-├── context.py              # CurrentContext shared across app
-├── tools.py                # Masking, cropping, feature maps, helpers
-├── spectral_functions.py   # Reflectance correction, smoothing, CR, peaks
-├── multi_box.py            # Batch processing of many raw boxes
-├── tool_dispatcher.py      # Safe GUI event routing for canvas tools
-├── util_windows.py         # Canvas widgets, dialogs, busy cursor, tables
-├── config.py               # Numeric/config parameters
-│
-├── gifs/                   # Demo GIFs used in README
-└── README.md
-```
 
 ---
 
