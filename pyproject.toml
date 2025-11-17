@@ -26,4 +26,4 @@ corespecviewer = "app.main:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["app"]
+include = ["app", "app.*"]
