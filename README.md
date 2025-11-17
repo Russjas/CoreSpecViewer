@@ -10,7 +10,7 @@ The system is designed for geoscientists and hyperspectral imaging specialists, 
 | Workflow Stage | Demonstration |
 |----------------|---------------|
 | **Open and process Specim Lumo data** | ![Open workflow](resources/gifs/Open_workflow.gif) |
-| **Mask and unwrap regions** | ![Mask to unwrap](gifs/resources/Mask_to_unwrap.gif) |
+| **Mask and unwrap regions** | ![Mask to unwrap](resources/gifs/Mask_to_unwrap.gif) |
 | **Feature extraction & visualisation** | ![Visualise](resources/gifs/Visualise.gif) |
 | **Spectral library browsing** | ![Library use](resources/gifs/Library_use.gif) |
 | **Full hole visualisation** | ![Full hole](resources/gifs/Full_hole.gif) |
