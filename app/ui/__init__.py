@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 UI module for CoreSpecViewer.
 
@@ -33,24 +32,23 @@ application. This module exposes the concrete pages so that the main application
 can instantiate and register them without importing their internal details.
 """
 
-from .raw_page import RawPage
-from .vis_page import VisualisePage
-from .lib_page import LibraryPage
-from .hole_page import HolePage
 from .catalogue_window import CatalogueWindow
-from .ribbon import Ribbon, Groups
+from .hole_page import HolePage
+from .lib_page import LibraryPage
+from .raw_page import RawPage
+from .ribbon import Groups, Ribbon
 from .util_windows import (
-    SpectralImageCanvas,
+    AutoSettingsDialog,
     ImageCanvas2D,
     InfoTable,
-    SpectrumWindow,
-    AutoSettingsDialog, 
     MetadataDialog,
-    two_choice_box, 
-    choice_box, 
-    InfoTable, 
-    busy_cursor
+    SpectralImageCanvas,
+    SpectrumWindow,
+    busy_cursor,
+    choice_box,
+    two_choice_box,
 )
+from .vis_page import VisualisePage
 
 __all__ = [
     "RawPage",
@@ -64,10 +62,10 @@ __all__ = [
     "ImageCanvas2D",
     "InfoTable",
     "SpectrumWindow",
-    "AutoSettingsDialog", 
+    "AutoSettingsDialog",
     "MetadataDialog",
-    "two_choice_box", 
-    "choice_box", 
-    "InfoTable", 
+    "two_choice_box",
+    "choice_box",
+    "InfoTable",
     "busy_cursor"
 ]

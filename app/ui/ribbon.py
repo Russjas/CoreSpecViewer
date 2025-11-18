@@ -1,6 +1,17 @@
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtWidgets import (QTabWidget, QWidget, QHBoxLayout, QToolBar, QAction, QMenu,QToolButton,
-                             QWidgetAction, QLabel, QVBoxLayout, QFrame, QSizePolicy)
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QAction,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QSizePolicy,
+    QTabWidget,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class Ribbon(QTabWidget):
     """Ribbon with three tabs: Raw, Mask, Visualise.
@@ -14,20 +25,20 @@ class Ribbon(QTabWidget):
         self.setMovable(False)
         self.setDocumentMode(True)
         self.bars = {}
-        
+
 
     def _create_bar(self):
         bar = QToolBar()
         bar.setMovable(False)
         bar.setFloatable(False)
         bar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-        
+
         return bar
-    
+
     def wrap(self, bar):
         page = QWidget(); lay = QHBoxLayout(page); lay.setContentsMargins(8,8,8,8)
         lay.addWidget(bar); lay.addStretch(1); return page
-        
+
     def _populate(self, bar: QToolBar, spec):
         for kind, label, payload in spec:
             if kind == "button":
@@ -47,7 +58,7 @@ class Ribbon(QTabWidget):
         self.bars[name] = new_tab
         self.addTab(self.wrap(new_tab), name)
         self._populate(self.bars[name], entries)
-       
+
     def add_global_actions(self, perm_act_list, pos='left'):
         """Add permanent buttons (e.g., Open/Save) to the ribbon corner."""
         tb = QToolBar(self)
@@ -76,7 +87,7 @@ QToolButton {
             for a in perm_act_list:
                 tb.addAction(a)
             self.setCornerWidget(tb, Qt.TopRightCorner)
-            
+
 class Groups(QTabWidget):
     """
     Ribbon-style control that shows all 'tabs' as grouped blocks
@@ -157,53 +168,53 @@ class Groups(QTabWidget):
             | Raw        |
             | buttons... |   | Masking    |   | Visualise |   | Hole operations |
         """
-    
+
         # Create toolbar for this group
         bar = self._create_bar()
         self.bars[name] = bar
-    
+
         # ----- Group widget structure -----
         group_widget = QWidget(self)
-    
+
         # Outer layout: [ VLine |  inner VBox  | VLine ]
         outer = QHBoxLayout(group_widget)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-    
+
         left_sep = QFrame(self)
         left_sep.setFrameShape(QFrame.VLine)
         left_sep.setFrameShadow(QFrame.Sunken)
         left_sep.setLineWidth(1)
         left_sep.setMidLineWidth(0)
-    
+
         right_sep = QFrame(self)
         right_sep.setFrameShape(QFrame.VLine)
         right_sep.setFrameShadow(QFrame.Sunken)
         right_sep.setLineWidth(1)
         right_sep.setMidLineWidth(0)
-    
+
         inner = QVBoxLayout()
         inner.setContentsMargins(10, 0, 10, 0)  # padding inside group
         inner.setSpacing(2)
-    
+
         label = QLabel(name)
         label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
         label.setStyleSheet("QLabel { font-weight: bold; }")
-    
+
         inner.addWidget(label)
         inner.addWidget(bar)
-    
+
         outer.addWidget(left_sep)
         outer.addLayout(inner)
         outer.addWidget(right_sep)
-    
+
         # Populate toolbar
         self._populate(bar, entries)
-    
+
         # Let the group size itself to its content, then fix that width
         group_widget.adjustSize()
         group_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
-    
+
         # Add the group to the horizontal layout (left/top aligned globally)
         self._group_layout.addWidget(group_widget)
 

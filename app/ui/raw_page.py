@@ -1,12 +1,12 @@
-# -*- coding: utf-8 -*-
 """
 Created on Mon Nov 17 11:37:07 2025
 
 @author: russj
 """
 
-from .util_windows import SpectralImageCanvas
 from .base_page import BasePage
+from .util_windows import SpectralImageCanvas
+
 
 class RawPage(BasePage):
     """
@@ -20,7 +20,7 @@ class RawPage(BasePage):
         super().__init__(parent)
         # Build the three-pane layout
         self._add_left(SpectralImageCanvas(self))
-        
+
 
     def update_display(self, key = 'mask'):
         if self.current_obj is None:
@@ -29,5 +29,5 @@ class RawPage(BasePage):
             return
         self.left_canvas.show_rgb(self.current_obj.get_display_reflectance(), self.current_obj.bands)
 
-    
-        
+
+

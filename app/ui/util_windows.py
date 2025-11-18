@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Tue Oct  7 12:11:50 2025
 
@@ -6,26 +5,37 @@ Created on Tue Oct  7 12:11:50 2025
 """
 
 
-import numpy as np
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, QSortFilterProxyModel
-from PyQt5.QtWidgets import (QApplication,
-    QMainWindow, QWidget, QVBoxLayout, QTableWidget,
-    QTableWidgetItem, QLineEdit, QDialog, QDialogButtonBox,
-    QMessageBox, QToolBar, QLabel, QAction
-)
 from contextlib import contextmanager
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationTool
-from matplotlib.figure import Figure
-from matplotlib.widgets import RectangleSelector, PolygonSelector
-from matplotlib.patches import Patch
+
 import matplotlib
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationTool
+from matplotlib.figure import Figure
+from matplotlib.patches import Patch
+from matplotlib.widgets import PolygonSelector, RectangleSelector
+import numpy as np
+from PyQt5.QtCore import QSortFilterProxyModel, Qt, pyqtSignal
+from PyQt5.QtWidgets import (
+    QAction,
+    QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 my_map = matplotlib.colormaps['viridis']
 my_map.set_bad('black')
 
-from ..spectral import spectral_functions as sf
 from ..interface import tools as t
+from ..spectral import spectral_functions as sf
+
 
 #==========reference passing and cache update======================
 @contextmanager
@@ -133,7 +143,7 @@ class InfoTable(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.table)
-        
+
 
     def add_row(self, key, value, editable=False):
         r = self.table.rowCount()
@@ -148,20 +158,20 @@ class InfoTable(QWidget):
             val_item.setFlags(val_item.flags() & ~Qt.ItemIsEditable)
         self.table.setItem(r, 1, val_item)
 
-            
+
     def set_from_dict(self, d):
         self.table.setRowCount(0)
         # Normal rows
         for k, v in d.items():
             self.add_row(k, v, editable=False)
-        
+
 
 
 
 class ImageCanvas2D(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-         
+
         layout = QVBoxLayout(self)
         self.fig = Figure(figsize=(8, 4))
         self.ax = self.fig.add_subplot(111)
@@ -172,21 +182,21 @@ class ImageCanvas2D(QWidget):
         layout.addWidget(self.toolbar)
 
     def show_rgb(self, image):
-        
+
         shp = getattr(image, "shape", None)
         if not shp or len(shp) == 1:
             return  # ignore 1D/unknown
-        
+
         if len(shp) == 2:
             rgb = image
             self.ax.clear()
             self.ax.imshow(rgb, cmap=my_map, origin="upper", vmin = np.min(rgb), vmax = np.max(rgb))
-        
+
         elif len(shp) == 3 and shp[2] == 3:
             rgb = image
             self.ax.clear()
             self.ax.imshow(rgb, origin="upper")
-        
+
         elif len(shp) == 3 and shp[2] > 3:
             rgb = sf.get_false_colour(image)
             self.ax.clear()
@@ -216,7 +226,7 @@ class ImageCanvas2D(QWidget):
         """
         if index_2d.ndim != 2:
             raise ValueError("index_2d must be a 2-D integer array of class indices.")
-    
+
         H, W = index_2d.shape
         if H == 0 or W == 0:
             self.ax.clear(); self.ax.set_axis_off(); self.canvas.draw(); return
@@ -243,14 +253,14 @@ class ImageCanvas2D(QWidget):
                 max_idx_legend = idx
         max_idx = max(max_idx_data, max_idx_legend)
         K = max_idx + 1
-                
+
         # ---- build labels array for 0..K-1 (fallback to "class i" if missing)
         labels = [idx_to_label.get(i, f"class {i}") for i in range(K)]
-    
+
         # ---- deterministic colors from tab20
         cmap = matplotlib.colormaps.get("tab20") or matplotlib.colormaps["tab10"]
         colors_rgb = (np.array([cmap(i % 20)[:3] for i in range(K)]) * 255).astype(np.uint8)  # (K,3)
-    
+
         # ---- make RGB image; treat negatives as transparent-ish background
         idx_img = index_2d.copy()
         neg_mask = idx_img < 0
@@ -259,34 +269,34 @@ class ImageCanvas2D(QWidget):
         rgb = colors_rgb[idx_img]
         if neg_mask.any():
             rgb[neg_mask] = np.array([0, 0, 0], dtype=np.uint8)
-        
-    
+
+
         # ---- draw
         self.ax.clear()
         self.ax.imshow(rgb, origin="upper")
         self.ax.set_axis_off()
-    
+
         # ---- legend includes only classes actually present (>=0) in the image
         valid = ~neg_mask
         handles = []
         leg = None
-    
+
         if valid.any():
             counts = np.bincount(idx_img[valid].ravel(), minlength=K)
             present = np.nonzero(counts)[0]  # indices with at least 1 pixel
-    
+
             if present.size > 0:
                 # sort by count desc, then index asc
                 present_sorted = sorted(
                     present.tolist(),
                     key=lambda i: (-int(counts[i]), int(i)),
                 )
-    
+
                 total = int(valid.sum())
-    
+
                 def _pct(i: int) -> float:
                     return (counts[i] / total * 100.0) if total > 0 else 0.0
-    
+
                 handles = [
                     Patch(
                         facecolor=(colors_rgb[i] / 255.0),
@@ -313,7 +323,7 @@ class ImageCanvas2D(QWidget):
         if leg:
             leg.set_title("Mineral", prop={"size": 9})
             leg.set_draggable(True)  # users can move it if they want
-    
+
         self.canvas.draw_idle()
 
     def clear_memmap_refs(self):
@@ -336,10 +346,10 @@ class SpectralImageCanvas(QWidget):
         # Single and right click wiring
         self.on_single_click = None         # callable(y, x) -> None
         self.on_right_click  = None         # callable(y, x) -> None
-        
+
         # polygon selector
         self._poly_selector = None
-        self.on_polygon_finished = None 
+        self.on_polygon_finished = None
 
         # UI elements
         layout = QVBoxLayout(self)
@@ -358,7 +368,7 @@ class SpectralImageCanvas(QWidget):
         self.cube = cube
         self.bands = bands
         rgb = sf.get_false_colour(cube)
-        
+
         self.ax.clear()
         self.ax.imshow(rgb, origin="upper")
         self.ax.set_axis_off()
@@ -382,7 +392,7 @@ class SpectralImageCanvas(QWidget):
         # Double clicks hard-wired to spectrum display
         if event.dblclick:
             spec = self.cube[r, c]
-            
+
             if self.spec_win is None:
                 self.spec_win = SpectrumWindow(self)
             title = "Spectrum Viewer"
@@ -395,13 +405,13 @@ class SpectralImageCanvas(QWidget):
         # pass single clicks back to parent using parent-assigned callable
         if event.button == 1 and callable(self.on_single_click):
             self.on_single_click(r, c)
-    
+
     # polygon selection methods
     def start_polygon_select(self):
-        
+
         self.cancel_rect_select()
         self.cancel_polygon_select()
-    
+
         def _on_select(verts):
             # verts is [(x,y), ...] in data coords
             print("[canvas] _on_select called; verts:", len(verts))
@@ -411,7 +421,7 @@ class SpectralImageCanvas(QWidget):
                 self.on_polygon_finished(v_rc)
             self.cancel_polygon_select()
             self.canvas.draw()
-    
+
         self._poly_selector = PolygonSelector(
         self.ax,
         onselect=_on_select,
@@ -422,11 +432,11 @@ class SpectralImageCanvas(QWidget):
         grab_range=5,
         draw_bounding_box=False,
     )
-        
-        
+
+
         self.canvas.widgetlock(self._poly_selector)
         self.canvas.draw()
-        
+
     def cancel_polygon_select(self):
         print("[canvas] cancel_polygon_select()")
         """Tear down an active polygon tool, if any."""
@@ -440,9 +450,9 @@ class SpectralImageCanvas(QWidget):
                 self._poly_selector = None
             except Exception:
                 self._poly_selector = None
-        
-    
-    
+
+
+
     # -------- Rectangle selection: start/cancel, callback, polling --------
     def start_rect_select(self, minspan=(5, 5), interactive=True):
         # avoid conflicts with pan/zoom from toolbar
@@ -506,12 +516,12 @@ class ClosableWidgetWrapper(QWidget):
     The parent page connects to the closed signal to remove this wrapper.
     """
     # Signal emitted when the close button is clicked, carries a reference to self
-    closed = pyqtSignal(object) 
-    
+    closed = pyqtSignal(object)
+
     def __init__(self, wrapped_widget: QWidget, title: str = "", parent=None, closeable = True):
         super().__init__(parent)
         self.wrapped_widget = wrapped_widget
-        
+
         # 1. Create a toolbar for the close button
         self.toolbar = QToolBar(self)
         self.toolbar.setStyleSheet("QToolBar { border: none; padding: 2px; }")
@@ -530,7 +540,7 @@ class ClosableWidgetWrapper(QWidget):
             self.toolbar.addAction(close_action)
         else:
             default_label = QAction("Default", self)
-            default_label.setToolTip(f"Default cannot be closed")
+            default_label.setToolTip("Default cannot be closed")
             self.toolbar.addAction(default_label)
 
         # 4. Main layout (Toolbar above, Wrapped Widget below)
@@ -561,15 +571,15 @@ class SpectrumWindow(QMainWindow):
         self.toolbar = NavigationTool(self.canvas, central)
         layout.addWidget(self.canvas)
         layout.addWidget(self.toolbar)
-        
+
 
         self.setCentralWidget(central)
-        
+
     def clear_all(self):
         self.ax.clear()
         self._series_count = 0
         self.canvas.draw()
-      
+
     def plot_spectrum(self, x, y, title=""):
         if x is not None:
             self.ax.plot(x, y)
@@ -581,11 +591,11 @@ class SpectrumWindow(QMainWindow):
             self.ax.set_title(title)
         self.ax.grid(True, alpha=0.3)
         self.canvas.draw()
-        self.show()  
-        
+        self.show()
+
     def closeEvent(self, ev):
         self.clear_all()
-        
+
 class MetadataDialog(QDialog):
     def __init__(self, meta=None, parent=None):
         super().__init__(parent)
@@ -625,7 +635,7 @@ class MetadataDialog(QDialog):
             "depth_from": self.from_edit.text().strip(),
             "depth_to": self.to_edit.text().strip(),
         }
-                
+
 class AutoSettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -664,6 +674,5 @@ class AutoSettingsDialog(QDialog):
             key = self.tbl.item(r, 0).text()
             val = self.tbl.item(r, 1).text()
             t.modify_config(key, val)
-        
-        self.accept()      
-        
+
+        self.accept()

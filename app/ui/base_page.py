@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Oct 22 09:47:46 2025
 
@@ -6,12 +5,12 @@ Created on Wed Oct 22 09:47:46 2025
 """
 
 
-from PyQt5.QtWidgets import QSplitter, QWidget, QVBoxLayout
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
-from .util_windows import ClosableWidgetWrapper, SpectralImageCanvas, ImageCanvas2D
 from ..interface import ToolDispatcher
 from ..models import CurrentContext
+from .util_windows import ClosableWidgetWrapper, ImageCanvas2D, SpectralImageCanvas
 
 
 class BasePage(QWidget):
@@ -33,7 +32,7 @@ class BasePage(QWidget):
 
         # Data models available to the page (set by controller)
         self._cxt = CurrentContext()
-    
+
     @property
     def cxt(self) -> CurrentContext | None:
         return self._cxt
@@ -46,8 +45,8 @@ class BasePage(QWidget):
     @property
     def current_obj(self):
         return self._cxt.current if self._cxt else None
-    
-          
+
+
 
     # --- building helpers ----------------------------------------------------
     def _add_left(self, w: QWidget):
@@ -93,18 +92,18 @@ class BasePage(QWidget):
         widget to the QSplitter, usually alongside self._right or self._third.
         """
          # Import locally for clean API
-        
+
         wrapper = ClosableWidgetWrapper(raw_widget, title=title, parent=self, closeable=closeable)
-        
+
         # Connect the wrapper's closed signal to the page's removal handler
-        wrapper.closed.connect(self.remove_widget) 
-        
+        wrapper.closed.connect(self.remove_widget)
+
         # Add the wrapper to the splitter
-        
+
         self._splitter.addWidget(wrapper)
-        
+
         return wrapper
-        
+
 
     def remove_widget(self, w: QWidget):
         """
@@ -123,7 +122,7 @@ class BasePage(QWidget):
         # 2. Remove from layout and disconnect from Python
         w.setParent(None)
         w.deleteLater()
-        
+
         # 3. If the removed widget was one of the three primary slots, clear the reference
         if w is self._left:
             self._left = None
@@ -131,7 +130,7 @@ class BasePage(QWidget):
             self._right = None
         elif w is self._third:
             self._third = None
-            
+
     def update_display(self, key='mask'):
         pass
     # --- accessors for the controller ---------------------------------------

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Tue Nov 11 11:28:13 2025
 
@@ -6,19 +5,17 @@ Created on Tue Nov 11 11:28:13 2025
 """
 
 
-from pathlib import Path
+import csv
 from datetime import datetime
-import csv, threading, traceback
+from pathlib import Path
+import threading
+import traceback
 
-from PyQt5.QtCore import QObject, pyqtSignal, QRunnable, QThreadPool
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QFileDialog
-)
+from PyQt5.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
+from PyQt5.QtWidgets import QDialog, QFileDialog, QLabel, QProgressBar, QPushButton, QVBoxLayout
 
-
+from ..interface.tools import discover_lumo_directories
 from ..models.raw_object import RawObject
-from ..interface.tools import discover_lumo_directories, crop_auto
-
 
 
 # ----------------------------
@@ -95,7 +92,7 @@ def process_multibox(src, dest, *,
             if out_meta.exists() and not force:
                 status, msg = "skipped", "already processed"
             else:
-                #hacked away 
+                #hacked away
                 #TODO build crop guards to avoid overcropping
                 raw = RawObject.from_Lumo_directory(box)     # may raise ValueError
                 #cropped = crop_auto(raw)

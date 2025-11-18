@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Sun Nov 16 18:21:56 2025
 
@@ -6,13 +5,13 @@ Created on Sun Nov 16 18:21:56 2025
 """
 from pathlib import Path
 
-from PyQt5.QtCore import Qt, QDir, pyqtSignal, QModelIndex
+from PyQt5.QtCore import QDir, QModelIndex, Qt, pyqtSignal
 from PyQt5.QtWidgets import (
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QTreeView,
     QFileSystemModel,
+    QMainWindow,
+    QTreeView,
+    QVBoxLayout,
+    QWidget,
 )
 
 
@@ -97,14 +96,14 @@ class CatalogueWindow(QMainWindow):
             self.dirActivated.emit(path)
         else:
             self.fileActivated.emit(path)
-            
+
     def closeEvent(self, event):
         """
         Ensure the main GUI knows this window is gone.
 
         Does NOT quit the app (unlike your old GUI's behaviour).
         """
-       
+
         parent = self.parent()
         if parent is not None and hasattr(parent, "_catalogue_window"):
             parent._catalogue_window = None
