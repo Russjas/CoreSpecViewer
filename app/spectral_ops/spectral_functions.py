@@ -14,9 +14,8 @@ from numba import jit
 import numpy as np
 from PIL import Image
 import scipy as sc
-import spectral.io.envi as envi
-
 import spectral as sp
+import spectral.io.envi as envi
 
 from ..config import con_dict  # live shared dict
 

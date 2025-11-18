@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Thu Nov 13 09:39:39 2025
 
@@ -17,7 +16,7 @@ con_dict = {
     "default_slice_stop": -5,
 
     # Savitzky–Golay
-    "savgol_window": 10,   
+    "savgol_window": 10,
     "savgol_polyorder": 2,
 }
 
@@ -29,7 +28,7 @@ def set_value(key, value):
     # naive cast
     ty = type(con_dict[key])
     con_dict[key] = ty(value)
-    
+
 
 def get_all():
-    return con_dict  
+    return con_dict

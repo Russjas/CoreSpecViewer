@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Standalone launcher for the CoreSpecViewer application.
 

@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (
     QApplication,
     QDialog,
     QDialogButtonBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -27,7 +28,6 @@ from PyQt5.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
-    QHBoxLayout,
     QVBoxLayout,
     QWidget,
 )
