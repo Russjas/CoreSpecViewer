@@ -54,7 +54,7 @@ class Dataset:
     suffix: str
     ext: str
     data: object = None
-    thumb: Image | None = None
+    thumb: Image.Image = None
     _memmap_ref: object = None
     def __post_init__(self):
         """Normalize the path and automatically load data if the file exists."""
