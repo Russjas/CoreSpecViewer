@@ -1,17 +1,18 @@
-# -*- coding: utf-8 -*-
 """
 Created on Mon Nov 17 09:26:58 2025
 
 @author: russj
 """
-from dataclasses import dataclass, field
-from pathlib import Path
-import json
 from collections import Counter
-from typing import Iterator, Tuple, List, Union, Dict
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 from datetime import datetime
+import json
+from pathlib import Path
+from typing import Union
 
 from .processed_object import ProcessedObject
+
 
 def combine_timestamp(meta: dict) -> datetime | None:
     """
@@ -37,8 +38,8 @@ class HoleObject:
     num_box: int
     first_box: int
     last_box: int
-    hole_meta: Dict[int, dict] = field(default_factory=dict)
-    boxes: Dict[int, "ProcessedObject"] = field(default_factory=dict)
+    hole_meta: dict[int, dict] = field(default_factory=dict)
+    boxes: dict[int, "ProcessedObject"] = field(default_factory=dict)
 
     @classmethod
     def build_from_box(cls, obj):
@@ -55,7 +56,7 @@ class HoleObject:
         root = Path(path)
 
         # ---- PASS 1: read JSON only (cheap) to detect dominant hole_id if not provided
-        hole_ids: List[str] = []
+        hole_ids: list[str] = []
         for fp in sorted(root.glob("*.json")):
             try:
                 meta = json.loads(fp.read_text(encoding="utf-8"))
@@ -135,7 +136,7 @@ class HoleObject:
 
         # handle re-scans by box number
         if box_num in self.boxes:
-            
+
             # if same basename, treat as duplicate and ignore
             if self.boxes[box_num].basename == obj.basename:
                 return box_num
@@ -163,16 +164,16 @@ class HoleObject:
             if not tst:
                 return False
         return True
-    
+
     def get_all_thumbs(self):
         for i in self:
             i.load_or_build_thumbs()
-    
+
     def __iter__(self) -> Iterator["ProcessedObject"]:
         for bn in sorted(self.boxes):
             yield self.boxes[bn]
 
-    def iter_items(self) -> Iterator[Tuple[int, "ProcessedObject"]]:
+    def iter_items(self) -> Iterator[tuple[int, "ProcessedObject"]]:
         for bn in sorted(self.boxes):
             yield bn, self.boxes[bn]
 
@@ -182,7 +183,7 @@ class HoleObject:
     def __contains__(self, box_number: int) -> bool:
         return box_number in self.boxes
 
-    def __getitem__(self, key: Union[int, slice, List[int]]) -> Union["ProcessedObject", List["ProcessedObject"]]:
+    def __getitem__(self, key: int | slice | list[int]) -> Union["ProcessedObject", list["ProcessedObject"]]:
         if isinstance(key, int):
             return self.boxes[key]
         elif isinstance(key, slice):

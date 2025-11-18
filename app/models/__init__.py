@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 CoreSpecViewer app.models package.
 
@@ -30,11 +29,11 @@ automatic loading/saving, and downstream integration with the GUI and processing
 workflows.
 """
 
+from .context import CurrentContext
+from .dataset import Dataset
+from .hole_object import HoleObject
 from .processed_object import ProcessedObject
 from .raw_object import RawObject
-from .hole_object import HoleObject
-from .dataset import Dataset
-from .context import CurrentContext
 
 __all__ = [
     "Dataset",

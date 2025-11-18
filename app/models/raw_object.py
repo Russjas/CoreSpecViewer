@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Mon Nov 17 09:26:58 2025
 
@@ -6,18 +5,14 @@ Created on Mon Nov 17 09:26:58 2025
 """
 
 
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
+
 import numpy as np
-from collections import Counter
-from typing import Optional
 
-from .processed_object import ProcessedObject  
 from ..spectral import spectral_functions as sf
-
-        
-            
-            
+from .processed_object import ProcessedObject
 
 SPECIM_LUMO_REQUIRED = {
     "data head":    "{id}.hdr",
@@ -31,7 +26,7 @@ SPECIM_LUMO_REQUIRED = {
     "white log":    "WHITEREF_{id}.log",
     "metadata":     "{id}.xml",
 }
-  
+
 @dataclass
 class RawObject:
     """
@@ -56,15 +51,15 @@ class RawObject:
     basename: str
     root_dir: Path
     files: dict = field(default_factory=dict)
-    temp_reflectance: Optional[np.ndarray] = field(default=None, repr=False)
+    temp_reflectance: np.ndarray | None = field(default=None, repr=False)
     metadata: dict = field(default_factory=dict)
     file_issues: dict = field(default_factory=dict)
     def __post_init__(self):
         """On initialization, populate metadata and compute reflectance."""
         self.get_metadata()
         self.get_reflectance()
-        
-        
+
+
     def get_metadata(self):
         """Load and merge Specim XML + ENVI header metadata if available."""
         if 'metadata' in self.files.keys() and 'data head' in self.files.keys():
@@ -75,7 +70,7 @@ class RawObject:
     def is_raw(self) -> bool:
         """Return True; distinguishes from ProcessedObject."""
         return True
-        
+
     @classmethod
     def from_Lumo_directory(cls, directory):
         """
@@ -93,18 +88,18 @@ class RawObject:
             box_id = Counter(stems).most_common(1)[0][0]
         else:
             box_id = d.name.lower()
-    
+
         required = {k: pat.format(id=box_id) for k, pat in SPECIM_LUMO_REQUIRED.items()}
         files = {}
         missing, duplicates, zero_byte = [], {}, {}
         critical_missing = []
-    
+
         # Define files that are CRITICAL for reflectance calculation
         CRITICAL_FILES = ["data head", "data raw", "white head", "white raw", "dark head", "dark raw"]
-    
+
         for role, expected_name in required.items():
             matches = [p for p in all_files if p.name.lower() == expected_name.lower()]
-            
+
             if not matches:
                 missing.append(role)
                 if role in CRITICAL_FILES:
@@ -119,23 +114,23 @@ class RawObject:
                     zero_byte[role] = str(f)
                 else:
                     files[role] = str(f)
-                    
+
         # CRITICAL CHECK: Still raise an error if raw data/references are missing.
         if critical_missing:
             raise ValueError(
                 f"Cannot open raw dataset: Critical files are missing or invalid: {critical_missing}"
             )
-            
+
         # Create the instance, including the file issue report
         raw_object = cls(basename=box_id, root_dir=d, files=files)
-        
+
         # Store all non-critical issues on the object for inspection/logging
         raw_object.file_issues = {
             "missing": missing,
             "duplicates": duplicates,
             "zero_byte": zero_byte,
         }
-    
+
         # Add a print or logging statement for non-critical issues (optional)
         if missing or duplicates or zero_byte:
             print(f"⚠️ Warning: Non-critical files issues found for {box_id}:")
@@ -145,7 +140,7 @@ class RawObject:
                 print(f"  Duplicates (Skipped): {duplicates}")
             if zero_byte:
                 print(f"  Zero Byte (Skipped): {zero_byte}")
-    
+
         return raw_object
 
 
@@ -164,7 +159,7 @@ class RawObject:
         """Generate a false-colour RGB composite for visualization."""
         if hasattr(self, "reflectance") and self.reflectance is not None:
             return sf.get_false_colour(self.reflectance, bands=bands)
-        
+
     def process(self):
         """
         Generate a ProcessedObject containing derived products.
@@ -189,7 +184,7 @@ class RawObject:
         po.add_dataset('mask', mask, ext='.npy')
         po.build_all_thumbs()
         return po
-     
+
     def add_temp_reflectance(self, array):
         """
         Stage a temporary reflectance array (e.g., cropped) without committing.
@@ -218,7 +213,7 @@ class RawObject:
     def has(self, key: str):
         """Return True if the required file role exists."""
         return key in self.files
-    
+
     def __getitem__(self, key):
         """Return the file path registered under the specified role key."""
         return self.files[key]

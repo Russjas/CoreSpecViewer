@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Tue Nov 11 13:28:04 2025
 
@@ -7,12 +6,11 @@ Created on Tue Nov 11 13:28:04 2025
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, Optional
 
-from .raw_object import RawObject
-from .processed_object import ProcessedObject
 from .hole_object import HoleObject
-
+from .processed_object import ProcessedObject
+from .raw_object import RawObject
 
 
 @dataclass
@@ -40,14 +38,14 @@ class CurrentContext:
     _po: Optional["ProcessedObject"] = None
     _ro: Optional["RawObject"] = None
     _ho: Optional["HoleObject"] = None
-    _review_log: Optional[Path] = None
-    _project_root: Optional[Path] = None
-    active: Optional[str] = None
-    
+    _review_log: Path | None = None
+    _project_root: Path | None = None
+    active: str | None = None
+
     #----- properties for enforcing active set on assignment
     @property
     def po(self): return self._po
-    
+
     @po.setter
     def po(self, obj):
         self._po = obj
@@ -56,7 +54,7 @@ class CurrentContext:
 
     @property
     def ro(self): return self._ro
-    
+
     @ro.setter
     def ro(self, obj):
         self._ro = obj
@@ -64,25 +62,25 @@ class CurrentContext:
 
     @property
     def ho(self): return self._ho
-    
+
     @ho.setter
     def ho(self, obj):
         self._ho = obj
-    
-    #current object can only ever be PO or RO - access point for tools that can use either        
+
+    #current object can only ever be PO or RO - access point for tools that can use either
     @property
-    def current(self) -> Optional[Any]:
+    def current(self) -> Any | None:
         if self.active == "po": return self._po
         if self.active == "ro": return self._ro
         return None
-    
+
     #current object can only ever be PO or RO - access point for tools that can use either
     @current.setter
     def current(self, obj):
         if obj is None:
             self.active = None
             return
-        
+
         is_raw = getattr(obj, "is_raw", None)
         if is_raw is True:
             self.ro = obj
@@ -90,11 +88,11 @@ class CurrentContext:
         if is_raw is False:
             self.po = obj
             return
-        
+
     # ------------------------------------------------------------------
     # convenience properties
     # ------------------------------------------------------------------
-    
+
     @property
     def has_processed(self) -> bool:
         return self.po is not None
@@ -107,14 +105,13 @@ class CurrentContext:
     def has_hole(self) -> bool:
         return self.ho is not None
 
-   
+
     @property
-    def metadata(self) -> Optional[dict]:
+    def metadata(self) -> dict | None:
         if self._ho is not None: return self._ho.metadata
         if self._po is not None: return self._po.metadata
         if self._ro is not None: return self._ro.metadata
         return None
 
-   
 
-    
+

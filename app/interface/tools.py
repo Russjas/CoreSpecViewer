@@ -1,25 +1,25 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Oct 22 11:33:11 2025
 
 @author: russj
 """
 from pathlib import Path
-import numpy as np
-from matplotlib.path import Path as mpl_path
 
+from matplotlib.path import Path as mpl_path
+import numpy as np
 
 from .. import config
-from ..models import ProcessedObject, RawObject, Dataset
+from ..models import ProcessedObject, RawObject
 from ..spectral import spectral_functions as sf
 
+
 def get_config():
-    return sf.con_dict  
+    return sf.con_dict
 
 def modify_config(key, value):
     config.set_value(key, value)
-    
-    
+
+
 def load(path):
     """
     Load a RawObject or ProcessedObject depending on path type.
@@ -40,7 +40,7 @@ def load(path):
 
 
 def crop(obj, y_min, y_max, x_min, x_max):
-    
+
     """
     Generic, window-agnostic spatial crop.
 
@@ -52,10 +52,10 @@ def crop(obj, y_min, y_max, x_min, x_max):
             obj.get_reflectance()
         if hasattr(obj, "temp_reflectance") and obj.temp_reflectance is not None:
             arr = obj.temp_reflectance
-            
-        else: 
+
+        else:
             arr = obj.reflectance
-            
+
         obj.temp_reflectance = arr[y_min:y_max, x_min:x_max]
         return obj
 
@@ -91,7 +91,7 @@ def crop_auto(obj):
             obj.get_reflectance()
         if hasattr(obj, "temp_reflectance") and obj.temp_reflectance is not None:
             arr = obj.temp_reflectance
-        else: 
+        else:
             arr = obj.reflectance
         img = sf.get_false_colour(arr)
         img = (img*255).astype(np.uint8)
@@ -118,7 +118,7 @@ def crop_auto(obj):
         if img.ndim < 2 or 0 in img.shape:
             return obj
         img = (img * 255).astype(np.uint8, copy=False)
-    
+
         cropped, slicer = sf.detect_slice_rectangles_robust(img)
         if slicer is None:
             return obj
@@ -135,7 +135,7 @@ def crop_auto(obj):
             else:
                 ds = obj.datasets.get(key)
                 src = getattr(ds, "data", None) if ds else None
-    
+
             if not (isinstance(src, np.ndarray) and src.ndim > 1):
                 continue
             try:
@@ -144,9 +144,9 @@ def crop_auto(obj):
                 continue
             if 0 in cropped.shape:
                 continue
-    
+
             cropped_copy = np.array(cropped)  # materialise
-    
+
             if obj.has_temp(key):
                 obj.temp_datasets[key].data = cropped_copy
             else:
@@ -183,9 +183,9 @@ def discover_lumo_directories(root_dir: Path) -> list[Path]:
                     if "capture" not in rel and 'metadata' not in rel and "calibrations" not in rel:
                         dirs.append(p.resolve())
     except PermissionError:
-        pass  
+        pass
 
-    
+
     return sorted(set(dirs))
 
 def reset(obj):
@@ -205,7 +205,7 @@ def mask_rect(obj, ymin, ymax, xmin, xmax):
 
 def mask_point(obj, mode, y, x):
     if mode == 'new':
-        msk = np.zeros((obj.savgol.shape[:2]))
+        msk = np.zeros(obj.savgol.shape[:2])
         pixel_vec = obj.savgol_cr[y, x, :]
         corr = sf.numpy_pearson(obj.savgol_cr, pixel_vec)
         msk[corr > 0.9] = 1
@@ -255,25 +255,25 @@ def mask_polygon(obj, vertices_rc):
 
 
 def improve_mask(obj):
-    
+
     msk = sf.improve_mask_from_graph(obj.mask)
     obj.add_temp_dataset('mask', data = msk)
     return obj
-    
+
 def calc_unwrap_stats(obj):
     label_image, stats = sf.get_stats_from_mask(obj.mask)
     label_image = label_image / np.max(label_image)
     obj.add_temp_dataset('stats', stats, '.npy')
     obj.add_temp_dataset('segments', label_image, '.npy')
-    
+
     return obj
 
 def unwrapped_output(obj):
     seg_image = sf.seg_from_stats(obj.segments, obj.stats)
     dhole_reflect = sf.unwrap_from_stats(obj.mask, obj.savgol,obj.stats)
-    dhole_depths = np.linspace(float(obj.metadata['core depth start']), float(obj.metadata['core depth stop']),  
+    dhole_depths = np.linspace(float(obj.metadata['core depth start']), float(obj.metadata['core depth stop']),
                                     dhole_reflect.shape[0])
-    
+
     obj.add_temp_dataset('DholeAverage', dhole_reflect.data, '.npy')
     obj.add_temp_dataset('DholeMask', dhole_reflect.mask, '.npy')
     obj.add_temp_dataset('DholeDepths', dhole_depths, '.npy')
@@ -281,14 +281,14 @@ def unwrapped_output(obj):
 
     return obj
 
-def run_feature_extraction(obj, key): 
+def run_feature_extraction(obj, key):
     pos, dep, feat_mask = sf.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'QUAD')
     obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
     obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
 
 #TODO: currently these are held entirely in the scope of lib window and not persistes
-# think about adding as datasets -> need to consider the display window logic    
+# think about adding as datasets -> need to consider the display window logic
 def quick_corr(obj, x, y):
     if obj.is_raw():
         return None
@@ -341,11 +341,11 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     exemplar_stack = np.vstack(bank)
     index, confidence = sf.mineral_map_wta_strict(data, exemplar_stack)
     legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
-    
+
     obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
     obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
     obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
-    
+
     return obj
 
 def kmeans_caller(obj, clusters = 5, iters = 50):
@@ -359,7 +359,7 @@ def kmeans_caller(obj, clusters = 5, iters = 50):
     flat = data.reshape(-1, B)
     vm = valid_mask.ravel()
     idx = np.nonzero(vm)[0]
-    X = flat[idx]  
+    X = flat[idx]
     #spectral demands 3d array
     X_3d = X.reshape(-1, 1, B)
     img, classes = sf.kmeans_spectral_wrapper(X_3d, clusters, iters)
@@ -368,7 +368,7 @@ def kmeans_caller(obj, clusters = 5, iters = 50):
     labels_full = np.full(flat.shape[0], -1, dtype=int)
     labels_full[idx] = img
     clustered_map = labels_full.reshape(H, W)
-    
+
     obj.add_temp_dataset(f'kmeans-{clusters}-{iters}INDEX', clustered_map.astype(np.int16), '.npy')
     obj.add_temp_dataset(f'kmeans-{clusters}-{iters}CLUSTERS', classes, '.npy')
     return obj
@@ -376,8 +376,7 @@ def kmeans_caller(obj, clusters = 5, iters = 50):
 if __name__ == "__main__":
     PO = ProcessedObject.from_path('D:/Multi_process_test_2/24_7_clonminch_39_161m55_166m09_2025-10-31_11-27-59_metadata.json')
 
-        
-    
 
 
-    
+
+

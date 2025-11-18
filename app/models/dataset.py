@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Mon Nov 17 09:26:57 2025
 
@@ -6,12 +5,12 @@ Created on Mon Nov 17 09:26:57 2025
 """
 
 from dataclasses import dataclass
-from pathlib import Path
-import numpy as np
-import json
-from PIL import Image
 import gc
-from typing import Optional
+import json
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
 
 
 @dataclass
@@ -55,7 +54,7 @@ class Dataset:
     suffix: str
     ext: str
     data: object = None
-    thumb: Optional[Image] = None
+    thumb: Image | None = None
     _memmap_ref: object = None
     def __post_init__(self):
         """Normalize the path and automatically load data if the file exists."""
@@ -99,21 +98,21 @@ class Dataset:
                 self._memmap_ref = data._mmap
             self.data = data
 
-        
+
         elif self.ext == '.json':
             self.data =json.loads(self.path.read_text(encoding="utf-8"))
-            
+
         elif self.ext == '.jpg':
             self.data = Image.open(self.path)
-        
+
         elif self.ext == '.npz':
             with np.load(self.path, allow_pickle=False) as npz:
                 data = npz["data"]
                 mask = npz["mask"].astype(bool)
-            
+
             self.data = np.ma.MaskedArray(data, mask=mask, copy=False)
-    
-    
+
+
     def save_dataset(self, new=False):
         """
         Write the dataset to disk in the appropriate format.
@@ -130,31 +129,31 @@ class Dataset:
         """
         if self.data is None:
             raise ValueError("No data loaded or assigned; nothing to save.")
-        
+
         if self.ext not in ['.npy', '.json', '.jpg', '.npz']:
             raise ValueError(f"Cannot save {self.ext}, this is an invalid file type")
-        
+
         if self.ext == '.npz':
             np.savez_compressed(
                 self.path,
                 data=self.data.data,  # raw data
                 mask=self.data.mask)
-                    
+
         elif self.ext == '.npy':
             # If it's a memmap and we're not creating new, just return
             print(type(self.data), self.key)
             if isinstance(self.data, np.memmap) and not new:
                 return
-                        
+
             print((self._memmap_ref is None), 'mem ref is None')
-            
+
             np.save(self.path, self.data)
-            
-            
+
+
         elif self.ext == '.json':
             text = json.dumps(self.data, indent=2)
             self.path.write_text(text, encoding='utf-8')
-        
+
         elif self.ext == '.jpg':
             if isinstance(self.data, Image.Image):
                 self.data.save(self.path)
@@ -176,7 +175,7 @@ class Dataset:
                 new_data = np.array(data, copy=True)
             else:
                 new_data = data.copy()
-        
+
         return Dataset(
             base=self.base,
             key=self.key,
@@ -185,11 +184,11 @@ class Dataset:
             ext=self.ext,
             data=new_data
         )
-    
-    
-    
-    
+
+
+
+
     def save_thumb(self):
-        
+
         if self.thumb is not None:
             self.thumb.save(str(self.path)[:-len(self.ext)]+'thumb.jpg')

@@ -28,7 +28,7 @@ class ToolDispatcher:
         self.canvas.on_right_click  = self._shim_right
         self.canvas.on_rectangle_selected = self._shim_rect
         self.canvas.on_polygon_finished = self._shim_polygon
-        
+
 
     # setters — choose temporary (default) or permanent
     def set_single_click(self, func, *, temporary=True):
@@ -38,7 +38,7 @@ class ToolDispatcher:
             self._perm_click = func
     def set_right_click(self, func, *, temporary=True):
         if temporary:
-            self._tmp_right = func 
+            self._tmp_right = func
         else:
             self._perm_right = func
     def set_rect(self, func, *, temporary=True):
@@ -47,9 +47,9 @@ class ToolDispatcher:
         else:
             self._perm_rect = func
     def set_polygon(self, func, *, temporary=True):
-        if temporary: 
+        if temporary:
             self._tmp_poly = func
-        else:         
+        else:
             self._perm_poly = func
 
     # granular clears for tools
@@ -57,7 +57,7 @@ class ToolDispatcher:
     def clear_temp_right(self): self._tmp_right = None
     def clear_temp_rect(self):  self._tmp_rect  = None
     def clear_temp_polygon(self): self._tmp_poly = None
-    
+
     def clear_all_temp(self):
         self._tmp_click = self._tmp_right = self._tmp_rect = self._tmp_poly = None
 

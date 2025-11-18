@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Mon Nov 17 09:26:57 2025
 
@@ -6,14 +5,12 @@ Created on Mon Nov 17 09:26:57 2025
 """
 from dataclasses import dataclass, field
 from pathlib import Path
+
 import numpy as np
 from PIL import Image
 
-from .dataset import Dataset
 from ..spectral import spectral_functions as sf
-
-
-
+from .dataset import Dataset
 
 
 @dataclass
@@ -45,8 +42,8 @@ class ProcessedObject:
     root_dir: Path
     datasets: dict = field(default_factory=dict)
     temp_datasets: dict = field(default_factory=dict)
- 
-    
+
+
 
     # ---- convenience attribute passthrough ----
     def __getattr__(self, name):
@@ -128,8 +125,8 @@ class ProcessedObject:
             if key.endswith('thumb'):                continue
 
             ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
-            
-                
+
+
             ds = Dataset(base=basename, key=key, path=fp, suffix=key, ext=ext)
             datasets[key] = ds
 
@@ -152,8 +149,8 @@ class ProcessedObject:
         path = self.root_dir / f"{self.basename}_{key}{ext}"
         ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
         self.datasets[key] = ds
-        
-    
+
+
     def add_temp_dataset(self, key, data=None, ext=".npy"):
         """Attach an in-memory dataset; not written until save_all()."""
         if key in self.datasets.keys():
@@ -165,7 +162,7 @@ class ProcessedObject:
         self.temp_datasets[key] = ds
         print('calling build thum with {key}')
         self.build_thumb(key)
-        
+
     def update_root_dir(self, path):
         """
         Update the root directory and adjust file paths for all datasets.
@@ -189,31 +186,31 @@ class ProcessedObject:
         """Replace the in-memory data for a given dataset key."""
         self.datasets[key].data = data
 
-        
+
     def commit_temps(self):
         """Promote all temporary datasets to permanent and clear temp cache."""
         for key in self.temp_datasets.keys():
             # Close old memmap handle before replacing
             if key in self.datasets:
-                
+
                 self.datasets[key].close_handle()
                 self.datasets[key]._memmap_ref = None
                 self.datasets[key].data = None
                 del self.datasets[key]
-                
+
             self.datasets[key] = self.temp_datasets[key]
-            
+
         self.clear_temps()
-        
+
     def clear_temps(self):
         """Remove all temporary datasets."""
         self.temp_datasets.clear()
-            
+
     @property
     def is_raw(self) -> bool:
         """Return False; used for interface consistency with RawObject."""
-        return False   
-      
+        return False
+
     @property
     def has_temps(self):
         """Whether the object currently holds temporary datasets."""
@@ -247,7 +244,7 @@ class ProcessedObject:
             return self.temp_datasets[key].data
         if key in self.datasets and isinstance(self.datasets[key].data, np.ndarray):
             return self.datasets[key].data
-        
+
         raise KeyError(f"No dataset '{key}' in temps or base")
 
     def reload_dataset(self, key):
@@ -265,7 +262,7 @@ class ProcessedObject:
             ds = self.datasets.get(key)
         if ds is None:
             return
-    
+
         try:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
                 if key == "mask":
@@ -275,17 +272,17 @@ class ProcessedObject:
                 else:
                     im = sf.mk_thumb(ds.data, mask=self.mask)
                 ds.thumb = im
-    
+
             elif ds.ext == ".npz":
                 im = sf.mk_thumb(ds.data.data, mask=ds.data.mask)
                 ds.thumb = im
-    
+
             else:
                 return
-    
+
         except ValueError:
             return
-    
+
     def build_all_thumbs(self):
         """Build thumbnails for all thumbnail-able datasets."""
         for key in self.datasets.keys()|self.temp_datasets.keys():
@@ -293,21 +290,21 @@ class ProcessedObject:
                 self.build_thumb(key)
             except Exception:
                 continue
-    
+
     def save_all_thumbs(self):
         """Save any in-memory thumbnails as JPEGs beside their datasets."""
         for ds in self.datasets.values():
             if ds.thumb is not None:
                 ds.save_thumb()
-                
+
     def load_thumbs(self):
         for key, ds in self.datasets.items():
             if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
                 self.datasets[key].thumb = Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg')
-                
+
     def load_or_build_thumbs(self):
         for key, ds in self.datasets.items():
-           
+
             if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
                 self.datasets[key].thumb = Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg')
             else:
