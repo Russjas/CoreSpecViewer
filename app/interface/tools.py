@@ -10,7 +10,7 @@ import numpy as np
 
 from .. import config
 from ..models import ProcessedObject, RawObject
-from ..spectral import spectral_functions as sf
+from ..spectral_ops import spectral_functions as sf
 
 
 def get_config():

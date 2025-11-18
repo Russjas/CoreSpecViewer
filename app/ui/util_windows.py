@@ -23,9 +23,11 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
+    QHBoxLayout,
     QVBoxLayout,
     QWidget,
 )
@@ -34,7 +36,7 @@ my_map = matplotlib.colormaps['viridis']
 my_map.set_bad('black')
 
 from ..interface import tools as t
-from ..spectral import spectral_functions as sf
+from ..spectral_ops import spectral_functions as sf
 
 
 #==========reference passing and cache update======================

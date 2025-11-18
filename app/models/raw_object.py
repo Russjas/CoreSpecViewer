@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ..spectral import spectral_functions as sf
+from ..spectral_ops import spectral_functions as sf
 from .processed_object import ProcessedObject
 
 SPECIM_LUMO_REQUIRED = {

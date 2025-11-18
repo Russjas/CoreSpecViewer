@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from ..spectral import spectral_functions as sf
+from ..spectral_ops import spectral_functions as sf
 from .dataset import Dataset
 
 

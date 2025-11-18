@@ -1,23 +1,22 @@
-# -*- coding: utf-8 -*-
 """
 Created on Tue Oct  7 16:46:18 2025
 
 @author: russj
 """
-import spectral.io.envi as envi
-import spectral as sp
-import numpy as np
-import scipy as sc
+import xml.etree.ElementTree as ET
 
-
-from numba import jit
-from PIL import Image
-import xml.etree.ElementTree as ET 
+import cv2
 from gfit.util import remove_hull
 import hylite
 from hylite.analyse import minimum_wavelength
-import cv2
 import matplotlib
+from numba import jit
+import numpy as np
+from PIL import Image
+import scipy as sc
+import spectral.io.envi as envi
+
+import spectral as sp
 
 from ..config import con_dict  # live shared dict
 
@@ -31,7 +30,7 @@ def _slice_from_sensor(sensor_type: str):
         start, stop = con_dict["swir_slice_start"], con_dict["swir_slice_stop"]
     elif "RGB" in s:
         start, stop = con_dict["rgb_slice_start"], con_dict["rgb_slice_stop"]
-    elif "FX50" in s: 
+    elif "FX50" in s:
         start, stop = con_dict["mwir_slice_start"], con_dict["mwir_slice_stop"]
     else:
         start, stop = con_dict["default_slice_start"], con_dict["default_slice_stop"]
@@ -63,7 +62,7 @@ def parse_lumo_metadata(xml_file):
 
     out = dict(pairs)
     out.update(flat)
-    
+
     return out
 
 def get_false_colour(array, bands=None):
@@ -152,10 +151,10 @@ def bands_from_snr(white, dark, wavelengths=None, snr_thresh=20.0, min_run=20):
     averaging over all non-band axes. 
     """
 
-    
+
     white = np.asarray(white)
     dark  = np.asarray(dark)
-    
+
     if white.shape[-1] != dark.shape[-1]:
         raise ValueError(f"Band mismatch: white B={white.shape[-1]}, dark B={dark.shape[-1]}")
 
@@ -169,7 +168,7 @@ def bands_from_snr(white, dark, wavelengths=None, snr_thresh=20.0, min_run=20):
     snr = (w_bar - d_bar) / d_std                    # shape (B,)
     good = snr >= snr_thresh
 
-    
+
 
     # largest contiguous True run
     starts, ends, in_run = [], [], False
@@ -186,7 +185,7 @@ def bands_from_snr(white, dark, wavelengths=None, snr_thresh=20.0, min_run=20):
     if lengths[idx] < min_run:
         # optional: relax or just return the longest anyway
         pass
-    
+
     thresh_test = np.where(snr > snr_thresh)
     return slice(thresh_test[0][0]-1, thresh_test[0][-1]+1), snr
 
@@ -223,9 +222,9 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False): # TODO
     box = envi.open(header_path)
     white_ref = envi.open(white_path)
     dark_ref  = envi.open(dark_path)
-     
+
     header = envi.read_envi_header(header_path)
-    
+
     bands = np.array([float(x) for x in header['wavelength']])
     data = np.array(box.load())
     white_ref = np.array(white_ref.load())
@@ -236,15 +235,15 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False): # TODO
         sensor = header['sensor type']
         band_slice = _slice_from_sensor(sensor)
         snr = None
-        
-        
+
+
     data  = data[:, :, band_slice]
     white = white_ref[:, :, band_slice]
     dark  = dark_ref[:, :, band_slice]
     bands = bands[band_slice]
-    
+
     data_reflect = reflect_correct(data, white, dark)
-    
+
     return data_reflect, bands, snr
 
 # Actual processing funcs========================================================
@@ -256,7 +255,7 @@ def process(cube):
     savgol_cr = remove_hull(savgol)
     mask = np.zeros((cube.shape[0], cube.shape[1]))
     return savgol, savgol_cr, mask
-        
+
 def improve_mask_from_graph(mask):
     """
     Heuristically thicken a mask column-wise using simple occupancy.
@@ -276,7 +275,7 @@ def improve_mask_from_graph(mask):
     line = np.sum(mask, axis = 0)
     new_mask=mask.copy()
     for i in range(line.shape[0]):
-        
+
         if line[i]>int(mask.shape[0]/3):
             new_mask[:,i] = 1
     return new_mask
@@ -330,9 +329,9 @@ def numpy_pearson(data, exemplar):
     m, n, b = data.shape
     coeffs = np.zeros((m,n))
     for i in range(m):
-        
-        for j in range(n):  
-            
+
+        for j in range(n):
+
             x = np.corrcoef(data[i,j], exemplar)[1,0]
             y = np.isnan(x)
             if y == False:
@@ -368,9 +367,9 @@ def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
     then into rows by ascending y. 
     """
 
-  
+
     segments = []
-    
+
     for i in range(1, stats.shape[0]): # Skip background (label 0)
         x, y, w, h, area = stats[i]
         if area < MIN_AREA or w < MIN_WIDTH:
@@ -379,22 +378,22 @@ def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
             segment = image[y:y+h, x:x+w]
                         # Store top-left x, y for sorting
             segments.append(((x, y), segment))
-           
+
     # Sort segments: right to left (x descending), top to bottom (y ascending)
     tolerance = 15
     segments_sorted = sorted(segments, key=lambda s: (round(-s[0][0]/tolerance), s[0][1]))
-    
-    
-    
+
+
+
     # Determine max width
     max_width = max(s[1].shape[1] for s in segments_sorted)
     # Pad segments to same width
     padded_segments = []
-    
+
     for _, seg in segments_sorted:
         h, w = seg.shape[:2]
         pad_total = max_width - w
-    
+
         if pad_total > 0:
             pad_left = pad_total // 2
             pad_right = pad_total - pad_left
@@ -402,17 +401,17 @@ def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
                 pad_shape = ((0, 0), (pad_left, pad_right))
             else:
                 pad_shape = ((0, 0), (pad_left, pad_right), (0, 0))
-    
+
             seg_padded = np.pad(seg, pad_shape, mode='constant', constant_values=0)
         else:
             seg_padded = seg
 
         padded_segments.append(seg_padded)
-    
-    
+
+
     # Stack vertically
     concatenated = np.vstack(padded_segments)
-    
+
     return concatenated
 
 
@@ -449,32 +448,32 @@ def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
     full_mask = np.zeros_like(image)
     full_mask[mask==1] = 1
     segments = []
-    
+
     for i in range(1, stats.shape[0]): # Skip background (label 0)
         x, y, w, h, area = stats[i]
         if area < MIN_AREA or w < MIN_WIDTH:
             continue # Skip small regions
         else:
             segment = np.ma.masked_array(image, mask = full_mask)[y:y+h, x:x+w]
-            
+
                         # Store top-left x, y for sorting
             segments.append(((x, y), segment))
-           
+
     # Sort segments: right to left (x descending), top to bottom (y ascending)
     tolerance = 10
     segments_sorted = sorted(segments, key=lambda s: (round(-s[0][0]/tolerance), s[0][1]))
-    
-    
-    
+
+
+
     # Determine max width
     max_width = max(s[1].shape[1] for s in segments_sorted)
     # Pad segments to same width
     padded_segments = []
-    
+
     for _, seg in segments_sorted:
         h, w = seg.shape[:2]
         pad_total = max_width - w
-    
+
         if pad_total > 0:
             pad_left = pad_total // 2
             pad_right = pad_total - pad_left
@@ -482,23 +481,23 @@ def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
                 pad_shape = ((0, 0), (pad_left, pad_right))
             else:
                 pad_shape = ((0, 0), (pad_left, pad_right), (0, 0))
-    
+
             seg_pad = np.pad(seg.data, pad_shape, mode='constant', constant_values=0)
             seg_mask_padded = np.pad(seg.mask, pad_shape, mode='constant', constant_values=1)
             seg_padded = np.ma.masked_array(seg_pad, mask = seg_mask_padded)
         else:
-            
+
             seg_padded = seg
-        
+
         padded_segments.append(seg_padded)
-    
+
     padded_seg_data = [x.data for x in padded_segments]
     padded_seg_mask = [x.mask for x in padded_segments]
     # Stack vertically
     concatenated_data = np.vstack(padded_seg_data)
     concatenated_mask = np.vstack(padded_seg_mask)
     concatenated= np.ma.masked_array(concatenated_data, mask = concatenated_mask)
-    
+
     return concatenated
 
 def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3):
@@ -512,7 +511,7 @@ def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3
             #print(type(peak_heights), type(peak_heights)[0])
             x = [bands[peak_indices[i]] for i in range(len(peak_indices)) if peak_heights[i] >thresh ]
             #print(len(x))
-            for k in x:        
+            for k in x:
                 if k > wavrange[0] and k < wavrange[1]:
                     arr[i,j] = k
                     break
@@ -525,7 +524,7 @@ feats = {'1400W':(	1387,	1445,	1350,	1450),
 '1550W':(	1520,	1563,	1510,	1610),
 '1760W':(	1751,	1764,	1730,	1790),
 '1850W':(	1749,	1949,	1820,	1880),
-'1900W': (1840,1990, 1850, 1970), 
+'1900W': (1840,1990, 1850, 1970),
 '2080W':(	1980,	2180,	2060,	2100),
 '2160W':(	2159,	2166,	2138,	2179),
 '2200W':(	2185,	2215,	2120,	2245),
@@ -558,7 +557,7 @@ def est_peaks_cube_scipy(data, bands, wavrange=(2300, 2340)):
         for j in range(l):
             peak_indices, peak_dict = sc.signal.find_peaks(1-data[i,j], height=(None, None))
             x = [bands[i] for i in peak_indices]
-            for k in x:        
+            for k in x:
                 if k > wavrange[0] and k < wavrange[1]:
                      arr[i,j] = k
                      break
@@ -567,15 +566,15 @@ def est_peaks_cube_scipy(data, bands, wavrange=(2300, 2340)):
     return arr
 
 
-def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', 
+def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
                  thresh=0.2):
-    
+
     feats = {'1400W':(	1387,	1445,	1350,	1450),
     '1480W':(	1471,	1491,	1440,	1520),
     '1550W':(	1520,	1563,	1510,	1610),
     '1760W':(	1751,	1764,	1730,	1790),
     '1850W':(	1749,	1949,	1820,	1880),
-    '1900W': (1840,1990, 1850, 1970), 
+    '1900W': (1840,1990, 1850, 1970),
     '2080W':(	1980,	2180,	2060,	2100),
     '2160W':(	2159,	2166,	2138,	2179),
     '2200W':(	2185,	2215,	2120,	2245),
@@ -608,11 +607,11 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
     wav_max = feats[feature][1]
     wav_min_index = np.argmin(np.abs(np.array(bands)-(feats[feature][0])))
     wav_max_index = np.argmin(np.abs(np.array(bands)-(feats[feature][1])))
-    
+
     check_response =  est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min, wav_max))
     #check_response =  est_peaks_cube_scipy_thresh(savgol_cr, bands, wavrange=(wav_min, wav_max), thresh = thresh)
-    
-    if technique.upper() == 'QND': 
+
+    if technique.upper() == 'QND':
         print(technique)
         new_bands = bands[cr_crop_min_index:cr_crop_max_index]
         m, n, b = savgol_cr.shape
@@ -624,30 +623,30 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
             minsB[minsA==i] = new_bands[i]
         position = minsB
         depth = 1-np.min(data, axis=2)
-        
-    elif technique.upper() == 'POLY':  
-        print(technique)        
+
+    elif technique.upper() == 'POLY':
+        print(technique)
         hiswir = hylite.HyImage(savgol)
         hiswir.set_wavelengths(bands)
-        Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max), 
+        Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max),
                                    n=1, method='poly', log=False, vb=False, minima=True)
         depth = Mpoly.__getitem__([0,'depth'])
         position = Mpoly.__getitem__([0,'pos'])
         width = Mpoly.__getitem__([0,'width'])
     elif technique.upper() == 'GAUS':
-        print(technique)          
+        print(technique)
         hiswir = hylite.HyImage(savgol)
         hiswir.set_wavelengths(bands)
-        Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max), 
+        Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max),
                                    n=1, method='gaussian', log=False, vb=True, minima=True)
         depth = Mpoly.__getitem__([0,'depth'])
         position = Mpoly.__getitem__([0,'pos'])
         width = Mpoly.__getitem__([0,'width'])
-    elif technique.upper() == 'QUAD':   
+    elif technique.upper() == 'QUAD':
         print(technique)
         hiswir = hylite.HyImage(savgol)
         hiswir.set_wavelengths(bands)
-        Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max), 
+        Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max),
                                    n=1, method='quad', log=False, vb=False, minima=True)
         depth = Mpoly.__getitem__([0,'depth'])
         position = Mpoly.__getitem__([0,'pos'])
@@ -658,15 +657,15 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
     #feature_mask[position<wav_min] = 1
     #if thresh:
         #feature_mask[depth<thresh] = 1
-    
-        
-    
-    
+
+
+
+
     return position, depth, feature_mask
 
 
 def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
-    
+
     cr_crop_min_22 = feats['2200W'][2]
     cr_crop_max_22 = feats['2200W'][3]
     cr_crop_min_index_22 = np.argmin(np.abs(np.array(bands)-(feats['2200W'][2])))
@@ -675,7 +674,7 @@ def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
     wav_max_22 = feats['2200W'][1]
     wav_min_index_22 = np.argmin(np.abs(np.array(bands)-(feats['2200W'][0])))
     wav_max_index_22 = np.argmin(np.abs(np.array(bands)-(feats['2200W'][1])))
-    
+
     cr_crop_min_23 = feats['2320W'][2]
     cr_crop_max_23 = feats['2320W'][3]
     cr_crop_min_index_23 = np.argmin(np.abs(np.array(bands)-(feats['2320W'][2])))
@@ -684,8 +683,8 @@ def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
     wav_max_23 = feats['2320W'][1]
     wav_min_index_23 = np.argmin(np.abs(np.array(bands)-(feats['2320W'][0])))
     wav_max_index_23 = np.argmin(np.abs(np.array(bands)-(feats['2320W'][1])))
-    
-    
+
+
     print('checking dirty or clean')
     dirty_or_clean = est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min_22, wav_max_22))
     print('checking how calcitic')
@@ -693,12 +692,12 @@ def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
     #carb wavelength position
     print('MWL-ing')
     calc_or_dolo, _, feat_mask = Combined_MWL(savgol, savgol_cr, mask, bands, '2320W', technique = technique)
-  
-                
+
+
     # ==========#Facies colours"===================================================================
     clean_calcite = [0, 0, 255] #1 in data
     clean_dolomitic_calcite = [255, 0, 0]#2 in data
-    clean_calcitic_dolomite = [0, 255, 255] #3 in data           
+    clean_calcitic_dolomite = [0, 255, 255] #3 in data
     clean_dolomite =[204, 255, 153]#4 in data
     dirty_calcite = [0, 255, 0]#5 in data
     dirty_dolomitic_calcite = [255, 255, 0]#6 in data
@@ -708,13 +707,13 @@ def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
     M, N, B = savgol_cr.shape
     output_image = np.zeros((M,N, 3))
     output_data = np.zeros((M,N))
-#decision tree            
-# 8 part facies                
+#decision tree
+# 8 part facies
     for i in range(M):
         for j in range(N):
             if dirty_or_clean[i,j] > 0:
                 #dirty
-                if calc_or_dolo[i,j] >= 2330:           
+                if calc_or_dolo[i,j] >= 2330:
                     output_image[i, j] = dirty_calcite
                     output_data[i, j] = 5
                 elif calc_or_dolo[i,j] < 2330 and calc_or_dolo[i,j] >= 2320:
@@ -723,12 +722,12 @@ def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
                 elif calc_or_dolo[i,j] < 2320 and calc_or_dolo[i,j] >= 2310:
                     output_image[i, j] = dirty_calcitic_dolomite
                     output_data[i, j] = 7
-                else:                                   
+                else:
                     output_image[i, j] = dirty_dolomite
                     output_data[i, j] = 8
-            else:                                       
+            else:
                 #Clean
-                if calc_or_dolo[i,j] >= 2330:           
+                if calc_or_dolo[i,j] >= 2330:
                     output_image[i, j] = clean_calcite
                     output_data[i, j] = 1
                 elif calc_or_dolo[i,j] < 2330 and calc_or_dolo[i,j] >= 2320:
@@ -737,10 +736,10 @@ def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
                 elif calc_or_dolo[i,j] < 2320 and calc_or_dolo[i,j] >= 2310:
                     output_image[i, j] = clean_calcitic_dolomite
                     output_data[i, j] = 3
-                else:                                   
+                else:
                     output_image[i, j] = clean_dolomite
                     output_data[i, j] = 4
-            if calcitic_or_not[i,j] < 0: 
+            if calcitic_or_not[i,j] < 0:
                 if dirty_or_clean[i,j] < 0:
                     #not calcitic not siliciclastic
                    output_image[i, j] = [255, 255, 255]# 10 non-carbonaceous response
@@ -749,15 +748,14 @@ def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
                     #not carbonaceous but siliciclastic
                     output_image[i, j] = [96, 96, 96] # 9
                     output_data[i, j] = 9
-        
+
     output_data[mask==1] = 0
     output_image[mask==1] = [0,0,0]
     return output_data, output_image
 
-import numpy as np
 
 def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
-    
+
     cr_crop_min_22 = feats['2200W'][2]
     cr_crop_max_22 = feats['2200W'][3]
     cr_crop_min_index_22 = np.argmin(np.abs(np.array(bands)-(feats['2200W'][2])))
@@ -766,7 +764,7 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     wav_max_22 = feats['2200W'][1]
     wav_min_index_22 = np.argmin(np.abs(np.array(bands)-(feats['2200W'][0])))
     wav_max_index_22 = np.argmin(np.abs(np.array(bands)-(feats['2200W'][1])))
-    
+
     cr_crop_min_23 = feats['2320W'][2]
     cr_crop_max_23 = feats['2320W'][3]
     cr_crop_min_index_23 = np.argmin(np.abs(np.array(bands)-(feats['2320W'][2])))
@@ -775,8 +773,8 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     wav_max_23 = feats['2320W'][1]
     wav_min_index_23 = np.argmin(np.abs(np.array(bands)-(feats['2320W'][0])))
     wav_max_index_23 = np.argmin(np.abs(np.array(bands)-(feats['2320W'][1])))
-    
-    
+
+
     print('checking dirty or clean')
     dirty_or_clean = est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min_22, wav_max_22))
     print('checking how calcitic')
@@ -785,11 +783,11 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     print('MWL-ing')
     print(bands[cr_crop_min_index_23:cr_crop_max_index_23].shape)
     calc_or_dolo, _ = get_SQM_peak_finder_vectorized(remove_hull(savgol[:,:,cr_crop_min_index_23:cr_crop_max_index_23]), bands[cr_crop_min_index_23:cr_crop_max_index_23])
-             
+
     # ==========#Facies colours"===================================================================
     clean_calcite = [0, 0, 255] #1 in data
     clean_dolomitic_calcite = [255, 0, 0]#2 in data
-    clean_calcitic_dolomite = [0, 255, 255] #3 in data           
+    clean_calcitic_dolomite = [0, 255, 255] #3 in data
     clean_dolomite =[204, 255, 153]#4 in data
     dirty_calcite = [0, 255, 0]#5 in data
     dirty_dolomitic_calcite = [255, 255, 0]#6 in data
@@ -799,13 +797,13 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     M, N, B = savgol_cr.shape
     output_image = np.zeros((M,N, 3))
     output_data = np.zeros((M,N))
-#decision tree            
-# 8 part facies                
+#decision tree
+# 8 part facies
     for i in range(M):
         for j in range(N):
             if dirty_or_clean[i,j] > 0:
                 #dirty
-                if calc_or_dolo[i,j] >= 2330:           
+                if calc_or_dolo[i,j] >= 2330:
                     output_image[i, j] = dirty_calcite
                     output_data[i, j] = 5
                 elif calc_or_dolo[i,j] < 2330 and calc_or_dolo[i,j] >= 2320:
@@ -814,12 +812,12 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
                 elif calc_or_dolo[i,j] < 2320 and calc_or_dolo[i,j] >= 2310:
                     output_image[i, j] = dirty_calcitic_dolomite
                     output_data[i, j] = 7
-                else:                                   
+                else:
                     output_image[i, j] = dirty_dolomite
                     output_data[i, j] = 8
-            else:                                       
+            else:
                 #Clean
-                if calc_or_dolo[i,j] >= 2330:           
+                if calc_or_dolo[i,j] >= 2330:
                     output_image[i, j] = clean_calcite
                     output_data[i, j] = 1
                 elif calc_or_dolo[i,j] < 2330 and calc_or_dolo[i,j] >= 2320:
@@ -828,10 +826,10 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
                 elif calc_or_dolo[i,j] < 2320 and calc_or_dolo[i,j] >= 2310:
                     output_image[i, j] = clean_calcitic_dolomite
                     output_data[i, j] = 3
-                else:                                   
+                else:
                     output_image[i, j] = clean_dolomite
                     output_data[i, j] = 4
-            if calcitic_or_not[i,j] < 0: 
+            if calcitic_or_not[i,j] < 0:
                 if dirty_or_clean[i,j] < 0:
                     #not calcitic not siliciclastic
                    output_image[i, j] = [255, 255, 255]# 10 non-carbonaceous response
@@ -840,7 +838,7 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
                     #not carbonaceous but siliciclastic
                     output_image[i, j] = [96, 96, 96] # 9
                     output_data[i, j] = 9
-        
+
     output_data[mask==1] = 0
     output_image[mask==1] = [0,0,0]
     return output_data, output_image
@@ -869,7 +867,7 @@ def get_SQM_peak_finder_vectorized(data, bands, atol=1e-12):
     print(M,N,B, bands.shape)
     # Argmin index at each pixel
     b = np.argmin(data, axis=-1)  # (M,N)
-    
+
     # Neighbor indices
     bL = np.clip(b - 1, 0, B - 1)
     bR = np.clip(b + 1, 0, B - 1)
@@ -938,7 +936,7 @@ def get_SQM_peak_finder_vectorized(data, bands, atol=1e-12):
     # Report fallback usage (edges/flat/degenerate)
     total = M * N
     used_band_centre = np.count_nonzero(dep == 0.0)  # depth stays 0 only where we fell back (by construction)
-    
+
 
     return np.squeeze(tru), np.squeeze(dep)
 
@@ -1030,10 +1028,10 @@ def auto_crop(radiance):
     mask_clean = cv2.morphologyEx(quickmask.astype(np.uint8), cv2.MORPH_CLOSE, kernel)
     cropped, (y0, y1, x0, x1) = crop_with_mask_cv2(radiance, mask_clean.astype(bool), invert=True)
     return cropped
-    
 
-   
-    
+
+
+
 def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndarray) -> np.ndarray:
     """
     Fast 1D linear resample onto target band centers (nm).
@@ -1041,16 +1039,16 @@ def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndar
     """
     y = np.interp(x_tgt_nm, x_src_nm, y_src, left=y_src[0], right=y_src[-1]).astype(float)
     y = np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
-    return y  
-    
+    return y
+
 def cr(spectra):
     '''helper function to keep scientific dependencies contained'''
     return remove_hull(spectra)
 
 
-    
-    
-    
+
+
+
 def detect_slice_rectangles_robust(
     image,                  #numpy array uint8, 3-channel (H, W, 3)
     min_area_frac=0.0005,     # min polygon area as a fraction of image area
@@ -1061,7 +1059,7 @@ def detect_slice_rectangles_robust(
     allow_rotated=True        # also accept minAreaRect boxes
 ):
     img = image
-    
+
     H, W = img.shape[:2]
     min_area = H * W * min_area_frac
 
@@ -1119,7 +1117,7 @@ def detect_slice_rectangles_robust(
 
     rects_xywh = [rects_xywh[i] for i in keep]
     rects_poly = [rects_poly[i] for i in keep]
-    
+
     areas = np.array([cv2.contourArea(p) for p in rects_poly])
     index = np.argmax(areas)
     x, y, w, h = rects_xywh[index]
@@ -1127,8 +1125,8 @@ def detect_slice_rectangles_robust(
     x1, x2 = x, x + w
     crop_slice = (slice(y, y + h), slice(x, x + w))
     return image[crop_slice], crop_slice
-    
- 
+
+
 @jit(nopython=True)
 def numpy_pearson_stackexemplar_threshed(data, exemplar_stack):
     num = exemplar_stack.shape[0]
@@ -1136,18 +1134,18 @@ def numpy_pearson_stackexemplar_threshed(data, exemplar_stack):
     confidence = np.zeros((data.shape[0], data.shape[1]))
     for i in range(data.shape[0]):
         for j in range(data.shape[1]):
-            c_list = np.zeros((num))
+            c_list = np.zeros(num)
             for n in range(num):
                 c_list[n] = np.corrcoef(data[i,j], exemplar_stack[n])[1,0]
             if np.max(c_list) > 0.7:
                 coeffs[i,j] = np.argmax(c_list)
                 confidence[i,j] = np.max(c_list)
-                
+
             else:
                 coeffs[i,j] = -999
                 confidence[i,j] = np.max(c_list)
     return coeffs, confidence
-    
+
 
 def mineral_map_wta(data, exemplar_stack, thresh=0.70, invalid_value=-999):
     """
@@ -1240,15 +1238,16 @@ def mineral_map_wta_strict(data, exemplar_stack, thresh=0.70, invalid_value=-999
     keep = best_corr > float(thresh)
     idx = np.where(keep, idx, invalid_value).astype(np.int32)
 
-    return idx.reshape(H, W), best_corr.reshape(H, W).astype(np.float32)   
+    return idx.reshape(H, W), best_corr.reshape(H, W).astype(np.float32)
 
-    
+
 def kmeans_spectral_wrapper(data, clusters, iters):
     m, c = sp.kmeans(data, clusters, iters)
     return m, c
 
 
 import time
+
 
 def index_to_rgb(index_2d: np.ndarray, mask: np.ndarray | None = None) -> np.ndarray:
     print("Index to RGB called")
@@ -1500,11 +1499,10 @@ def mk_thumb(
 
     checkpoint("END")
     return im
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
