@@ -492,7 +492,7 @@ class LibraryPage(BasePage):
         if not self.db.open():
             err = self.db.lastError().text()
             QMessageBox.critical(self, "Database Error",
-                                 f"Could not open database:\n{path}\n\nError: {err}")
+                                 f"Could not find spectral library, continuing without")
             # Remove failed connection handle
             QSqlDatabase.removeDatabase(conn_name)
             return
@@ -503,7 +503,7 @@ class LibraryPage(BasePage):
             QSqlDatabase.removeDatabase(conn_name)
             QMessageBox.critical(
                 self, "Schema Error",
-                f"Required tables 'samples' and '{SPECTRA_TABLE_NAME}' not found in:\n{path}"
+                f"Could not find spectral library, continuing without"
             )
             return
     
@@ -512,7 +512,7 @@ class LibraryPage(BasePage):
         self.model.setTable(SAMPLE_TABLE_NAME)
         if not self.model.select():
             QMessageBox.critical(self, "SQL Error",
-                                 f"Failed to load 'samples' table: {self.model.lastError().text()}")
+                                 f"Could not find spectral library, continuing without")
             self.db.close()
             QSqlDatabase.removeDatabase(conn_name)
             return

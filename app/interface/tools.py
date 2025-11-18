@@ -205,22 +205,23 @@ def mask_rect(obj, ymin, ymax, xmin, xmax):
 
 def mask_point(obj, mode, y, x):
     if mode == 'new':
-        obj.add_temp_dataset('mask', data = np.zeros((obj.savgol.shape[:2])))
+        msk = np.zeros((obj.savgol.shape[:2]))
         pixel_vec = obj.savgol_cr[y, x, :]
         corr = sf.numpy_pearson(obj.savgol_cr, pixel_vec)
-        obj.mask[corr > 0.9] = 1
+        msk[corr > 0.9] = 1
+        obj.add_temp_dataset('mask', data = msk)
         return obj
     if mode == 'enhance':
-        if not obj.has_temp('mask'):
-            obj.add_temp_dataset('mask')
+        msk = obj.mask
         pixel_vec = obj.savgol_cr[y, x, :]
         corr = sf.numpy_pearson(obj.savgol_cr, pixel_vec)
-        obj.mask[corr > 0.9] = 1
+        msk[corr > 0.9] = 1
+        obj.add_temp_dataset('mask', data = msk)
         return obj
     if mode == 'line':
-        if not obj.has_temp('mask'):
-            obj.add_temp_dataset('mask')
-        obj.mask[:, x] = 1
+        msk = obj.mask
+        msk[:, x] = 1
+        obj.add_temp_dataset('mask', data = msk)
         return obj
 
 def mask_polygon(obj, vertices_rc):
@@ -232,14 +233,8 @@ def mask_polygon(obj, vertices_rc):
     - Keeps interior as-is (commonly 0), sets outside to 1.
     """
     if obj.is_raw:
-        H, W = obj.get_display_reflectance().shape[:2]
-    else:
-        H, W = obj.savgol.shape[:2]
-
-    # ensure temp mask exists (0=keep, 1=masked)
-    if not obj.has_temp('mask'):
-        z = np.zeros((H, W), dtype=np.uint8)
-        obj.add_temp_dataset('mask', data=z)
+        return obj
+    H, W = obj.savgol.shape[:2]
 
     poly = np.asarray(vertices_rc, dtype=float)
     if poly.ndim != 2 or poly.shape[1] != 2 or poly.shape[0] < 3:
@@ -253,16 +248,16 @@ def mask_polygon(obj, vertices_rc):
     inside = inside.reshape(H, W)
 
     # outside = ~inside  -> set to 1
-    m = obj.mask if obj.has_temp('mask') else obj.datasets['mask'].data
-    m[~inside] = 1
-
+    msk = obj.mask
+    msk[~inside] = 1
+    obj.add_temp_dataset('mask', data = msk)
     return obj
 
 
 def improve_mask(obj):
-    if not obj.has_temp('mask'):
-        obj.add_temp_dataset('mask')
-    obj.temp_datasets['mask'].data = sf.improve_mask_from_graph(obj.mask)
+    
+    msk = sf.improve_mask_from_graph(obj.mask)
+    obj.add_temp_dataset('mask', data = msk)
     return obj
     
 def calc_unwrap_stats(obj):
@@ -291,7 +286,9 @@ def run_feature_extraction(obj, key):
     obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
     obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
-    
+
+#TODO: currently these are held entirely in the scope of lib window and not persistes
+# think about adding as datasets -> need to consider the display window logic    
 def quick_corr(obj, x, y):
     if obj.is_raw():
         return None
@@ -343,23 +340,11 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
         raise ValueError("No exemplars provided.")
     exemplar_stack = np.vstack(bank)
     index, confidence = sf.mineral_map_wta_strict(data, exemplar_stack)
-    
-    def _stage(key: str, ext: str, data):
-        ds = Dataset(
-            base=obj.basename,
-            key=key,
-            path=str(obj.root_dir) + '/' +  f"{str(obj.basename)}_{key}{ext}",
-            suffix=key,
-            ext=ext,
-            data=data
-        )
-        obj.temp_datasets[key] = ds
-        return key
     legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
     
-    idx_key   = _stage(f"{key_prefix}INDEX",  ".npy",  index.astype(np.int16))
-    legend_key = _stage(f"{key_prefix}LEGEND",  ".json",  legend)
-    confidence_key = _stage(f'{key_prefix}CONF', '.npy', confidence)
+    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
+    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
+    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
     
     return obj
 
@@ -384,7 +369,7 @@ def kmeans_caller(obj, clusters = 5, iters = 50):
     labels_full[idx] = img
     clustered_map = labels_full.reshape(H, W)
     
-    obj.add_temp_dataset(f'kmeans-{clusters}-{iters}INDEX', clustered_map, '.npy')
+    obj.add_temp_dataset(f'kmeans-{clusters}-{iters}INDEX', clustered_map.astype(np.int16), '.npy')
     obj.add_temp_dataset(f'kmeans-{clusters}-{iters}CLUSTERS', classes, '.npy')
     return obj
 

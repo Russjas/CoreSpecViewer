@@ -113,7 +113,7 @@ class VisualisePage(BasePage):
             if self.current_obj.has(legend_key):
                 legend = self.current_obj[legend_key].data
     
-            if index is not None and getattr(index, "ndim", 0) == 2 and legend:
+            if index is not None and getattr(index, "ndim", 0) == 2:
                 self.right_canvas._show_index_with_legend(index, self.current_obj.mask, legend)
                 return
     
@@ -165,12 +165,13 @@ class VisualisePage(BasePage):
         Uses existing self.cache contents; no changes to add_to_cache/remove_product needed.
         """
         # --- categorize keys from current cache ---
-        base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "stats", "bands", "cropped"}  # tweak as you like
+        base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
         unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
-    
+        non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands" }
         base = []
         unwrapped = []
         products = []
+        non_vis = []
         if self.current_obj is not None and not self.current_obj.is_raw:
             try:
                 table_title = f'{self.current_obj.metadata["borehole id"]} {self.current_obj.metadata["box number"]}'
@@ -185,6 +186,8 @@ class VisualisePage(BasePage):
                 base.append(k)
             elif any(k.startswith(pfx) for pfx in unwrap_prefixes):
                 unwrapped.append(k)
+            elif any(k.endswith(sfx) for sfx in non_vis_suff):
+                non_vis.append(k)
             else:
                 products.append(k)
     
@@ -213,16 +216,16 @@ class VisualisePage(BasePage):
             _insert_header("Base processed")
             for k in base:
                 _insert_item(k)
-    
+        if products:
+            _insert_header("Products")
+            for k in products:
+                _insert_item(k)
         if unwrapped:
             _insert_header("Unwrapped")
             for k in unwrapped:
                 _insert_item(k)
     
-        if products:
-            _insert_header("Products")
-            for k in products:
-                _insert_item(k)
+        
     
         self.table.resizeRowsToContents()
             

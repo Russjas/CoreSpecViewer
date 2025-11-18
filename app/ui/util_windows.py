@@ -220,24 +220,30 @@ class ImageCanvas2D(QWidget):
         H, W = index_2d.shape
         if H == 0 or W == 0:
             self.ax.clear(); self.ax.set_axis_off(); self.canvas.draw(); return
-    
+         # ---- derive max index from data (non-negative only)
+        data_positive = index_2d[index_2d >= 0]
+        if data_positive.size == 0:
+            # nothing to show
+            self.ax.clear()
+            self.ax.set_axis_off()
+            self.canvas.draw()
+            return
+        max_idx_data = int(data_positive.max())
         # ---- normalize legend (index->label), dedup by index (last wins)
         idx_to_label = {}
+        max_idx_legend = -1
         for row in legend or []:
             try:
                 idx = int(row.get("index"))
                 lab = str(row.get("label", f"class {idx}"))
-                idx_to_label[idx] = lab
             except Exception:
                 continue
-    
-        # ---- decide K from actual indices present (ignore negatives)
-        present = np.unique(index_2d[index_2d >= 0])
-        if present.size == 0:
-            self.ax.clear(); self.ax.set_axis_off(); self.canvas.draw(); return
-        max_idx = int(present.max())
+            idx_to_label[idx] = lab
+            if idx > max_idx_legend:
+                max_idx_legend = idx
+        max_idx = max(max_idx_data, max_idx_legend)
         K = max_idx + 1
-    
+                
         # ---- build labels array for 0..K-1 (fallback to "class i" if missing)
         labels = [idx_to_label.get(i, f"class {i}") for i in range(K)]
     
@@ -252,7 +258,6 @@ class ImageCanvas2D(QWidget):
         idx_img = np.clip(idx_img, 0, K - 1)
         rgb = colors_rgb[idx_img]
         if neg_mask.any():
-            # paint negatives light gray (or leave as-is if you prefer)
             rgb[neg_mask] = np.array([0, 0, 0], dtype=np.uint8)
         
     
@@ -263,27 +268,33 @@ class ImageCanvas2D(QWidget):
     
         # ---- legend includes only classes actually present (>=0) in the image
         valid = ~neg_mask
-        present = np.unique(idx_img[valid])
-        if present.size > 0:
-            # counts per index across the displayed image
+        handles = []
+        leg = None
+    
+        if valid.any():
             counts = np.bincount(idx_img[valid].ravel(), minlength=K)
-            # sort present indices by count desc (stable tie-break on index asc)
-            present_sorted = sorted(present.tolist(), key=lambda i: (-int(counts[i]), int(i)))
-
-            total = int(valid.sum())
-            def _pct(i):  # percentage as 0–100 with 1 decimal
-                return (counts[i] / total * 100.0) if total > 0 else 0.0
-
-            handles = [
-                Patch(
-                    facecolor=(colors_rgb[i] / 255.0),
-                    edgecolor='k',
-                    label=f"{labels[i]} — {int(counts[i])} px ({_pct(i):.1f}%)"
+            present = np.nonzero(counts)[0]  # indices with at least 1 pixel
+    
+            if present.size > 0:
+                # sort by count desc, then index asc
+                present_sorted = sorted(
+                    present.tolist(),
+                    key=lambda i: (-int(counts[i]), int(i)),
                 )
-                for i in present_sorted
-            ]
-        else:
-            handles = []
+    
+                total = int(valid.sum())
+    
+                def _pct(i: int) -> float:
+                    return (counts[i] / total * 100.0) if total > 0 else 0.0
+    
+                handles = [
+                    Patch(
+                        facecolor=(colors_rgb[i] / 255.0),
+                        edgecolor="k",
+                        label=f"{labels[i]} — {int(counts[i])} px ({_pct(i):.1f}%)",
+                    )
+                    for i in present_sorted
+                ]
 
         if handles:
            # make space on the right
@@ -497,7 +508,7 @@ class ClosableWidgetWrapper(QWidget):
     # Signal emitted when the close button is clicked, carries a reference to self
     closed = pyqtSignal(object) 
     
-    def __init__(self, wrapped_widget: QWidget, title: str = "", parent=None):
+    def __init__(self, wrapped_widget: QWidget, title: str = "", parent=None, closeable = True):
         super().__init__(parent)
         self.wrapped_widget = wrapped_widget
         
@@ -512,10 +523,11 @@ class ClosableWidgetWrapper(QWidget):
         #self.toolbar.addStretch()
 
         # 3. Add the close action
-        close_action = QAction("✕ Close", self)
-        close_action.setToolTip(f"Close {title}")
-        close_action.triggered.connect(self._emit_closed)
-        self.toolbar.addAction(close_action)
+        if closeable:
+            close_action = QAction("✕ Close", self)
+            close_action.setToolTip(f"Close {title}")
+            close_action.triggered.connect(self._emit_closed)
+            self.toolbar.addAction(close_action)
 
         # 4. Main layout (Toolbar above, Wrapped Widget below)
         layout = QVBoxLayout(self)

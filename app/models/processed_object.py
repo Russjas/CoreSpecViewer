@@ -155,9 +155,6 @@ class ProcessedObject:
         
     
     def add_temp_dataset(self, key, data=None, ext=".npy"):
-        print(f'adding temp dataset {key}')
-        if ext == '.npy' or ext == '.npz':
-            print(data.dtype)
         """Attach an in-memory dataset; not written until save_all()."""
         if key in self.datasets.keys():
             self.temp_datasets[key] = self.datasets[key].copy(data=data)
@@ -262,7 +259,7 @@ class ProcessedObject:
         for ds in self.datasets.values():
             ds.load_dataset()
     def build_thumb(self, key):
-        # Prefer temp version if it exists
+        print(f'build thumb {key}')
         ds = self.temp_datasets.get(key)
         if ds is None:
             ds = self.datasets.get(key)
@@ -273,8 +270,9 @@ class ProcessedObject:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
                 if key == "mask":
                     im = sf.mk_thumb(ds.data)
+                elif key.endswith("INDEX"):
+                    im = sf.mk_thumb(ds.data, mask=self.mask, index_mode=True)
                 else:
-                    # ideally: use temp mask if you have one, same “prefer temp” logic
                     im = sf.mk_thumb(ds.data, mask=self.mask)
                 ds.thumb = im
     

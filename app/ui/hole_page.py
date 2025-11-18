@@ -11,7 +11,7 @@ import sys
 import numpy as np
 
 from PyQt5.QtCore import QSize, pyqtSignal, Qt
-from PyQt5.QtGui import QPixmap, QIcon
+from PyQt5.QtGui import QPixmap, QIcon, QStandardItem
 from PyQt5.QtWidgets import (QVBoxLayout, QTableWidgetItem,QTableWidget,
                              QApplication, QWidget, QPushButton, QFileDialog,
                              QComboBox, QFormLayout, QLabel, QAbstractItemView)
@@ -33,6 +33,8 @@ class HoleBoxTable(QTableWidget):
         self._page = page
         self.dataset_key = dataset_key
         super().__init__(0, len(self.columns), parent)
+
+        self._header_combo = None  # for thumb column dataset chooser
 
         # pretty header labels
         labels = []
@@ -68,9 +70,12 @@ class HoleBoxTable(QTableWidget):
             else:
                 hdr.setSectionResizeMode(idx, hdr.ResizeToContents)
 
-  # ------------------------------------------------------------------
+        # keep header-combo positioned correctly
+        hdr.sectionResized.connect(self._update_header_combo_geometry)
+        hdr.sectionMoved.connect(self._update_header_combo_geometry)
+    
+    # ------------------------------------------------------------------
     def populate_from_hole(self):
-        
         self.setRowCount(0)
         self.cxt = self._page.cxt
         if self.cxt is None or self.cxt.ho is None:
@@ -132,6 +137,9 @@ class HoleBoxTable(QTableWidget):
         if self.rowCount() > 0:
             self.setCurrentCell(0, 0)
 
+        # refresh header combo label if needed
+        self._update_header_label()
+
     # ------------------------------------------------------------------
     def _get_thumb_pixmap(self, po):
         po.load_thumbs()
@@ -140,9 +148,6 @@ class HoleBoxTable(QTableWidget):
         if ds is None:
             ds = getattr(po, "datasets", {}).get(key)
     
-        if ds is None or getattr(ds, "thumb", None) is None:
-           return QPixmap()
-        
         if ds.thumb is None:
             try:
                 print('building')
@@ -166,12 +171,142 @@ class HoleBoxTable(QTableWidget):
     def set_dataset_key(self, key):
         """
         Change the dataset key used for thumbnails (e.g. 'savgol_cr', 'savgol', 'RGB').
-        Optionally repopulates immediately if a HoleObject is provided.
+        Repopulates immediately if a HoleObject is present.
         """
         self.dataset_key = key
+        self._update_header_label()
         self.cxt = self._page.cxt
         if self.cxt is not None and self.cxt.ho is not None:
-            self.populate_from_hole()  
+            self.populate_from_hole()
+
+    # ------------------------------------------------------------------
+    # Header combobox handling
+    # ------------------------------------------------------------------
+    def set_header_dataset_keys(self, keys: list[str]):
+        """
+        Create or update a QComboBox in the thumb-column header to select
+        which dataset key is used for thumbnails.
+        """
+        if "thumb" not in self.columns:
+            return
+
+        thumb_idx = self.columns.index("thumb")
+        header = self.horizontalHeader()
+
+        # lazy-create combo
+        if self._header_combo is None:
+            combo = QComboBox(header)
+            combo.currentTextChanged.connect(self._on_header_dataset_changed)
+            self._header_combo = combo
+        else:
+            combo = self._header_combo
+
+        combo.blockSignals(True)
+        combo.clear()
+        def add_header_item(combo, text):
+            model = combo.model()
+            row = model.rowCount()
+            model.insertRow(row)
+            item = QStandardItem(text)
+            item.setFlags(Qt.ItemIsEnabled)     
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            model.setItem(row, 0, item)
+        
+        base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
+        unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
+        non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands", 'metadata' }
+        base = []
+        unwrapped = []
+        products = []
+        non_vis = []
+        
+        for k in sorted(keys):  # stable order
+            if k in base_whitelist:
+                base.append(k)
+            elif any(k.startswith(pfx) for pfx in unwrap_prefixes):
+                unwrapped.append(k)
+            elif any(k.endswith(sfx) for sfx in non_vis_suff):
+                non_vis.append(k)
+            else:
+                products.append(k)
+        
+        add_header_item(combo, "---Base data---")
+        for k in base:
+            combo.addItem(k)
+        add_header_item(combo, "---Products---")
+        for k in products:
+            combo.addItem(k)
+        
+        
+
+        # try to default to savgol_cr, then savgol, then first key
+        default = None
+        for cand in ("savgol_cr", "savgol"):
+            if cand in keys:
+                default = cand
+                break
+        if default is None and keys:
+            default = keys[0]
+
+        if default is not None:
+            idx = combo.findText(default)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+                self.dataset_key = default
+
+        combo.blockSignals(False)
+
+        # clear any existing text in that header item
+        item = self.horizontalHeaderItem(thumb_idx)
+        if item is not None:
+            item.setText("")
+
+        self._reposition_header_combo()
+
+    def _on_header_dataset_changed(self, key: str):
+        key = key.strip()
+        if not key:
+            return
+        # this will also repopulate from hole
+        self.set_dataset_key(key)
+
+    def _reposition_header_combo(self):
+        if self._header_combo is None or "thumb" not in self.columns:
+            return
+        header = self.horizontalHeader()
+        thumb_idx = self.columns.index("thumb")
+        section_pos = header.sectionPosition(thumb_idx)
+        section_size = header.sectionSize(thumb_idx)
+        h = header.height()
+        self._header_combo.setGeometry(
+            section_pos + 2,
+            1,
+            max(40, section_size - 4),
+            h - 2,
+        )
+        self._header_combo.show()
+
+    def _update_header_combo_geometry(self, *args):
+        # args are (logicalIndex, oldSize, newSize) or (logicalIndex, oldPos, newPos)
+        self._reposition_header_combo()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_header_combo()
+
+    def _update_header_label(self):
+        """If no header combo is used, keep the thumb header text in sync."""
+        if "thumb" not in self.columns:
+            return
+        if self._header_combo is not None:
+            # combo visible, label handled by combo
+            return
+        thumb_idx = self.columns.index("thumb")
+        item = self.horizontalHeaderItem(thumb_idx)
+        if item is not None:
+            item.setText(self.dataset_key) 
 
     
 class HoleControlPanel(QWidget):
@@ -200,22 +335,6 @@ class HoleControlPanel(QWidget):
         info_layout.addRow("Depth range:", self.lbl_depth_range)
 
         self.layout.addLayout(info_layout)
-        
-        
-        # ---- Secondary strip dataset ----------------------------------
-        self.layout.addSpacing(12)
-        self.layout.addWidget(QLabel("Secondary strip dataset:", self))
-
-        self.secondary_combo = QComboBox(self)
-        self.secondary_combo.setToolTip(
-            "Controls which dataset is used to build thumbnails in the "
-            "second strip table."
-        )
-        self.secondary_combo.currentTextChanged.connect(
-            self._on_secondary_dataset_changed
-        )
-        self.layout.addWidget(self.secondary_combo)
-
         self.layout.addStretch(1)
 
     # ------------------------------------------------------------------
@@ -231,7 +350,6 @@ class HoleControlPanel(QWidget):
             self.lbl_hole_id.setText("—")
             self.lbl_box_count.setText("—")
             self.lbl_depth_range.setText("—")
-            self._set_dataset_keys([])
             return
 
         self.lbl_hole_id.setText(str(self.cxt.ho.hole_id or "—"))
@@ -261,57 +379,9 @@ class HoleControlPanel(QWidget):
         else:
             self.lbl_depth_range.setText("—")
 
-        # ---- dataset keys for secondary strip -------------------------
-        keys = set()
-        try:
-            if self.cxt.ho.boxes:
-                for box in self.cxt.ho:
-                    keys = keys | box.datasets.keys() | box.temp_datasets.keys()
-                    
-        except Exception:
-            pass
+        
 
-        self._set_dataset_keys(keys)
-
-    # ------------------------------------------------------------------
-    def _set_dataset_keys(self, keys: list[str]):
-        """Populate the combobox without firing change signals."""
-        self.secondary_combo.blockSignals(True)
-        self.secondary_combo.clear()
-        for k in keys:
-            self.secondary_combo.addItem(k)
-
-        # try to default to savgol_cr, then savgol, then first key
-        default = None
-        for cand in ("savgol_cr", "savgol"):
-            if cand in keys:
-                default = cand
-                break
-        if default is None and keys:
-            default = keys[0]
-
-        if default is not None:
-            idx = self.secondary_combo.findText(default)
-            if idx >= 0:
-                self.secondary_combo.setCurrentIndex(idx)
-
-        self.secondary_combo.blockSignals(False)
-
-    # ------------------------------------------------------------------
-    def _on_secondary_dataset_changed(self, key: str):
-        """
-        User changed the dataset key for the secondary strip. Rebuild the
-        second table using this key.
-        """
-        key = key.strip()
-        if not key:
-            return
-        self.cxt = self._page.cxt
-        if self.cxt is None or self.cxt.ho is None:
-            return
-
-        # Reuse existing populate logic on the second table
-        self._page._box_table2.set_dataset_key(key)
+    
 
         
         
@@ -329,10 +399,13 @@ class HolePage(BasePage):
         super().__init__(parent)
         
         # Replace the default left canvas with our box table
+        
         self._box_table = HoleBoxTable(self, columns=["box", "thumb"])
-        self._add_left(self._box_table)
+        #self._add_left(self._box_table)
+        self._add_closable_widget(self._box_table, '', closeable = False)
         self._box_table2 = HoleBoxTable(self, columns=["thumb"], dataset_key = 'savgol_cr')
-        self._add_right(self._box_table2)
+        #self._add_right(self._box_table2)
+        self._add_closable_widget(self._box_table2, '', closeable = False)
         self._control_panel = HoleControlPanel(self)
         self._add_third(self._control_panel)
         # When a row is selected, update the CurrentContext.po
@@ -346,11 +419,6 @@ class HolePage(BasePage):
         btn_save = QPushButton("Save all changes", self)
         self._control_panel.layout.addWidget(btn_save)
         btn_save.clicked.connect(self.save_changes)
-        
-        
-        
-        self.canvas = ImageCanvas2D()
-        #self._add_right(self.canvas)
         
         #scroll sync between the two tables
         self._syncing_scroll = False
@@ -389,9 +457,25 @@ class HolePage(BasePage):
         """
         Populate the box table from the current HoleObject, if any.
         """
+        
         self._box_table.populate_from_hole()
         self._box_table2.populate_from_hole()
         self._control_panel.update_for_hole()
+        
+        
+        keys = set()
+        try:
+            if self.cxt.ho.boxes:
+                for box in self.cxt.ho:
+                    keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+                    
+        except Exception:
+            pass
+        if keys:
+            self._box_table.set_header_dataset_keys(keys)
+            self._box_table2.set_header_dataset_keys(keys)
+        
+        
     # ------------------------------------------------------------------
     # Slots / handlers
     # ------------------------------------------------------------------

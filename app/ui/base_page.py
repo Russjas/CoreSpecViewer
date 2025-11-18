@@ -87,14 +87,14 @@ class BasePage(QWidget):
                 self._dispatcher.clear()
 
         # Nothing to explicitly disconnect on ImageCanvas2D/InfoTable by default
-    def _add_closable_widget(self, raw_widget: QWidget, title: str):
+    def _add_closable_widget(self, raw_widget: QWidget, title: str, closeable=True):
         """
         Wraps a widget in a ClosableWidgetWrapper and adds it as a *secondary*
         widget to the QSplitter, usually alongside self._right or self._third.
         """
          # Import locally for clean API
         
-        wrapper = ClosableWidgetWrapper(raw_widget, title=title, parent=self)
+        wrapper = ClosableWidgetWrapper(raw_widget, title=title, parent=self, closeable=closeable)
         
         # Connect the wrapper's closed signal to the page's removal handler
         wrapper.closed.connect(self.remove_widget) 

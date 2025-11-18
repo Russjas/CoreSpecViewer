@@ -1247,130 +1247,106 @@ def kmeans_spectral_wrapper(data, clusters, iters):
     m, c = sp.kmeans(data, clusters, iters)
     return m, c
 
-#TODO: Come back and refactor this after time checks
-def mk_thumb_sidelines(arr, baseheight=90, basewidth=800, mask=None):
+
+import time
+
+def index_to_rgb(index_2d: np.ndarray, mask: np.ndarray | None = None) -> np.ndarray:
+    print("Index to RGB called")
     """
-    Create a PIL thumbnail image from an array, using the same
-    visual conventions as ImageCanvas2D.show_rgb.
+    Convert an indexed mineral map + optional mask into an RGB image.
+
+    Parameters
+    ----------
+    index_2d : (H, W) integer array
+        Class indices. Negative values are treated as background.
+    mask : (H, W) bool or 0/1 array, optional
+        Additional mask. True/1 = masked (drawn as background).
+
+    Returns
+    -------
+    rgb8 : (H, W, 3) uint8
+        Color image ready for PIL / imshow.
+    """
+    idx = np.asarray(index_2d)
+    if idx.ndim != 2:
+        raise ValueError(f"index_to_rgb expects a 2-D index map; got {idx.shape}")
+
+    H, W = idx.shape
+    if H == 0 or W == 0:
+        raise ValueError("index_to_rgb got zero-sized index map.")
+
+    # ---- derive K purely from data (non-negative indices)
+    positive = idx[idx >= 0]
+    if positive.size == 0:
+        # nothing valid, return black
+        return np.zeros((H, W, 3), dtype=np.uint8)
+
+    max_idx = int(positive.max())
+    K = max_idx + 1
+
+    # ---- deterministic colors from tab20, wrapping every 20 classes
+    cmap = matplotlib.colormaps["tab20"]
+    colors_rgb = (np.array([cmap(i % 20)[:3] for i in range(K)]) * 255).astype(np.uint8)  # (K,3)
+
+    # ---- build RGB image with background/negatives + mask
+    idx_img = idx.copy()
+    neg_mask = idx_img < 0
+
+    if mask is not None:
+        m = np.asarray(mask)
+        if m.shape != (H, W):
+            raise ValueError(f"Mask shape {m.shape} does not match index map {idx.shape}.")
+        neg_mask |= m.astype(bool)
+
+    idx_img = np.clip(idx_img, 0, K - 1)
+    rgb = colors_rgb[idx_img]  # (H,W,3), uint8
+
+    # paint background+masked pixels black
+    if neg_mask.any():
+        rgb[neg_mask] = np.array([0, 0, 0], dtype=np.uint8)
+
+    return rgb
+
+def mk_thumb(
+    arr,
+    baseheight: int = 90,
+    basewidth: int = 800,
+    mask: np.ndarray | None = None,
+    index_mode: bool = False,
+):
+    """
+    Create a PIL thumbnail image from an array.
 
     Parameters
     ----------
     arr : np.ndarray
         Shape (H, W, B), (H, W) or (H, W, 3).
+        - If index_mode=False: numeric image or cube.
+        - If index_mode=True: 2D integer index map (negative = background).
     baseheight : int
         Max height of the thumbnail (pixels).
     basewidth : int
         Max width of the thumbnail (pixels).
-    mask : np.ndarray[bool], optional
-        Boolean mask of shape (H, W). True = masked (black).
+    mask : np.ndarray[bool] or 0/1, optional
+        Boolean mask of shape (H, W). True/1 = masked (black).
+    index_mode : bool, optional
+        If True, treat arr as an indexed mineral map and use tab20 colors
+        (via index_to_rgb), instead of colormap/false-colour.
 
     Returns
     -------
     PIL.Image.Image
         RGB thumbnail image, ready to save as JPEG.
     """
-    arr = np.asarray(arr)
-
-    if arr.ndim not in (2, 3):
-        raise ValueError(f"Unsupported array shape {arr.shape}; expected 2D or 3D.")
-    if 0 in arr.shape:
-        raise ValueError(f"arr shape {arr.shape} cannot have a zero size dim")
-
-    if mask is not None:
-        mask = np.asarray(mask, dtype=bool)
-        if mask.shape != arr.shape[:2]:
-            raise ValueError(
-                f"Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}."
-            )
-    if arr.shape[0] > arr.shape[1]:
-        arr = np.flip(np.swapaxes(arr, 0, 1), axis=0)
-        if mask is not None:
-            mask = np.flip(np.swapaxes(mask, 0, 1), axis=0)
-    # ---- Convert to RGB (H, W, 3), matching ImageCanvas2D.show_rgb logic
-    if arr.ndim == 2:
-        # 2D -> use the same colormap as show_rgb (my_map, with min/max scaling)
-        a = arr.astype(float)
-        amin = np.nanmin(a)
-        amax = np.nanmax(a)
-        if amax > amin:
-            norm = (a - amin) / (amax - amin)
-        else:
-            norm = np.zeros_like(a, dtype=float)
-        rgb = my_map(norm)[..., :3]  # (H, W, 3) float in [0,1]
-
-        # scale to 0–255
-        rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
-
-    else:
-        # 3D
-        H, W, C = arr.shape
-
-        # Hyperspectral -> use the same false-colour function as the viewer
-        if C > 3:
-            fc = get_false_colour(arr)  # should return (H, W, 3)
-            fc = np.asarray(fc)
-            if fc.ndim != 3 or fc.shape[2] != 3:
-                raise ValueError("sf.get_false_colour must return an (H, W, 3) array.")
-            # handle float vs uint8
-            if np.issubdtype(fc.dtype, np.integer):
-                rgb8 = np.clip(fc, 0, 255).astype(np.uint8)
-            else:
-                # float: assume arbitrary range, normalise to [0,1]
-                vmin = np.nanmin(fc)
-                vmax = np.nanmax(fc)
-                if vmax > vmin:
-                    rgb = (fc - vmin) / (vmax - vmin)
-                else:
-                    rgb = np.zeros_like(fc, dtype=float)
-                rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
-
-        else:
-            # C == 1 or C == 3
-            a = arr
-
-            if C == 1:
-                a = np.repeat(a, 3, axis=2)
-
-            # Now a is (H, W, 3)
-            if np.issubdtype(a.dtype, np.integer):
-                # Assume uint8-style data
-                rgb8 = np.clip(a, 0, 255).astype(np.uint8)
-            else:
-                # float: we don't know the range -> normalise like imshow defaults
-                vmin = np.nanmin(a)
-                vmax = np.nanmax(a)
-                if vmax > vmin:
-                    rgb = (a - vmin) / (vmax - vmin)
-                else:
-                    rgb = np.zeros_like(a, dtype=float)
-                rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
-
-    # ---- Apply mask (masked regions = black)
-    if mask is not None:
-        rgb8[mask] = 0
-
-    # ---- Create PIL image and resize with aspect-ratio preserved
-    h, w = rgb8.shape[:2]
-    scale = min(basewidth / float(w), baseheight / float(h), 1.0)
-    new_w = max(1, int(round(w * scale)))
-    new_h = max(1, int(round(h * scale)))
-
-    im = Image.fromarray(rgb8, mode="RGB")
-    im = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
-
-    return im
-
-import time
-
-def mk_thumb(arr, baseheight=90, basewidth=800, mask=None):
-    print('make thumb called')
+    print("make thumb called")
     t0 = time.perf_counter()
 
-    def checkpoint(label):
+    def checkpoint(label: str):
         print(f"[mk_thumb] {label}: {time.perf_counter() - t0:.4f}s")
 
     checkpoint("start")
 
+    # ---- to ndarray + sanity checks
     arr = np.asarray(arr)
     checkpoint("after np.asarray(arr)")
 
@@ -1379,7 +1355,7 @@ def mk_thumb(arr, baseheight=90, basewidth=800, mask=None):
     if 0 in arr.shape:
         raise ValueError(f"arr shape {arr.shape} cannot have a zero size dim")
 
-    # mask check
+    # ---- mask validation
     if mask is not None:
         mask = np.asarray(mask, dtype=bool)
         if mask.shape != arr.shape[:2]:
@@ -1388,98 +1364,128 @@ def mk_thumb(arr, baseheight=90, basewidth=800, mask=None):
             )
     checkpoint("after mask validation")
 
-    # orientation flip
+    # ---- orientation flip
     if arr.shape[0] > arr.shape[1]:
         arr = np.flip(np.swapaxes(arr, 0, 1), axis=0)
         if mask is not None:
             mask = np.flip(np.swapaxes(mask, 0, 1), axis=0)
     checkpoint("after optional orientation flip")
 
-    # ---- Convert to RGB
-    if arr.ndim == 2:
-        # 2D → colormap
-        a = arr.astype(float)
-        checkpoint("after arr.astype(float)")
+    # ------------------------------------------------------------------
+    # 1) INDEX MODE: use classification colour map (tab20)
+    # ------------------------------------------------------------------
+    if index_mode:
+        if arr.ndim != 2:
+            raise ValueError(
+                f"index_mode=True requires a 2-D index map; got shape {arr.shape}"
+            )
 
-        amin = np.nanmin(a)
-        amax = np.nanmax(a)
-        checkpoint("after nanmin/max")
+        rgb8 = index_to_rgb(arr, mask=mask)
+        checkpoint("after index_to_rgb()")
 
-        if amax > amin:
-            norm = (a - amin) / (amax - amin)
-        else:
-            norm = np.zeros_like(a, dtype=float)
-        checkpoint("after normalisation")
-
-        rgb = my_map(norm)[..., :3]
-        checkpoint("after colormap call (my_map(norm))")
-
-        rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
-        checkpoint("after rgb→uint8 conversion")
-
+    # ------------------------------------------------------------------
+    # 2) NORMAL MODE: original mk_thumb behaviour
+    # ------------------------------------------------------------------
     else:
-        # 3D
-        H, W, C = arr.shape
+        if arr.ndim == 2:
+            # 2D → colormap
+            a = arr.astype(float)
+            checkpoint("after arr.astype(float)")
 
-        if C > 3:
-            # hyperspectral false-colour conversion
-            fc = get_false_colour(arr)
-            checkpoint("after get_false_colour(arr)")
+            amin = np.nanmin(a)
+            amax = np.nanmax(a)
+            checkpoint("after nanmin/max")
 
-            fc = np.asarray(fc)
-            checkpoint("after np.asarray(fc)")
-
-            if fc.ndim != 3 or fc.shape[2] != 3:
-                raise ValueError("sf.get_false_colour must return (H, W, 3) array.")
-
-            if np.issubdtype(fc.dtype, np.integer):
-                rgb8 = np.clip(fc, 0, 255).astype(np.uint8)
-                checkpoint("after clip+astype for integer false-colour")
+            if amax > amin:
+                norm = (a - amin) / (amax - amin)
             else:
-                vmin = np.nanmin(fc)
-                vmax = np.nanmax(fc)
-                checkpoint("after nanmin/max on false-colour")
+                norm = np.zeros_like(a, dtype=float)
+            checkpoint("after normalisation")
 
-                if vmax > vmin:
-                    rgb = (fc - vmin) / (vmax - vmin)
-                else:
-                    rgb = np.zeros_like(fc, dtype=float)
-                checkpoint("after false-colour normalisation")
+            rgb = my_map(norm)[..., :3]
+            checkpoint("after colormap call (my_map(norm))")
 
-                rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
-                checkpoint("after false-colour float→uint8")
+            rgb8 = np.nan_to_num(
+                rgb * 255.0,
+                nan=0.0,
+                posinf=255.0,
+                neginf=0.0,
+            ).astype(np.uint8)
+            checkpoint("after rgb→uint8 conversion")
 
         else:
-            # C == 1 or C == 3
-            a = arr
+            # 3D
+            H, W, C = arr.shape
 
-            if C == 1:
-                a = np.repeat(a, 3, axis=2)
-                checkpoint("after repeat single band to RGB")
+            if C > 3:
+                # hyperspectral false-colour conversion
+                fc = get_false_colour(arr)
+                checkpoint("after get_false_colour(arr)")
 
-            if np.issubdtype(a.dtype, np.integer):
-                rgb8 = np.clip(a, 0, 255).astype(np.uint8)
-                checkpoint("after integer RGB clip+astype")
-            else:
-                vmin = np.nanmin(a)
-                vmax = np.nanmax(a)
-                checkpoint("after nanmin/max for RGB")
+                fc = np.asarray(fc)
+                checkpoint("after np.asarray(fc)")
 
-                if vmax > vmin:
-                    rgb = (a - vmin) / (vmax - vmin)
+                if fc.ndim != 3 or fc.shape[2] != 3:
+                    raise ValueError("get_false_colour must return (H, W, 3) array.")
+
+                if np.issubdtype(fc.dtype, np.integer):
+                    rgb8 = np.clip(fc, 0, 255).astype(np.uint8)
+                    checkpoint("after clip+astype for integer false-colour")
                 else:
-                    rgb = np.zeros_like(a, dtype=float)
-                checkpoint("after float RGB normalisation")
+                    vmin = np.nanmin(fc)
+                    vmax = np.nanmax(fc)
+                    checkpoint("after nanmin/max on false-colour")
 
-                rgb8 = np.nan_to_num(rgb * 255.0, nan=0.0, posinf=255.0, neginf=0.0).astype(np.uint8)
-                checkpoint("after float RGB→uint8 conversion")
+                    if vmax > vmin:
+                        rgb = (fc - vmin) / (vmax - vmin)
+                    else:
+                        rgb = np.zeros_like(fc, dtype=float)
+                    checkpoint("after false-colour normalisation")
 
-    # ---- Apply mask
-    if mask is not None:
-        rgb8[mask] = 0
-        checkpoint("after applying mask")
+                    rgb8 = np.nan_to_num(
+                        rgb * 255.0,
+                        nan=0.0,
+                        posinf=255.0,
+                        neginf=0.0,
+                    ).astype(np.uint8)
+                    checkpoint("after false-colour float→uint8")
 
-    # resize
+            else:
+                # C == 1 or C == 3
+                a = arr
+
+                if C == 1:
+                    a = np.repeat(a, 3, axis=2)
+                    checkpoint("after repeat single band to RGB")
+
+                if np.issubdtype(a.dtype, np.integer):
+                    rgb8 = np.clip(a, 0, 255).astype(np.uint8)
+                    checkpoint("after integer RGB clip+astype")
+                else:
+                    vmin = np.nanmin(a)
+                    vmax = np.nanmax(a)
+                    checkpoint("after nanmin/max for RGB")
+
+                    if vmax > vmin:
+                        rgb = (a - vmin) / (vmax - vmin)
+                    else:
+                        rgb = np.zeros_like(a, dtype=float)
+                    checkpoint("after float RGB normalisation")
+
+                    rgb8 = np.nan_to_num(
+                        rgb * 255.0,
+                        nan=0.0,
+                        posinf=255.0,
+                        neginf=0.0,
+                    ).astype(np.uint8)
+                    checkpoint("after float RGB→uint8 conversion")
+
+        # ---- apply mask (normal mode only; index_mode already handled it)
+        if mask is not None:
+            rgb8[mask] = 0
+            checkpoint("after applying mask")
+
+    # ---- final resize (PIL, as in original)
     h, w = rgb8.shape[:2]
     scale = min(basewidth / float(w), baseheight / float(h), 1.0)
     new_w = max(1, int(round(w * scale)))
@@ -1488,17 +1494,12 @@ def mk_thumb(arr, baseheight=90, basewidth=800, mask=None):
     im = Image.fromarray(rgb8, mode="RGB")
     checkpoint("after Image.fromarray")
 
-    im = im.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    if (new_w, new_h) != (w, h):
+        im = im.resize((new_w, new_h), Image.LANCZOS)
     checkpoint("after resize (LANCZOS)")
 
     checkpoint("END")
     return im
-    
-    
-    
-    
-    
-    
     
     
     
