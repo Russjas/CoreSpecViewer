@@ -221,7 +221,7 @@ A major feature enabling hole‑level interpretation.
   *Multi-scale, multi-sensor data integration for automated 3-D geological mapping.*  
   *Ore Geology Reviews*, **136**, 104252.  
   https://doi.org/10.1016/j.oregeorev.2021.104252  
-- Correlation / WTA  
+- Correlation / WTA mineral mapping  
 - Spectral plotting  
 - Show/hide legends  
 - Export maps  
