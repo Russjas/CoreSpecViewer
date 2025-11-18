@@ -333,7 +333,7 @@ def numpy_pearson(data, exemplar):
 
             x = np.corrcoef(data[i,j], exemplar)[1,0]
             y = np.isnan(x)
-            if y == False:
+            if not y:
                 coeffs[i,j] = x
             else:
                 coeffs[i,j] = 0

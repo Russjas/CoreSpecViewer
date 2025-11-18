@@ -269,7 +269,6 @@ def calc_unwrap_stats(obj):
     return obj
 
 def unwrapped_output(obj):
-    seg_image = sf.seg_from_stats(obj.segments, obj.stats)
     dhole_reflect = sf.unwrap_from_stats(obj.mask, obj.savgol,obj.stats)
     dhole_depths = np.linspace(float(obj.metadata['core depth start']), float(obj.metadata['core depth stop']),
                                     dhole_reflect.shape[0])
