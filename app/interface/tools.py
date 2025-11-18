@@ -212,14 +212,14 @@ def mask_point(obj, mode, y, x):
         obj.add_temp_dataset('mask', data = msk)
         return obj
     if mode == 'enhance':
-        msk = obj.mask
+        msk = np.array(obj.mask)
         pixel_vec = obj.savgol_cr[y, x, :]
         corr = sf.numpy_pearson(obj.savgol_cr, pixel_vec)
         msk[corr > 0.9] = 1
         obj.add_temp_dataset('mask', data = msk)
         return obj
     if mode == 'line':
-        msk = obj.mask
+        msk = np.array(obj.mask)
         msk[:, x] = 1
         obj.add_temp_dataset('mask', data = msk)
         return obj
@@ -248,7 +248,7 @@ def mask_polygon(obj, vertices_rc):
     inside = inside.reshape(H, W)
 
     # outside = ~inside  -> set to 1
-    msk = obj.mask
+    msk = np.array(obj.mask)
     msk[~inside] = 1
     obj.add_temp_dataset('mask', data = msk)
     return obj

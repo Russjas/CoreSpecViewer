@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (QVBoxLayout, QTableWidgetItem,QTableWidget,
 
 
 from ..models import HoleObject
-from .util_windows import busy_cursor, ImageCanvas2D
+from .util_windows import busy_cursor, ImageCanvas2D, ClosableWidgetWrapper
 from .base_page import BasePage
 
 
@@ -147,6 +147,8 @@ class HoleBoxTable(QTableWidget):
         ds = getattr(po, "temp_datasets", {}).get(key)
         if ds is None:
             ds = getattr(po, "datasets", {}).get(key)
+            if ds is None:
+                return QPixmap()
     
         if ds.thumb is None:
             try:
@@ -241,15 +243,8 @@ class HoleBoxTable(QTableWidget):
         
         
 
-        # try to default to savgol_cr, then savgol, then first key
-        default = None
-        for cand in ("savgol_cr", "savgol"):
-            if cand in keys:
-                default = cand
-                break
-        if default is None and keys:
-            default = keys[0]
-
+        
+        default = self.dataset_key
         if default is not None:
             idx = combo.findText(default)
             if idx >= 0:
@@ -327,15 +322,113 @@ class HoleControlPanel(QWidget):
         self.lbl_hole_id = QLabel("—")
         self.lbl_box_count = QLabel("—")
         self.lbl_depth_range = QLabel("—")
-
+        
         info_layout = QFormLayout()
         info_layout.setLabelAlignment(Qt.AlignLeft)
         info_layout.addRow("Hole ID:", self.lbl_hole_id)
         info_layout.addRow("# boxes:", self.lbl_box_count)
         info_layout.addRow("Depth range:", self.lbl_depth_range)
-
         self.layout.addLayout(info_layout)
+        
+        # --- Extra column control panel---
+        # Create a local container for the combo + button
+        combo_block = QWidget(self)
+        combo_layout = QVBoxLayout(combo_block)
+        combo_layout.setContentsMargins(0, 0, 0, 0)
+        combo_layout.setSpacing(1)   # tight vertical spacing
+        
+        # Label
+        label = QLabel("Add extra columns:", combo_block)
+        combo_layout.addWidget(label)
+        
+        # Combo box
+        self.secondary_combo = QComboBox(combo_block)
+        self.secondary_combo.setToolTip(
+            "Controls which dataset is used to build thumbnails in the "
+            "new strip table."
+        )
+        
+        combo_layout.addWidget(self.secondary_combo)
+        
+        # Button directly below combo
+        self.create_button = QPushButton("Show", combo_block)
+        self.create_button.clicked.connect(self._on_display_btn_clicked)
+        combo_layout.addWidget(self.create_button)
+        
+        # Now add the *whole block* to your main layout
+        self.layout.addWidget(combo_block)
+        
+
         self.layout.addStretch(1)
+
+    def _set_dataset_keys(self):
+        """Populate the combobox without firing change signals."""
+        self.secondary_combo.blockSignals(True)
+        self.secondary_combo.clear()
+        keys = set()
+        try:
+            if self.cxt.ho.boxes:
+                for box in self.cxt.ho:
+                    keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+        except Exception:
+            pass
+        if keys:
+            combo = self.secondary_combo
+            def add_header_item(combo, text):
+                model = combo.model()
+                row = model.rowCount()
+                model.insertRow(row)
+                item = QStandardItem(text)
+                item.setFlags(Qt.ItemIsEnabled)     
+                font = item.font()
+                font.setBold(True)
+                item.setFont(font)
+                model.setItem(row, 0, item)
+            
+            base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
+            unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
+            non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands", 'metadata' }
+            base = []
+            unwrapped = []
+            products = []
+            non_vis = []
+            
+            for k in sorted(keys):  # stable order
+                if k in base_whitelist:
+                    base.append(k)
+                elif any(k.startswith(pfx) for pfx in unwrap_prefixes):
+                    unwrapped.append(k)
+                elif any(k.endswith(sfx) for sfx in non_vis_suff):
+                    non_vis.append(k)
+                else:
+                    products.append(k)
+            
+            add_header_item(combo, "---Base data---")
+            for k in base:
+                combo.addItem(k)
+            add_header_item(combo, "---Products---")
+            for k in products:
+                combo.addItem(k)
+
+        self.secondary_combo.blockSignals(False)
+
+    # ------------------------------------------------------------------
+    def _on_display_btn_clicked(self, key: str):
+        """
+        User changed the dataset key for the secondary strip. Rebuild the
+        second table using this key.
+        """
+        text = self.secondary_combo.currentText()
+    
+        key = text.strip()
+        if not key:
+            return
+        self.cxt = self._page.cxt
+        if self.cxt is None or self.cxt.ho is None:
+            return
+
+        self._page.add_column(dataset_key=key)
+
 
     # ------------------------------------------------------------------
     def update_for_hole(self):
@@ -378,6 +471,7 @@ class HoleControlPanel(QWidget):
             self.lbl_depth_range.setText(f"{dmin:.2f}–{dmax:.2f} m")
         else:
             self.lbl_depth_range.setText("—")
+        self._set_dataset_keys()
 
         
 
@@ -397,18 +491,21 @@ class HolePage(BasePage):
     def __init__(self, parent=None):
         
         super().__init__(parent)
+        self._syncing_scroll = False
+        self._scroll_tables: list[HoleBoxTable] = []
         
-        # Replace the default left canvas with our box table
-        
-        self._box_table = HoleBoxTable(self, columns=["box", "thumb"])
-        #self._add_left(self._box_table)
-        self._add_closable_widget(self._box_table, '', closeable = False)
-        self._box_table2 = HoleBoxTable(self, columns=["thumb"], dataset_key = 'savgol_cr')
-        #self._add_right(self._box_table2)
-        self._add_closable_widget(self._box_table2, '', closeable = False)
+        #Details and buttons
         self._control_panel = HoleControlPanel(self)
-        self._add_third(self._control_panel)
-        # When a row is selected, update the CurrentContext.po
+        self._add_left(self._control_panel)
+        #Default thumb column
+        self._box_table = HoleBoxTable(self, columns=["box", "thumb"])
+        self._add_closable_widget(self._box_table, '', closeable = False)
+        self._register_scroll_table(self._box_table)
+        #Extra, dynamic thumb columns
+        self.extra_columns = []
+        self.add_column()
+        
+        # When a row is selected, update the CurrentContext.po, (default column only, for now)
         self._box_table.cellDoubleClicked.connect(self._on_box_selected)
         self._box_table.cellClicked.connect(self._on_box_clicked)        
            
@@ -420,19 +517,82 @@ class HolePage(BasePage):
         self._control_panel.layout.addWidget(btn_save)
         btn_save.clicked.connect(self.save_changes)
         
-        #scroll sync between the two tables
-        self._syncing_scroll = False
-        vbar1 = self._box_table.verticalScrollBar()
-        vbar2 = self._box_table2.verticalScrollBar()
-        vbar1.valueChanged.connect(self._on_table1_scrolled)
-        vbar2.valueChanged.connect(self._on_table2_scrolled)
         
+    #====== Dynamic column handling =========================
+    def add_column(self, dataset_key = 'mask'):
+        new_col = HoleBoxTable(self, columns=["thumb"], dataset_key=dataset_key)
+        new_col.cellDoubleClicked.connect(self._on_box_selected)
+        new_col.cellClicked.connect(self._on_box_clicked) 
+        self._add_closable_widget(new_col, '')
+        self.extra_columns.append(new_col)
+        self._register_scroll_table(new_col)
+        self._refresh_from_hole()
+        
+    def remove_widget(self, w: QWidget):
+        """
+        Override BasePage.remove_widget so that when a closable thumb column
+        is closed, we keep self.extra_columns in sync and drop references to
+        the underlying HoleBoxTable.
+        """
+        inner = None
+        if isinstance(w, ClosableWidgetWrapper):
+            inner = getattr(w, "wrapped_widget", None)
+
+        if isinstance(inner, HoleBoxTable):
+            try:
+                self.extra_columns.remove(inner)
+            except ValueError:
+                # Already removed or was never registered; ignore
+                pass
+            self._unregister_scroll_table(inner)
+        super().remove_widget(w)
+        
+    def _register_scroll_table(self, table: HoleBoxTable):
+        """
+        Add a HoleBoxTable to the scroll-sync group.
+        """
+        if table in self._scroll_tables:
+            return  # already registered
+        self._scroll_tables.append(table)
+        vbar = table.verticalScrollBar()
+        vbar.valueChanged.connect(self._on_any_table_scrolled)
+
+    def _unregister_scroll_table(self, table: HoleBoxTable):
+        """
+        Remove a HoleBoxTable from the scroll-sync group and disconnect signals.
+        Called when a column is closed.
+        """
+        if table in self._scroll_tables:
+            self._scroll_tables.remove(table)
+        try:
+            vbar = table.verticalScrollBar()
+            vbar.valueChanged.disconnect(self._on_any_table_scrolled)
+        except Exception:
+            # Already disconnected or table is being destroyed
+            pass
+
+    def _on_any_table_scrolled(self, value: int):
+        """
+        Keep all registered HoleBoxTables vertically aligned.
+        Any table can act as the scroll driver.
+        """
+        if self._syncing_scroll:
+            return
+
+        self._syncing_scroll = True
+        src_vbar = self.sender()
+
+        for table in self._scroll_tables:
+            vbar = table.verticalScrollBar()
+            if vbar is src_vbar:
+                continue
+            vbar.setValue(value)
+
+        self._syncing_scroll = False
     # ------------------------------------------------------------------
     # Context handling
     # ------------------------------------------------------------------
     
-    def test_func(self, *args):
-        print(*args, 'test func')
     def open_hole(self):
         path = QFileDialog.getExistingDirectory(
                    self,
@@ -457,9 +617,10 @@ class HolePage(BasePage):
         """
         Populate the box table from the current HoleObject, if any.
         """
-        
+        self._control_panel.update_for_hole()
         self._box_table.populate_from_hole()
-        self._box_table2.populate_from_hole()
+        for col in self.extra_columns:
+            col.populate_from_hole()
         self._control_panel.update_for_hole()
         
         
@@ -473,7 +634,8 @@ class HolePage(BasePage):
             pass
         if keys:
             self._box_table.set_header_dataset_keys(keys)
-            self._box_table2.set_header_dataset_keys(keys)
+            for col in self.extra_columns:
+                col.set_header_dataset_keys(keys)
         
         
     # ------------------------------------------------------------------
@@ -526,22 +688,13 @@ class HolePage(BasePage):
         
     
     def save_changes(self):
-        print('this called')
-        
+               
         if self.cxt is not None and self.cxt.ho is not None:
             with busy_cursor('Saving.....', self):
-                print('saving')
                 for po in self.cxt.ho:
                     if po.has_temps:
-                        print(po.metadata['box number'])
                         po.commit_temps()
-                        print('finished commit, starting thumb build')
-                        #po.build_all_thumbs()
-                        print('finished thumb build, starting save')
-                        #po.save_all_thumbs()
-                        print('saved thumbs')
                         po.save_all()
-                        print('saved all, reloading')
                         po.reload_all()
                         po.load_thumbs()
                 self._refresh_from_hole()
@@ -550,24 +703,8 @@ class HolePage(BasePage):
     def update_display(self, key=''):
         self._refresh_from_hole()
         
-        
-    
-        
-        
-    # sync table scroll handles
-    def _on_table1_scrolled(self, value: int):
-        if self._syncing_scroll:
-            return
-        self._syncing_scroll = True
-        self._box_table2.verticalScrollBar().setValue(value)
-        self._syncing_scroll = False
 
-    def _on_table2_scrolled(self, value: int):
-        if self._syncing_scroll:
-            return
-        self._syncing_scroll = True
-        self._box_table.verticalScrollBar().setValue(value)
-        self._syncing_scroll = False
+    
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     viewer = HolePage()

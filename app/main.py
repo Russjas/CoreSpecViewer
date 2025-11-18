@@ -363,23 +363,7 @@ class MainRibbonController(QMainWindow):
     def process_multi_raw(self):
         multi_box.run_multibox_dialog(self)
     
-    def save_clicked_temp(self):#TODO if the save error doesnt recur this can be deleted
-
-        print('Why no changes?')
-        self.cxt.current.print_refs('before clear canvas')
-        #self._clear_all_canvas_refs()
-        self.cxt.current.print_refs('after clear canvas current')
-        self.cxt.po.print_refs('after clear canvas po')
-        #self.ref_hold = self.cxt.current.datasets['savgol']._memmap_ref
-        print('COMMITING')
-        self.cxt.po.commit_temps()
-        print('SAVING')
-        self.cxt.current.save_all()
-        self._distribute_context()
-        self.update_display()
-        
-
-        
+      
     def save_clicked(self):
          
         if self.cxt.current.is_raw:
@@ -404,8 +388,6 @@ class MainRibbonController(QMainWindow):
         try:
             with busy_cursor('saving...', self):
                 self.cxt.current.save_all()
-                #self.cxt.po.build_all_thumbs()
-                #self.cxt.po.save_all_thumbs()
                 self.cxt.current.reload_all()
                 self.cxt.current.load_thumbs()
                 self.update_display()
@@ -784,11 +766,6 @@ class MainRibbonController(QMainWindow):
                     if po.has_temps:
                         print(po.metadata['box number'])
                         po.commit_temps()
-                        print('finished commit, starting thumb build')
-                        po.build_all_thumbs()
-                        print('finished thumb build, starting save')
-                        po.save_all_thumbs()
-                        print('saved thumbs')
                         po.save_all()
                         print('saved all, reloading')
                         po.reload_all()

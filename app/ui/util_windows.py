@@ -528,6 +528,10 @@ class ClosableWidgetWrapper(QWidget):
             close_action.setToolTip(f"Close {title}")
             close_action.triggered.connect(self._emit_closed)
             self.toolbar.addAction(close_action)
+        else:
+            default_label = QAction("Default", self)
+            default_label.setToolTip(f"Default cannot be closed")
+            self.toolbar.addAction(default_label)
 
         # 4. Main layout (Toolbar above, Wrapped Widget below)
         layout = QVBoxLayout(self)
