@@ -129,6 +129,7 @@ class ProcessedObject:
 
             ds = Dataset(base=basename, key=key, path=fp, suffix=key, ext=ext)
             datasets[key] = ds
+            print(key)
 
         return cls(basename=basename, root_dir=root, datasets=datasets)
 

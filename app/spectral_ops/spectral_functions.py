@@ -1239,6 +1239,170 @@ def mineral_map_wta_strict(data, exemplar_stack, thresh=0.70, invalid_value=-999
 
     return idx.reshape(H, W), best_corr.reshape(H, W).astype(np.float32)
 
+def mineral_map_wta_sam_strict(data, exemplar_stack, max_angle_deg=8.0, invalid_value=-999):
+    """
+    Winner-takes-all Spectral Angle Mapper (SAM).
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Hyperspectral cube, shape (H, W, B), float.
+    exemplar_stack : np.ndarray
+        Library spectra, shape (K, B), float.
+    max_angle_deg : float
+        Maximum allowed SAM angle (in degrees). Pixels with best_angle > max_angle_deg
+        are set to invalid_value in the class map.
+    invalid_value : int
+        Fill value for invalid / no-match pixels in the class map.
+
+    Returns
+    -------
+    class_idx : np.ndarray, int32, shape (H, W)
+        Winner-takes-all class index for each pixel. invalid_value where no valid match.
+    best_angle : np.ndarray, float32, shape (H, W)
+        SAM angle (degrees) of the winning class. Smaller = better match, NaN where undefined.
+    """
+    H, W, B = data.shape
+    K = exemplar_stack.shape[0]
+
+    # Flatten pixels to (N, B)
+    X = data.reshape(-1, B).astype(np.float64)   # (N, B)
+    E = exemplar_stack.astype(np.float64)        # (K, B)
+
+    # L2 norms
+    X_norm = np.linalg.norm(X, axis=1, keepdims=True)  # (N, 1)
+    E_norm = np.linalg.norm(E, axis=1, keepdims=True)  # (K, 1)
+
+    # Zero-norm masks (angle undefined)
+    X_zero = (X_norm == 0)   # (N, 1)
+    E_zero = (E_norm == 0)   # (K, 1)
+
+    # Normalise; where norm==0, divide by 1 and mask later
+    Xn = X / np.where(X_norm == 0, 1.0, X_norm)
+    En = E / np.where(E_norm == 0, 1.0, E_norm)
+
+    # Cosine similarity matrix: (N, K)
+    cos_sim = Xn @ En.T
+
+    # Inject NaNs where angle is undefined (zero vector)
+    if X_zero.any():
+        cos_sim[X_zero[:, 0], :] = np.nan
+    if E_zero.any():
+        cos_sim[:, E_zero[:, 0]] = np.nan
+
+    # Clip to valid domain for arccos
+    cos_sim = np.clip(cos_sim, -1.0, 1.0)
+
+    # Best (maximum) cosine per pixel – equivalent to minimum angle
+    best_cos = np.nanmax(cos_sim, axis=1)    # (N,)
+
+    # Handle rows that are all-NaN
+    all_nan = np.isnan(best_cos)
+    idx = np.empty_like(best_cos, dtype=np.int32)
+    if (~all_nan).any():
+        idx[~all_nan] = np.nanargmax(cos_sim[~all_nan], axis=1).astype(np.int32)
+    if all_nan.any():
+        idx[all_nan] = invalid_value
+
+    # Convert best cosine similarity to angle in degrees
+    best_angle = np.empty_like(best_cos, dtype=np.float64)
+    valid = ~all_nan
+    if valid.any():
+        best_angle[valid] = np.degrees(np.arccos(best_cos[valid]))
+    if all_nan.any():
+        best_angle[all_nan] = np.nan
+
+    # Apply angle threshold: keep if angle <= max_angle_deg
+    keep = (best_angle <= float(max_angle_deg))
+    # Also drop NaNs
+    keep &= ~np.isnan(best_angle)
+
+    idx = np.where(keep, idx, invalid_value).astype(np.int32)
+
+    return idx.reshape(H, W), best_angle.reshape(H, W).astype(np.float32)
+
+def mineral_map_wta_msam_strict(data, members, thresh=0.70, invalid_value=-999):
+    """
+    Modified after Spectral Python package MSAM algorithm.
+    Winner-takes-all classification using Modified SAM (MSAM) scores
+    following Oshigami et al. (2013).
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Hyperspectral cube, shape (H, W, B), float-like.
+    members : np.ndarray
+        Library spectra / endmembers, shape (K, B), float-like.
+    thresh : float
+        Minimum MSAM score to accept a match. Pixels with best_score <= thresh
+        are assigned `invalid_value` in the class map.
+        MSAM score is in [0, 1], with 1 = perfect match (zero angle).
+    invalid_value : int
+        Fill value for pixels with no valid match (or undefined score).
+
+    Returns
+    -------
+    class_idx : np.ndarray, int32, shape (H, W)
+        Winner-takes-all class index for each pixel. `invalid_value` where no
+        valid match.
+    best_score : np.ndarray, float32, shape (H, W)
+        MSAM score of the winning class. Range [0, 1]; NaN where undefined.
+    """
+    H, W, B = data.shape
+    K = members.shape[0]
+    assert members.shape[1] == B, "Matrix dimensions are not aligned."
+
+    # Flatten pixels: (N, B)
+    X = data.reshape(-1, B).astype(np.float64)     # (N, B)
+    M = members.astype(np.float64)                 # (K, B)
+
+    # --- Normalise endmembers (demean + unit length) ---
+    M_mean = M.mean(axis=1, keepdims=True)         # (K, 1)
+    M_demean = M - M_mean                          # (K, B)
+    M_norm = np.linalg.norm(M_demean, axis=1, keepdims=True)  # (K, 1)
+    M_zero = (M_norm == 0)                         # (K, 1)
+    M_unit = M_demean / np.where(M_norm == 0, 1.0, M_norm)    # (K, B)
+
+    # --- Normalise pixels (demean + unit length) ---
+    X_mean = X.mean(axis=1, keepdims=True)         # (N, 1)
+    X_demean = X - X_mean                          # (N, B)
+    X_norm = np.linalg.norm(X_demean, axis=1, keepdims=True)  # (N, 1)
+    X_zero = (X_norm == 0)                         # (N, 1)
+    X_unit = X_demean / np.where(X_norm == 0, 1.0, X_norm)    # (N, B)
+
+    # --- Cosine similarity (after MSAM normalisation) ---
+    # (N, K) matrix of dot products between pixel and each member
+    cos_sim = X_unit @ M_unit.T                    # (N, K)
+    cos_sim = np.clip(cos_sim, -1.0, 1.0)
+
+    # Inject NaNs where MSAM is undefined (zero norm vectors)
+    if X_zero.any():
+        cos_sim[X_zero[:, 0], :] = np.nan
+    if M_zero.any():
+        cos_sim[:, M_zero[:, 0]] = np.nan
+
+    # --- MSAM score: 1 - (angle / (pi/2)), so 1 = perfect match ---
+    # angle = arccos(cos_sim) in [0, pi]
+    angle = np.arccos(cos_sim)                     # (N, K), radians
+    msam_score = 1.0 - (angle / (np.pi / 2.0))     # (N, K)
+    # For invalid (NaN cos_sim), msam_score stays NaN
+
+    # --- Winner-takes-all selection ---
+    best_score = np.nanmax(msam_score, axis=1)     # (N,)
+    all_nan = np.isnan(best_score)
+
+    idx = np.empty_like(best_score, dtype=np.int32)
+    if (~all_nan).any():
+        idx[~all_nan] = np.nanargmax(msam_score[~all_nan], axis=1).astype(np.int32)
+    if all_nan.any():
+        idx[all_nan] = invalid_value
+
+    # --- Thresholding in MSAM space ---
+    # Keep only pixels with score > thresh, like your Pearson WTA.
+    keep = (best_score > float(thresh)) & (~np.isnan(best_score))
+    idx = np.where(keep, idx, invalid_value).astype(np.int32)
+
+    return idx.reshape(H, W), best_score.reshape(H, W).astype(np.float32)
 
 def kmeans_spectral_wrapper(data, clusters, iters):
     m, c = sp.kmeans(data, clusters, iters)

@@ -198,9 +198,12 @@ class MainRibbonController(QMainWindow):
         self.ribbon.add_tab('Visualise', [
             ("button", "Quick Cluster", self.act_kmeans),
             ("menu",   "Correlation", [
-                ("MineralMap (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors")),
-                ("Other…",            lambda: self.act_vis_correlation("other")),
-            ]),
+                ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors")),
+                ("MineralMap SAM (Winner-takes-all)", self.act_vis_sam),
+                ("MineralMap MSAM (Winner-takes-all)", self.act_vis_msam),
+                
+                
+               ]),
             ("menu",   "Features", self.extract_feature_list),
             ])
         # --- HOLE TAB ---
@@ -674,6 +677,41 @@ class MainRibbonController(QMainWindow):
         self.choose_view('vis')
 
         self.update_display(key=f'kmeans-{clusters}-{iters}INDEX')
+
+    def act_vis_sam(self):
+        print('this was called')
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
+            return
+        exemplars, coll_name = self.lib_page.get_collection_exemplars()
+        if not exemplars or not coll_name:
+            return
+        with busy_cursor('correlation...', self):
+            self.cxt.current = t.wta_min_map_SAM(self.cxt.current, exemplars, coll_name)
+
+        self.choose_view('vis')
+        self.update_display()
+        
+    def act_vis_msam(self):
+        print('this was called')
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
+            return
+        exemplars, coll_name = self.lib_page.get_collection_exemplars()
+        if not exemplars or not coll_name:
+            return
+        with busy_cursor('correlation...', self):
+            self.cxt.current = t.wta_min_map_MSAM(self.cxt.current, exemplars, coll_name)
+
+        self.choose_view('vis')
+        self.update_display()
+
 
     def _clear_all_canvas_refs(self):
         """Clear memmap references from all page canvases before saving."""

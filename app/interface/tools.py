@@ -289,7 +289,7 @@ def run_feature_extraction(obj, key):
 #TODO: currently these are held entirely in the scope of lib window and not persistes
 # think about adding as datasets -> need to consider the display window logic
 def quick_corr(obj, x, y):
-    if obj.is_raw():
+    if obj.is_raw:
         return None
     res_y = sf.resample_spectrum(x, y, obj.bands)
     return np.ma.masked_array(sf.numpy_pearson(obj.savgol_cr, sf.cr(res_y)), mask = obj.mask)
@@ -326,7 +326,7 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     labels    : list[str]
     """
     coll_name = coll_name.replace('_', '')
-    key_prefix = f"MinMap{coll_name}"
+    key_prefix = f"MinMap-pearson-{coll_name}"
     data = obj.savgol_cr
     bands_nm = obj.bands
     labels, bank = [], []
@@ -346,6 +346,89 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
 
     return obj
+
+
+def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
+    """
+    Compute a winner-takes-all Pearson class index and best-corr map.
+
+    Parameters
+    ----------
+    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    use_cr : bool
+        If True, continuum-removes each exemplar to match obj.savgol_cr.
+
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    coll_name = coll_name.replace('_', '')
+    key_prefix = f"MinMap-MSAM-{coll_name}"
+    data = obj.savgol_cr
+    bands_nm = obj.bands
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_wta_msam_strict(data, exemplar_stack)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+
+    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
+    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
+    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
+
+    return obj
+
+
+def wta_min_map_SAM(obj, exemplars, coll_name, mode='numpy'):
+    """
+    Compute a winner-takes-all Pearson class index and best-corr map.
+
+    Parameters
+    ----------
+    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    use_cr : bool
+        If True, continuum-removes each exemplar to match obj.savgol_cr.
+
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    coll_name = coll_name.replace('_', '')
+    key_prefix = f"MinMap-SAM-{coll_name}"
+    data = obj.savgol_cr
+    bands_nm = obj.bands
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_wta_sam_strict(data, exemplar_stack)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+
+    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
+    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
+    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
+
+    return obj
+
 
 def kmeans_caller(obj, clusters = 5, iters = 50):
     H,W,B = obj.savgol.shape
