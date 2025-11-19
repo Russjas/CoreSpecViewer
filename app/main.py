@@ -206,21 +206,43 @@ class MainRibbonController(QMainWindow):
                ]),
             ("menu",   "Features", self.extract_feature_list),
             ])
+        
         # --- HOLE TAB ---
+        self.extract_feature_list_multi = []
+        for key in feature_keys:
+            self.extract_feature_list_multi.append((key, lambda _, k=key: self.run_feature_extraction(k, multi=True)))
         self.ribbon.add_tab('Hole operations',[
                             ("button", "Previous", self.hole_prev_box),
                             ("button", "Next", self.hole_next_box),
                             ("button", "Return to Raw", self.hole_return_to_raw),
-                            ("button", "Save All", self.save_all_changes)
-
+                            ("menu",   "Fullhole Correlations", [
+                                ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors", multi=True)),
+                                ("MineralMap SAM (Winner-takes-all)", lambda: self.act_vis_sam( multi=True)),
+                                ("MineralMap MSAM (Winner-takes-all)", lambda: self.act_vis_msam(multi=True)),
+                               ]),
+                            ("menu",   "Fullhole Features", self.extract_feature_list_multi),
+                            ("button", "Save All", self.save_all_changes),
                             ])
 
     #======== UI methods ===============================================
+    def _clear_all_canvas_refs(self):
+        """Clear memmap references from all page canvases before saving."""
+        for page in self.page_list:
+            # Clear left canvas (SpectralImageCanvas)
+            if hasattr(page, 'left_canvas') and hasattr(page.left_canvas, 'clear_memmap_refs'):
+                page.left_canvas.clear_memmap_refs()
+
+            # Clear right canvas (ImageCanvas2D)
+            if hasattr(page, 'right_canvas') and hasattr(page.right_canvas, 'clear_memmap_refs'):
+                page.right_canvas.clear_memmap_refs()  
+    
+    
     def update_display(self, key = 'mask'):
         p = self._active_page()
         if hasattr(p, "cache"):
             p.add_to_cache(key)
         p.update_display(key = key)
+
 
     def _on_tab_changed(self, new_idx: int):
         """Handles user-initiated tab changes."""
@@ -240,7 +262,6 @@ class MainRibbonController(QMainWindow):
 
 
     def _distribute_context(self):
-
         for pg in self.page_list:
             pg.cxt = self.cxt
 
@@ -378,9 +399,6 @@ class MainRibbonController(QMainWindow):
             return
 
 
-
-
-
     def process_multi_raw(self):
         multi_box.run_multibox_dialog(self)
 
@@ -415,8 +433,6 @@ class MainRibbonController(QMainWindow):
         except Exception as e:
            QMessageBox.warning(self, "Save dataset", f"Failed to save dataset: {e}")
            return
-
-
 
 
     def save_as_clicked(self):
@@ -474,12 +490,13 @@ class MainRibbonController(QMainWindow):
 
     def automatic_crop(self):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Cropping", "No Current Scan")
             return
         with busy_cursor('cropping...', self):
             self.cxt.current = t.crop_auto(self.cxt.current)
         self._distribute_context()
         self.update_display()
+
 
     def process_raw(self):
         if self.cxt.current is None:
@@ -501,7 +518,6 @@ class MainRibbonController(QMainWindow):
                 self.cxt.current.metadata['box number'] = result['box']
                 self.cxt.current.metadata['core depth start'] = result['depth_from']
                 self.cxt.current.metadata['core depth stop'] = result['depth_to']
-
         try:
             with busy_cursor('processing...', self):
 
@@ -570,6 +586,7 @@ class MainRibbonController(QMainWindow):
         self._distribute_context()
         self.update_display()
 
+
     def act_mask_polygon(self):
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
@@ -577,9 +594,7 @@ class MainRibbonController(QMainWindow):
         p = self._active_page()
         if not p or not p.dispatcher or self.cxt.current is None:
             return
-
         def _on_finish(vertices_rc):
-
             self.cxt.current = t.mask_polygon(self.cxt.current, vertices_rc)
             self._distribute_context()
             self.update_display()
@@ -615,7 +630,18 @@ class MainRibbonController(QMainWindow):
         self.update_display(key='DholeAverage')
 
     # -------- VISUALISE actions --------
-    def run_feature_extraction(self, key):
+    def run_feature_extraction(self, key, multi = False):
+        if multi:
+            if self.cxt.ho is None: 
+                return
+            for po in self.cxt.ho:
+                new = t.run_feature_extraction(po, key)
+                po.save_all()
+                po.reload_all()
+                po.load_thumbs()
+            self._distribute_context()
+            self.update_display()
+            return
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
@@ -626,7 +652,22 @@ class MainRibbonController(QMainWindow):
         self.update_display()
 
 
-    def act_vis_correlation(self, kind: str):
+    def act_vis_correlation(self, kind: str, multi = False):
+        if multi:
+            if self.cxt.ho is None: 
+                return
+            exemplars, coll_name = self.lib_page.get_collection_exemplars()
+            if not exemplars or not coll_name:
+                return
+            with busy_cursor('correlation...', self):
+                for po in self.cxt.ho:
+                    new = t.wta_min_map(po, exemplars, coll_name)
+                    po.save_all()
+                    po.reload_all()
+                    po.load_thumbs()
+            self.choose_view('vis')
+            self.update_display()
+            return
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
@@ -642,44 +683,23 @@ class MainRibbonController(QMainWindow):
         self.choose_view('vis')
         self.update_display()
 
-    def act_kmeans(self):
-        if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+
+    def act_vis_sam(self, multi = False):
+        if multi:
+            if self.cxt.ho is None: 
+                return
+            exemplars, coll_name = self.lib_page.get_collection_exemplars()
+            if not exemplars or not coll_name:
+                return
+            with busy_cursor('correlation...', self):
+                for po in self.cxt.ho:
+                    new = t.wta_min_map_SAM(po, exemplars, coll_name)
+                    po.save_all()
+                    po.reload_all()
+                    po.load_thumbs()
+            self.choose_view('vis')
+            self.update_display()
             return
-        # Prompt for clusters
-        clusters, ok1 = QInputDialog.getInt(
-            self,
-            "KMeans Clustering",
-            "Enter number of clusters:",
-            value=5,          # default
-            min=1,
-            max=50
-        )
-
-        # If cancelled, abort
-        if not ok1:
-            return
-        # Prompt for iterations
-        iters, ok2 = QInputDialog.getInt(
-            self,
-            "KMeans Clustering",
-            "Enter number of iterations:",
-            value=50,         # default
-            min=1,
-            max=1000
-        )
-
-        if not ok2:
-            return
-
-        with busy_cursor('clustering...', self):
-            self.cxt.current = t.kmeans_caller(self.cxt.current, clusters, iters)
-        self.choose_view('vis')
-
-        self.update_display(key=f'kmeans-{clusters}-{iters}INDEX')
-
-    def act_vis_sam(self):
-        print('this was called')
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
@@ -694,8 +714,24 @@ class MainRibbonController(QMainWindow):
 
         self.choose_view('vis')
         self.update_display()
-        
-    def act_vis_msam(self):
+
+
+    def act_vis_msam(self, multi = False):
+        if multi:
+            if self.cxt.ho is None: 
+                return
+            exemplars, coll_name = self.lib_page.get_collection_exemplars()
+            if not exemplars or not coll_name:
+                return
+            with busy_cursor('correlation...', self):
+                for po in self.cxt.ho:
+                    new = t.wta_min_map_MSAM(po, exemplars, coll_name)
+                    po.save_all()
+                    po.reload_all()
+                    po.load_thumbs()
+            self.choose_view('vis')
+            self.update_display()
+            return
         print('this was called')
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
@@ -713,18 +749,42 @@ class MainRibbonController(QMainWindow):
         self.update_display()
 
 
-    def _clear_all_canvas_refs(self):
-        """Clear memmap references from all page canvases before saving."""
+    def act_kmeans(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
+        # Prompt for clusters
+        clusters, ok1 = QInputDialog.getInt(
+            self,
+            "KMeans Clustering",
+            "Enter number of clusters:",
+            value=5,          # default
+            min=1,
+            max=50
+        )
+    
+        # If cancelled, abort
+        if not ok1:
+            return
+        # Prompt for iterations
+        iters, ok2 = QInputDialog.getInt(
+            self,
+            "KMeans Clustering",
+            "Enter number of iterations:",
+            value=50,         # default
+            min=1,
+            max=1000
+        )
+    
+        if not ok2:
+            return
+    
+        with busy_cursor('clustering...', self):
+            self.cxt.current = t.kmeans_caller(self.cxt.current, clusters, iters)
+        self.choose_view('vis')
+    
+        self.update_display(key=f'kmeans-{clusters}-{iters}INDEX')
 
-
-        for page in self.page_list:
-            # Clear left canvas (SpectralImageCanvas)
-            if hasattr(page, 'left_canvas') and hasattr(page.left_canvas, 'clear_memmap_refs'):
-                page.left_canvas.clear_memmap_refs()
-
-            # Clear right canvas (ImageCanvas2D)
-            if hasattr(page, 'right_canvas') and hasattr(page.right_canvas, 'clear_memmap_refs'):
-                page.right_canvas.clear_memmap_refs()
 
             # --- HOLE actions ---
     def hole_next_box(self):
