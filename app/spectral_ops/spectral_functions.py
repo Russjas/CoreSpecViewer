@@ -176,6 +176,7 @@ def mk_thumb(
     basewidth: int = 800,
     mask: np.ndarray | None = None,
     index_mode: bool = False,
+    resize: bool = True
 ):
     """
     Create a PIL thumbnail image from an array.
@@ -211,17 +212,21 @@ def mk_thumb(
 
     # ---- to ndarray + sanity checks
     arr = np.asarray(arr)
+    print(arr.shape, 'shape check after asarray')
     checkpoint("after np.asarray(arr)")
 
     if arr.ndim not in (2, 3):
         raise ValueError(f"Unsupported array shape {arr.shape}; expected 2D or 3D.")
+        print('errored on ndims')
     if 0 in arr.shape:
+        print('errored on 0')
         raise ValueError(f"arr shape {arr.shape} cannot have a zero size dim")
 
     # ---- mask validation
     if mask is not None:
         mask = np.asarray(mask, dtype=bool)
         if mask.shape != arr.shape[:2]:
+            print(f'Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}.')
             raise ValueError(
                 f"Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}."
             )
@@ -357,7 +362,7 @@ def mk_thumb(
     im = Image.fromarray(rgb8, mode="RGB")
     checkpoint("after Image.fromarray")
 
-    if (new_w, new_h) != (w, h):
+    if (new_w, new_h) != (w, h) and resize:
         im = im.resize((new_w, new_h), Image.LANCZOS)
     checkpoint("after resize (LANCZOS)")
 

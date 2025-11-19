@@ -205,6 +205,7 @@ class MainRibbonController(QMainWindow):
                 
                ]),
             ("menu",   "Features", self.extract_feature_list),
+            ("button", "Generate Images", self.gen_images),
             ])
         
         # --- HOLE TAB ---
@@ -215,6 +216,7 @@ class MainRibbonController(QMainWindow):
                             ("button", "Previous", self.hole_prev_box),
                             ("button", "Next", self.hole_next_box),
                             ("button", "Return to Raw", self.hole_return_to_raw),
+                            ("button", "Quick Cluster", lambda: self.act_kmeans(multi = True)),
                             ("menu",   "Fullhole Correlations", [
                                 ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors", multi=True)),
                                 ("MineralMap SAM (Winner-takes-all)", lambda: self.act_vis_sam( multi=True)),
@@ -222,6 +224,7 @@ class MainRibbonController(QMainWindow):
                                ]),
                             ("menu",   "Fullhole Features", self.extract_feature_list_multi),
                             ("button", "Save All", self.save_all_changes),
+                            ("button", "Generate Images", lambda: self.gen_images(multi = True))
                             ])
 
     #======== UI methods ===============================================
@@ -327,30 +330,31 @@ class MainRibbonController(QMainWindow):
     def on_catalogue_activated(self, path):
         if not path:
             return
-        try:
-            loaded_obj = t.load(path)
-            if loaded_obj.is_raw:
-                self.cxt.current = loaded_obj
-                self.choose_view('raw')
-                self.update_display()
-            else:
-                self.cxt.current = loaded_obj
-                self.choose_view('vis')
-                self.update_display()
-            return
-        except Exception as e:
-            print(path,e)
+        with busy_cursor(self, 'Loading....'):
             try:
-                hole = HoleObject.build_from_parent_dir(path)
-                print('hole loaded')
-                self.cxt.ho = hole
-                self._distribute_context()
-                self.choose_view('hol')
-                self.update_display()
+                loaded_obj = t.load(path)
+                if loaded_obj.is_raw:
+                    self.cxt.current = loaded_obj
+                    self.choose_view('raw')
+                    self.update_display()
+                else:
+                    self.cxt.current = loaded_obj
+                    self.choose_view('vis')
+                    self.update_display()
                 return
             except Exception as e:
                 print(path,e)
-                return
+                try:
+                    hole = HoleObject.build_from_parent_dir(path)
+                    print('hole loaded')
+                    self.cxt.ho = hole
+                    self._distribute_context()
+                    self.choose_view('hol')
+                    self.update_display()
+                    return
+                except Exception as e:
+                    print(path,e)
+                    return
 
 
     def load_from_disk(self):
@@ -401,6 +405,24 @@ class MainRibbonController(QMainWindow):
 
     def process_multi_raw(self):
         multi_box.run_multibox_dialog(self)
+
+
+    def gen_images(self, multi = False):
+        if self.cxt is None:
+            return
+        if multi:
+            if self.cxt.ho is None:
+                return
+            for po in self.cxt.ho:
+                self.cxt.current.save_all()
+                po.export_images()
+                self.cxt.current.reload_all()
+                self.cxt.current.load_thumbs()
+            print('multi')
+        if self.cxt.po is None or self.cxt.current.is_raw:
+            return
+        self.cxt.current.export_images()
+        print('single')
 
 
     def save_clicked(self):
