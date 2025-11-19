@@ -1,7 +1,7 @@
 """
-Created on Mon Nov 17 11:37:07 2025
+UI page for displaying and interacting with RawObject data.
 
-@author: russj
+Shows RGB preview, allows reflectance conversion, and box-level operations.
 """
 
 from .base_page import BasePage
@@ -10,7 +10,7 @@ from .util_windows import SpectralImageCanvas
 
 class RawPage(BasePage):
     """
-    Mirrors your ProcessRaw composition:
+    
       left  = SpectralImageCanvas  (reflectance cube view, dbl-click spectra)
       right = ImageCanvas2D        (product/preview)
       third = InfoTable            (cache/status)

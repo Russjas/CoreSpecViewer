@@ -1,7 +1,8 @@
 """
-Created on Tue Nov 11 13:28:04 2025
+Tracks the active dataset context for the UI.
 
-@author: russj
+Holds the current RawObject, ProcessedObject, and HoleObject,
+and signals which object is currently active for visualisation or editing.
 """
 
 from dataclasses import dataclass

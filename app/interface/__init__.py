@@ -1,11 +1,5 @@
 """
-Created on Mon Nov 17 10:57:58 2025
-
-@author: russj
-"""
-
-"""
-CoreSpecViewer – Interface Package
+CoreSpecViewer Interface Package
 ==================================
 
 This package contains the lightweight interface layer that connects the

@@ -1,11 +1,8 @@
 """
-Created on Fri Nov 14 11:37:13 2025
+UI page for viewing multi-box holes and downhole data.
 
-@author: russj
+Allows selection of boxes, linking of datasets, and merged downhole outputs.
 """
-
-
-
 import sys
 
 import numpy as np

@@ -1,7 +1,5 @@
 """
-Created on Tue Nov 11 11:28:13 2025
-
-@author: russj
+Module for auto-processing multiple core-boxes unsupervised
 """
 
 

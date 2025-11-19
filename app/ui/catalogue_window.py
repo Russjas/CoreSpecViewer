@@ -1,7 +1,7 @@
 """
-Created on Sun Nov 16 18:21:56 2025
+Standalone window for browsing directories and selecting scan files.
 
-@author: russj
+Provides drive/root view and emits selection signals back to the UI.
 """
 from pathlib import Path
 

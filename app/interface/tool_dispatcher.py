@@ -1,4 +1,9 @@
+"""
+Dispatches UI actions to the correct data object.
 
+Maps button and interaction signals to tool functions,
+ensuring the correct object (Raw, Processed, Hole) receives the operation.
+"""
 
 
 class ToolDispatcher:

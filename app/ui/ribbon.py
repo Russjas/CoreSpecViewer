@@ -1,3 +1,9 @@
+"""
+Main toolbar (ribbon) used to trigger high-level spectral and mask tools.
+
+Provides button groups for crop, mask, processing, classification, and saving.
+"""
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,

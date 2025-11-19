@@ -1,7 +1,8 @@
 """
-Created on Mon Nov 17 11:37:08 2025
+UI page for visualising processed data.
 
-@author: russj
+Displays spectral products (RGB, masks, MWL maps, classifications)
+and provides pixel inspection tools.
 """
 
 from PyQt5.QtCore import Qt

@@ -1,7 +1,9 @@
 """
-Created on Mon Nov 17 09:26:57 2025
+Represents a processed hyperspectral dataset.
 
-@author: russj
+Stores derived products (reflectance, SAVGOL, CR, masks, MWL results,
+spectral maps) and supports temporary products, saving .npz outputs,
+and UI-friendly dataset access.
 """
 from dataclasses import dataclass, field
 from pathlib import Path

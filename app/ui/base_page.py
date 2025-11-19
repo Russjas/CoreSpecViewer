@@ -1,7 +1,7 @@
 """
-Created on Wed Oct 22 09:47:46 2025
+Base class for CoreSpecViewer pages.
 
-@author: russj
+Provides access to shared context, tool dispatch, and common UI layout helpers.
 """
 
 

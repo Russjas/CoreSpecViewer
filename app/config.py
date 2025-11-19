@@ -1,7 +1,8 @@
 """
-Created on Thu Nov 13 09:39:39 2025
+Global configuration dictionary and default parameters used across CoreSpecViewer.
 
-@author: russj
+Stores SAVGOL settings, directory rules, filtering thresholds, and UI behaviour
+flags shared by spectral and interface modules.
 """
 
 con_dict = {

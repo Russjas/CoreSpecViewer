@@ -1,7 +1,8 @@
 """
-Created on Mon Nov 17 09:26:57 2025
+Base dataset class with common behaviour for RawObject and ProcessedObject.
 
-@author: russj
+Stores metadata, paths, thumbnails, and utilities for saving/loading 
+NumPy-based spectral datasets.
 """
 
 from dataclasses import dataclass

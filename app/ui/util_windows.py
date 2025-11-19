@@ -1,7 +1,8 @@
 """
-Created on Tue Oct  7 12:11:50 2025
+Auxiliary pop-up windows and modal dialogues.
 
-@author: russj
+Contains file choosers, legend editors, statistics viewers, and interactive tools
+used outside and embedded in the main pages.
 """
 
 

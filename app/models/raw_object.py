@@ -1,9 +1,9 @@
 """
-Created on Mon Nov 17 09:26:58 2025
+Represents an unprocessed hyperspectral scan.
 
-@author: russj
+Holds radiance data, illumination references, wavelengths, and metadata.
+Provides reflectance conversion for further processing.
 """
-
 
 from collections import Counter
 from dataclasses import dataclass, field

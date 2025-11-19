@@ -1,9 +1,9 @@
 """
-Created on Mon Nov 17 11:37:08 2025
+Library page for working with spectral exemplar collections.
 
-@author: russj
+Supports importing, viewing, renaming, and exporting spectral libraries
+used for correlation and MSAM/WTA classification.
 """
-
 import os
 import sqlite3
 

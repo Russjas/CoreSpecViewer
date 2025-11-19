@@ -1,7 +1,8 @@
 """
-Created on Mon Nov 17 09:26:58 2025
+Container for multiple scanned core boxes belonging to a drill hole.
 
-@author: russj
+Manages ordering, metadata, merged downhole tables, and propagation of
+derived datasets between boxes.
 """
 from collections import Counter
 from collections.abc import Iterator
