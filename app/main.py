@@ -639,7 +639,8 @@ class MainRibbonController(QMainWindow):
                 po.save_all()
                 po.reload_all()
                 po.load_thumbs()
-            self._distribute_context()
+                
+            self.choose_view('hol')
             self.update_display()
             return
         if self.cxt.current is None:
@@ -648,7 +649,8 @@ class MainRibbonController(QMainWindow):
         print(key)
         with busy_cursor(f'extracting {key}...', self):
             self.cxt.current = t.run_feature_extraction(self.cxt.current, key)
-        self._distribute_context()
+        
+        self.choose_view('vis')
         self.update_display()
 
 
@@ -665,7 +667,8 @@ class MainRibbonController(QMainWindow):
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
-            self.choose_view('vis')
+                    
+            self.choose_view('hol')
             self.update_display()
             return
         if self.cxt.current is None:
@@ -697,7 +700,8 @@ class MainRibbonController(QMainWindow):
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
-            self.choose_view('vis')
+                    
+            self.choose_view('hol')
             self.update_display()
             return
         if self.cxt.current is None:
@@ -729,7 +733,8 @@ class MainRibbonController(QMainWindow):
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
-            self.choose_view('vis')
+                    
+            self.choose_view('hol')
             self.update_display()
             return
         print('this was called')
@@ -749,33 +754,38 @@ class MainRibbonController(QMainWindow):
         self.update_display()
 
 
-    def act_kmeans(self):
+    def act_kmeans(self, multi = False):
+        if multi:
+            if self.cxt.ho is None: 
+                return
+            clusters, ok1 = QInputDialog.getInt(self, "KMeans Clustering",
+                "Enter number of clusters:",value=5, min=1, max=50)
+            if not ok1:
+                return
+            iters, ok2 = QInputDialog.getInt(self, "KMeans Clustering",
+                "Enter number of iterations:", value=50, min=1, max=1000)
+            if not ok2:
+                return
+        
+            with busy_cursor('clustering...', self):
+                for po in self.cxt.ho:
+                    t.kmeans_caller(po, clusters, iters)
+                    po.save_all()
+                    po.reload_all()
+                    po.load_thumbs()
+                    self.update_display()
+            self.choose_view('hol')
+            self.update_display()
+            return
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
-        # Prompt for clusters
-        clusters, ok1 = QInputDialog.getInt(
-            self,
-            "KMeans Clustering",
-            "Enter number of clusters:",
-            value=5,          # default
-            min=1,
-            max=50
-        )
-    
-        # If cancelled, abort
+        clusters, ok1 = QInputDialog.getInt(self, "KMeans Clustering",
+            "Enter number of clusters:",value=5, min=1, max=50)
         if not ok1:
             return
-        # Prompt for iterations
-        iters, ok2 = QInputDialog.getInt(
-            self,
-            "KMeans Clustering",
-            "Enter number of iterations:",
-            value=50,         # default
-            min=1,
-            max=1000
-        )
-    
+        iters, ok2 = QInputDialog.getInt(self, "KMeans Clustering",
+            "Enter number of iterations:", value=50, min=1, max=1000)
         if not ok2:
             return
     
