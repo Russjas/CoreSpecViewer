@@ -309,12 +309,14 @@ class LibraryPage(BasePage):
                 self.spec_win_cr = SpectrumWindow(self)
 
             self.spec_win_cr.plot_spectrum(x_data*1000, t.get_cr(y_data), title)
+            self.spec_win_cr.ax.set_ylabel("CR Reflectance (Unitless)")
         else:
             title = f"Spectra for: {item_name} (ID: {sample_id})"
             if self.spec_win is None:
                 self.spec_win = SpectrumWindow(self)
     
             self.spec_win.plot_spectrum(x_data*1000, y_data, title)
+            
 
     def _selected_sample_ids(self):
         """Return list of SampleID values from selected rows."""
