@@ -86,7 +86,7 @@ class MainRibbonController(QMainWindow):
 
         self.setWindowTitle("CoreSpecViewer")
         self.resize(1400, 900)
-
+               
         # --- Data shared across modes (filled as user works) ---
         self.cxt = CurrentContext()
         self._catalogue_window = None

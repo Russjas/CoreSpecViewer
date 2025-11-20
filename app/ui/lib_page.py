@@ -40,6 +40,8 @@ class LibraryPage(BasePage):
         # State
         self.spec_win = None
         self.spec_win_cr = None
+        
+# ===== Attributes that can be offloaded to Manager
         self.db_path = None
         self.db = QSqlDatabase()   # placeholder; real one is created in open_database()
         self.model = None
@@ -546,15 +548,18 @@ class LibraryPage(BasePage):
             self.db.close()
             QSqlDatabase.removeDatabase(conn_name)
             return
-
+        
+        #Remain in Page======================================================
         self._proxy.setSourceModel(self.model)
         self.table_view.resizeColumnsToContents()
         self.db_path = path
         self.setWindowTitle(f"PyQt5 SQLite Viewer: {os.path.basename(path)}")
-
+        #======================================================================
+        #offload to manager
         # Reset per-DB state
         self.collection_ids.clear()
         self.collections.clear()
+        
         self._proxy.set_allowed_ids(None)
         self._refresh_collection_selector()
         if self.spec_win:

@@ -128,6 +128,7 @@ class VisualisePage(BasePage):
         """
         Ignore header rows; on item rows, open the product on the right canvas.
         """
+        
         it = self.table.item(row, 0)
         if not it:
             return
@@ -136,7 +137,9 @@ class VisualisePage(BasePage):
         key = it.text().strip()
         if not key:
             return
-
+        if key.endswith('CLUSTERS'):
+            #TODO: logic for interrogating cluster centers will go here
+            return
         self.update_display(key=key)
 
     def add_to_cache(self, key: str):
@@ -166,7 +169,7 @@ class VisualisePage(BasePage):
         # --- categorize keys from current cache ---
         base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
         unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
-        non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands" }
+        non_vis_suff = {'LEGEND',  "stats", "bands" }
         base = []
         unwrapped = []
         products = []
