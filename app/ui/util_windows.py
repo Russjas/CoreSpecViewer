@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib.widgets import PolygonSelector, RectangleSelector
 import numpy as np
-from PyQt5.QtCore import QSortFilterProxyModel, Qt, pyqtSignal
+from PyQt5.QtCore import QSortFilterProxyModel, Qt, pyqtSignal, QModelIndex
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -28,9 +28,11 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTableView,
     QToolBar,
     QVBoxLayout,
     QWidget,
+    
 )
 
 my_map = matplotlib.colormaps['viridis']
@@ -53,6 +55,17 @@ def busy_cursor(msg=None, window=None):
         QApplication.restoreOverrideCursor()
         if window and hasattr(window, "statusBar"):
             window.statusBar().clearMessage()
+
+class RightClick_Table(QTableView):
+    rightClicked = pyqtSignal(QModelIndex)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton:
+            index = self.indexAt(event.pos())
+            if index.isValid():
+                self.rightClicked.emit(index)
+            # Important: still pass it on so selection/focus/double-click logic works
+        super().mousePressEvent(event)
 
 
 class IdSetFilterProxy(QSortFilterProxyModel):

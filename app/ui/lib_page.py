@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import QComboBox, QFileDialog, QInputDialog, QMessageBox, Q
 
 from ..interface import tools as t
 from .base_page import BasePage
-from .util_windows import IdSetFilterProxy, ImageCanvas2D, SpectrumWindow, busy_cursor
+from .util_windows import IdSetFilterProxy, ImageCanvas2D, SpectrumWindow, busy_cursor, RightClick_Table
 
 # In the 'samples' table (which is displayed in the QTableView):
 ID_COLUMN_INDEX = 0   # Column containing SampleID (used for the lookup)
@@ -39,6 +39,7 @@ class LibraryPage(BasePage):
 
         # State
         self.spec_win = None
+        self.spec_win_cr = None
         self.db_path = None
         self.db = QSqlDatabase()   # placeholder; real one is created in open_database()
         self.model = None
@@ -76,11 +77,12 @@ class LibraryPage(BasePage):
 
 
         # Left pane = the table
-        self.table_view = QTableView(self)
+        self.table_view = RightClick_Table(self)
         self.table_view.setSortingEnabled(True)
         self.table_view.setSelectionBehavior(QTableView.SelectRows)
         self.table_view.setSelectionMode(QTableView.ExtendedSelection)
         self.table_view.doubleClicked.connect(self.handle_double_click)
+        self.table_view.rightClicked.connect(self.handle_right_click)
         self._add_left(self.table_view)
 
         self._proxy = IdSetFilterProxy(ID_COLUMN_INDEX, parent=self)
@@ -157,6 +159,26 @@ class LibraryPage(BasePage):
 
             self.display_spectra(sample_id, item_name)
 
+    
+    def handle_right_click(self, index):
+        if index.isValid():
+            m = self.table_view.model()
+            # 1. Get the SampleID (key for the spectra table)
+            id_index = m.index(index.row(), ID_COLUMN_INDEX)
+            sample_id = m.data(id_index)
+
+            # 2. Get the Name for the plot title
+            name_index = m.index(index.row(), NAME_COLUMN_INDEX)
+            item_name = m.data(name_index)
+
+            if sample_id is None:
+                QMessageBox.warning(self, "Error", "Could not retrieve SampleID.")
+                return
+
+            self.display_spectra(sample_id, item_name, hull_rem=True)
+        
+        
+        
     def correlate(self):
         if self.current_obj is None:
             QMessageBox.critical(self, "Selection error",
@@ -242,7 +264,7 @@ class LibraryPage(BasePage):
             corr_canvas.ax.set_title(f"{mineral_name} (ID: {sample_id})", fontsize=11)
 
 
-    def display_spectra(self, sample_id, item_name):
+    def display_spectra(self, sample_id, item_name, hull_rem = False):
         """Queries the spectra table, unpacks BLOBs using the correct dtype, and launches the plot window."""
         query = QSqlQuery(self.db)
         sql = (f"SELECT {WAVELENGTH_BLOB_COL}, {REFLECTANCE_BLOB_COL} "
@@ -281,11 +303,18 @@ class LibraryPage(BasePage):
             return
 
         # Launch the plot window
-        title = f"Spectra for: {item_name} (ID: {sample_id})"
-        if self.spec_win is None:
-            self.spec_win = SpectrumWindow(self)
+        if hull_rem:
+            title = f"CR Spectra for: {item_name} (ID: {sample_id})"
+            if self.spec_win_cr is None:
+                self.spec_win_cr = SpectrumWindow(self)
 
-        self.spec_win.plot_spectrum(x_data*1000, y_data, title)
+            self.spec_win_cr.plot_spectrum(x_data*1000, t.get_cr(y_data), title)
+        else:
+            title = f"Spectra for: {item_name} (ID: {sample_id})"
+            if self.spec_win is None:
+                self.spec_win = SpectrumWindow(self)
+    
+            self.spec_win.plot_spectrum(x_data*1000, y_data, title)
 
     def _selected_sample_ids(self):
         """Return list of SampleID values from selected rows."""

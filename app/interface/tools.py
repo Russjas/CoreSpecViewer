@@ -338,7 +338,9 @@ def unwrapped_output(obj):
     obj.add_temp_dataset('DholeDepths', dhole_depths, '.npy')
 
     return obj
-
+#==========pass through helpers===============================================
+def get_cr(spectra):
+    return sf.cr(spectra)
 
 #========= Reflectance interpretation tools ===================================
 
