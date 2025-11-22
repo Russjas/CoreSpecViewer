@@ -606,6 +606,15 @@ def wta_min_map_direct(arr, exemplars, bands,  mode='numpy'):
 
     return np.squeeze(index), np.squeeze(confidence)
 
+def match_spectra(spectra_x, spectra_y, bands_nm):
+    """
+    passthrough fuction for matching a spectrum to a band range
+    """
+    y_res = sf.resample_spectrum(np.asarray(spectra_x, float), np.asarray(spectra_y, float), bands_nm)
+    
+    return y_res
+
+
 
 def kmeans_caller(obj, clusters = 5, iters = 50):
     """

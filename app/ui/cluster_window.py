@@ -262,7 +262,64 @@ class ClusterWindow(BasePage):
         class_id = self._row_to_class_id(row)
         if col in (0, 1):
             self._show_cluster_spectrum(class_id)
+        if col in (2, 3):
+            if not self.matches_pearson:
+                return
+            self.show_show_lib_spec(class_id, 'pears')
+        if col in (4, 5):
+            if not self.matches_sam:
+                return
+            self.show_show_lib_spec(class_id, 'sam')
+        if col in (6, 7):
+            if not self.matches_msam:
+                return
+            self.show_show_lib_spec(class_id, 'msam')
         return
+
+    def show_show_lib_spec(self, class_id, kind = 'pears'):
+        if self.centres is None:
+            return
+        if class_id < 0 or class_id >= self.centres.shape[0]:
+            return
+
+        po = self.po
+        if po is None:
+            return
+        bands = getattr(po, "bands", None)
+        if kind == 'pears':
+            if not self.matches_pearson:
+                return
+            sample_id = self.matches_pearson[class_id][0]
+            if sample_id<0:
+                return
+            sample_name = self.cxt.library.get_sample_name(sample_id)
+            x_nm, y = self.cxt.library.get_spectrum(sample_id)
+        if kind == 'sam':
+            if not self.matches_sam:
+                return
+            sample_id = self.matches_sam[class_id][0]
+            if sample_id<0:
+                return
+            sample_name = self.cxt.library.get_sample_name(sample_id)
+            x_nm, y = self.cxt.library.get_spectrum(sample_id)
+        if kind == 'msam':
+            if not self.matches_msam:
+                return
+            sample_id = self.matches_msam[class_id][0]
+            if sample_id<0:
+                return
+            sample_name = self.cxt.library.get_sample_name(sample_id)
+            x_nm, y = self.cxt.library.get_spectrum(sample_id)
+        
+        
+        display_spectra = t.match_spectra(x_nm, y, bands)
+        title = f"CR Spectra for: {sample_name} (ID: {sample_id})"
+        if self.spec_win is None:
+            self.spec_win = SpectrumWindow(self)
+
+        self.spec_win.plot_spectrum(bands, t.get_cr(display_spectra), title)
+        self.spec_win.ax.set_ylabel("CR Reflectance (Unitless)")
+
 
     def _show_cluster_spectrum(self, class_id: int):
         """
@@ -317,12 +374,13 @@ class ClusterWindow(BasePage):
             return
         exemp_ids = list(exemplars.keys())
         index, score = t.wta_min_map_MSAM_direct(self.centres, exemplars, self.current_obj.bands)
+        match_ids = [exemp_ids[i] if i >= 0 else -999 for i in index]
         match_name = [
-                self.cxt.library.get_sample_name(exemp_ids[i]) if i > 0 else "No match"
+                self.cxt.library.get_sample_name(exemp_ids[i]) if i >= 0 else "No match"
                 for i in index
                 ]
         for i in range(self.centres.shape[0]):
-            self.matches_msam[i] = (index[i], match_name[i], score[i])
+            self.matches_msam[i] = (match_ids[i], match_name[i], score[i])
         self._update_matches_in_table()
         
         
@@ -345,14 +403,14 @@ class ClusterWindow(BasePage):
             return
         exemp_ids = list(exemplars.keys())
         index, score = t.wta_min_map_SAM_direct(self.centres, exemplars, self.current_obj.bands)
-        
+        match_ids = [exemp_ids[i] if i >= 0 else -999 for i in index]
         match_name = [
-                self.cxt.library.get_sample_name(exemp_ids[i]) if i > 0 else "No match"
+                self.cxt.library.get_sample_name(exemp_ids[i]) if i >= 0 else "No match"
                 for i in index
                 ]
         print(index, match_name)
         for i in range(self.centres.shape[0]):
-            self.matches_sam[i] = (index[i], match_name[i], score[i])
+            self.matches_sam[i] = (match_ids[i] if i >=0 else -999, match_name[i], score[i])
         self._update_matches_in_table()
         
     def _pearson_lib(self):
@@ -373,12 +431,13 @@ class ClusterWindow(BasePage):
             return
         exemp_ids = list(exemplars.keys())
         index, score = t.wta_min_map_direct(self.centres, exemplars, self.current_obj.bands)
+        match_ids = [exemp_ids[i] if i >= 0 else -999 for i in index]
         match_name = [
-                self.cxt.library.get_sample_name(exemp_ids[i]) if i > 0 else "No match"
+                self.cxt.library.get_sample_name(exemp_ids[i]) if i >= 0 else "No match"
                 for i in index
                 ]
         for i in range(self.centres.shape[0]):
-            self.matches_pearson[i] = (index[i], match_name[i], score[i])
+            self.matches_pearson[i] = (match_ids[i] if i >=0 else -999, match_name[i], score[i])
         self._update_matches_in_table()
 
     def _update_matches_in_table(self):
