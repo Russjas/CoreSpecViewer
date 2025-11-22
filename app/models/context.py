@@ -5,13 +5,14 @@ Holds the current RawObject, ProcessedObject, and HoleObject,
 and signals which object is currently active for visualisation or editing.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
 from .hole_object import HoleObject
 from .processed_object import ProcessedObject
 from .raw_object import RawObject
+from .lib_manager import LibraryManager
 
 
 @dataclass
@@ -39,6 +40,7 @@ class CurrentContext:
     _po: Optional["ProcessedObject"] = None
     _ro: Optional["RawObject"] = None
     _ho: Optional["HoleObject"] = None
+    library: LibraryManager = field(default_factory=LibraryManager)
     _review_log: Path | None = None
     _project_root: Path | None = None
     active: str | None = None

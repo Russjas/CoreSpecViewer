@@ -424,6 +424,40 @@ def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
 
     return obj
 
+def wta_min_map_MSAM_direct(arr, exemplars, bands,  mode='numpy'):
+    """
+    Compute a winner-takes-all MSAM class index and best-corr map.
+    This direct variation returns an array directly, rather than adding to the
+    model
+
+    Parameters
+    ----------
+    array : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    data = np.array(arr[np.newaxis,...])
+    bands_nm = np.array(bands)
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_wta_msam_strict(data, exemplar_stack)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+
+    return np.squeeze(index), np.squeeze(confidence)
+
 
 def wta_min_map_SAM(obj, exemplars, coll_name, mode='numpy'):
     """
@@ -462,6 +496,41 @@ def wta_min_map_SAM(obj, exemplars, coll_name, mode='numpy'):
     obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
 
     return obj
+
+
+def wta_min_map_SAM_direct(arr, exemplars, bands,  mode='numpy'):
+    """
+    Compute a winner-takes-all SAM class index and best-corr map.
+    This direct variation returns an array directly, rather than adding to the
+    model
+
+    Parameters
+    ----------
+    array : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    data = np.array(arr[np.newaxis,...])
+    bands_nm = np.array(bands)
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_wta_sam_strict(data, exemplar_stack)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+
+    return np.squeeze(index), np.squeeze(confidence)
 
 
 def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
@@ -503,6 +572,41 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     return obj
 
 
+def wta_min_map_direct(arr, exemplars, bands,  mode='numpy'):
+    """
+    Compute a winner-takes-all Pearson class index and best-corr map.
+    This direct variation returns an array directly, rather than adding to the
+    model
+
+    Parameters
+    ----------
+    array : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    data = np.array(arr[np.newaxis,...])
+    bands_nm = np.array(bands)
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_wta_strict(data, exemplar_stack)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+
+    return np.squeeze(index), np.squeeze(confidence)
+
+
 def kmeans_caller(obj, clusters = 5, iters = 50):
     """
     Calls an implementation of k-means using user-defined cluster and 
@@ -534,5 +638,16 @@ def kmeans_caller(obj, clusters = 5, iters = 50):
 
 
 
+def compute_pixel_counts(idx: np.ndarray, m: int) -> np.ndarray:
+    """
+    Count pixels per cluster ID using a H x W index map.
+    Negative IDs are treated as background and ignored.
+    """
+    flat = np.asarray(idx).ravel()
+    flat = flat[flat >= 0]
+    if flat.size == 0:
+        return np.zeros(m, dtype=int)
+    counts = np.bincount(flat, minlength=m)
+    return counts[:m]
 
 

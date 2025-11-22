@@ -13,7 +13,9 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib.widgets import PolygonSelector, RectangleSelector
+
 import numpy as np
+
 from PyQt5.QtCore import QSortFilterProxyModel, Qt, pyqtSignal, QModelIndex
 from PyQt5.QtWidgets import (
     QAction,
@@ -180,8 +182,6 @@ class InfoTable(QWidget):
         # Normal rows
         for k, v in d.items():
             self.add_row(k, v, editable=False)
-
-
 
 
 class ImageCanvas2D(QWidget):
@@ -571,9 +571,6 @@ class ClosableWidgetWrapper(QWidget):
         self.closed.emit(self)
 
 
-
-
-
 class SpectrumWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -611,6 +608,7 @@ class SpectrumWindow(QMainWindow):
 
     def closeEvent(self, ev):
         self.clear_all()
+
 
 class MetadataDialog(QDialog):
     def __init__(self, meta=None, parent=None):
@@ -651,6 +649,7 @@ class MetadataDialog(QDialog):
             "depth_from": self.from_edit.text().strip(),
             "depth_to": self.to_edit.text().strip(),
         }
+
 
 class AutoSettingsDialog(QDialog):
     def __init__(self, parent=None):
