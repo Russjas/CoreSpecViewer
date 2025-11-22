@@ -32,6 +32,7 @@ or call the top-level `main()` function to launch the full CoreSpecViewer GUI.
 """
 import sys
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -47,6 +48,7 @@ from PyQt5.QtWidgets import (
 
 from .interface import tools as t
 from .models import CurrentContext, HoleObject
+from .ui.cluster_window import ClusterWindow
 from .ui import (
     AutoSettingsDialog,
     CatalogueWindow,
@@ -90,6 +92,7 @@ class MainRibbonController(QMainWindow):
         # --- Data shared across modes (filled as user works) ---
         self.cxt = CurrentContext()
         self._catalogue_window = None
+        self.cluster_windows: list[ClusterWindow] = []
 
         # --- UI shell: ribbon + stacked pages ---
         central = QWidget(self)
@@ -145,8 +148,12 @@ class MainRibbonController(QMainWindow):
         self.hol_page = HolePage(self)
 
         self.hol_page.changeView.connect(lambda key: self.choose_view(key, force=True))
+        self.vis_page.clusterRequested.connect(self.open_cluster_window)
 
         self.page_list = [self.raw_page, self.vis_page, self.lib_page, self.hol_page]
+        #ensure pgs have correct context at start
+        self._distribute_context()
+        self.lib_page._find_default_database()
 
         self.tabs.addTab(self.raw_page, "Raw")
         self.tabs.addTab(self.vis_page, "Visualise")
@@ -652,6 +659,20 @@ class MainRibbonController(QMainWindow):
         self.update_display(key='DholeAverage')
 
     # -------- VISUALISE actions --------
+    
+    def ask_collection_name(self):
+        if not self.cxt.library:
+            return None
+        names = sorted(self.cxt.library.collections.keys())
+        if not names:
+            QMessageBox.information(self, "No collections", "Create a collection first via 'Add Selected → Collection'.")
+            return None
+        if len(names) == 1:
+            return names[0]
+        name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
+        return name if ok else None
+    
+    
     def run_feature_extraction(self, key, multi = False):
         if multi:
             if self.cxt.ho is None: 
@@ -679,13 +700,17 @@ class MainRibbonController(QMainWindow):
     def act_vis_correlation(self, kind: str, multi = False):
         if multi:
             if self.cxt.ho is None: 
+                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
                 return
-            exemplars, coll_name = self.lib_page.get_collection_exemplars()
-            if not exemplars or not coll_name:
+            name = self.ask_collection_name()
+            if not name:
+                return
+            exemplars = self.cxt.library.get_collection_exemplars(name)
+            if not exemplars:
                 return
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
-                    new = t.wta_min_map(po, exemplars, coll_name)
+                    new = t.wta_min_map(po, exemplars, name)
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -693,17 +718,21 @@ class MainRibbonController(QMainWindow):
             self.choose_view('hol')
             self.update_display()
             return
+        #======================================================================
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
             return
-        exemplars, coll_name = self.lib_page.get_collection_exemplars()
-        if not exemplars or not coll_name:
+        name = self.ask_collection_name()
+        if not name:
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
             return
         with busy_cursor('correlation...', self):
-            self.cxt.current = t.wta_min_map(self.cxt.current, exemplars, coll_name, kind)
+            self.cxt.current = t.wta_min_map(self.cxt.current, exemplars, name, kind)
 
         self.choose_view('vis')
         self.update_display()
@@ -712,13 +741,17 @@ class MainRibbonController(QMainWindow):
     def act_vis_sam(self, multi = False):
         if multi:
             if self.cxt.ho is None: 
+                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
                 return
-            exemplars, coll_name = self.lib_page.get_collection_exemplars()
-            if not exemplars or not coll_name:
+            name = self.ask_collection_name()
+            if not name:
+                return
+            exemplars = self.cxt.library.get_collection_exemplars(name)
+            if not exemplars:
                 return
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
-                    new = t.wta_min_map_SAM(po, exemplars, coll_name)
+                    new = t.wta_min_map_SAM(po, exemplars, name)
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -732,11 +765,14 @@ class MainRibbonController(QMainWindow):
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
             return
-        exemplars, coll_name = self.lib_page.get_collection_exemplars()
-        if not exemplars or not coll_name:
+        name = self.ask_collection_name()
+        if not name:
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
             return
         with busy_cursor('correlation...', self):
-            self.cxt.current = t.wta_min_map_SAM(self.cxt.current, exemplars, coll_name)
+            self.cxt.current = t.wta_min_map_SAM(self.cxt.current, exemplars, name)
 
         self.choose_view('vis')
         self.update_display()
@@ -745,13 +781,17 @@ class MainRibbonController(QMainWindow):
     def act_vis_msam(self, multi = False):
         if multi:
             if self.cxt.ho is None: 
+                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
                 return
-            exemplars, coll_name = self.lib_page.get_collection_exemplars()
-            if not exemplars or not coll_name:
+            name = self.ask_collection_name()
+            if not name:
+                return
+            exemplars = self.cxt.library.get_collection_exemplars(name)
+            if not exemplars:
                 return
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
-                    new = t.wta_min_map_MSAM(po, exemplars, coll_name)
+                    new = t.wta_min_map_MSAM(po, exemplars, name)
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -766,11 +806,14 @@ class MainRibbonController(QMainWindow):
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
             return
-        exemplars, coll_name = self.lib_page.get_collection_exemplars()
-        if not exemplars or not coll_name:
+        name = self.ask_collection_name()
+        if not name:
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
             return
         with busy_cursor('correlation...', self):
-            self.cxt.current = t.wta_min_map_MSAM(self.cxt.current, exemplars, coll_name)
+            self.cxt.current = t.wta_min_map_MSAM(self.cxt.current, exemplars, name)
 
         self.choose_view('vis')
         self.update_display()
@@ -921,7 +964,51 @@ class MainRibbonController(QMainWindow):
                 self.choose_view('hol')
                 self.update_display()
 
-
+#----------- manage ClusterWindow for interogating cluster centres-------------
+    def open_cluster_window(self, cluster_key: str):
+        """
+        Create a ClusterWindow for the given *CLUSTERS dataset key and
+        show it as a standalone window.
+    
+        Pinned to whatever self.cxt.current is at the moment of opening.
+        """
+        po = self.cxt.current
+        if po is None or getattr(po, "is_raw", False):
+            QMessageBox.information(
+                self,
+                "No processed box",
+                "You need a processed box selected before inspecting clusters.",
+            )
+            return
+    
+        win = ClusterWindow(
+            parent=self,
+            cxt=self.cxt,
+            po=po,
+            cluster_key=cluster_key,
+        )
+        win.setWindowFlag(Qt.Window, True)
+        win.setAttribute(Qt.WA_DeleteOnClose, True)
+        win.setWindowTitle(cluster_key)
+        # Keep a reference so it doesn't get GC'd
+        self.cluster_windows.append(win)
+    
+        # When Qt destroys the window, prune our list
+        win.destroyed.connect(
+            lambda _obj=None, w=win: self._on_cluster_window_destroyed(w)
+        )
+    
+        win.activate()  # BasePage.activate(): loads centres from pinned PO
+        win.show()
+        win.raise_()
+    
+    def _on_cluster_window_destroyed(self, win: ClusterWindow):
+        try:
+            self.cluster_windows.remove(win)
+        except ValueError:
+            pass
+    
+    
 def main():
     app = QApplication(sys.argv)
     win = MainRibbonController()

@@ -5,7 +5,7 @@ Displays spectral products (RGB, masks, MWL maps, classifications)
 and provides pixel inspection tools.
 """
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
 
 from .base_page import BasePage
@@ -14,11 +14,9 @@ from .util_windows import ImageCanvas2D, SpectralImageCanvas, SpectrumWindow
 
 class VisualisePage(BasePage):
     """
-    Mirrors WorkingWindow central content:
-      left  = SpectralImageCanvas  (master image; dbl-click spectra)
-      right = ImageCanvas2D        (derived product)
-      third = InfoTable            (cached products table)
+    Page for visualising derived content from core box scans
     """
+    clusterRequested = pyqtSignal(str)
     def __init__(self, parent=None):
         super().__init__(parent)
         self._add_left(SpectralImageCanvas(self))
@@ -120,10 +118,6 @@ class VisualisePage(BasePage):
         self.right_canvas.show_rgb(self.current_obj.get_data(key))
 
 
-
-
-
-
     def _on_row_activated(self, row: int, col: int):
         """
         Ignore header rows; on item rows, open the product on the right canvas.
@@ -139,6 +133,7 @@ class VisualisePage(BasePage):
             return
         if key.endswith('CLUSTERS'):
             #TODO: logic for interrogating cluster centers will go here
+            self.clusterRequested.emit(key)
             return
         self.update_display(key=key)
 
