@@ -1,3 +1,12 @@
+"""
+Cluster page for examing cluster centres returned from unsupervised clustering methods.
+
+Supports viewing cluster centre spectrum and classifying using correlation techniques.
+"""
+
+
+
+
 import numpy as np
 
 from PyQt5.QtCore import Qt
@@ -306,9 +315,10 @@ class ClusterWindow(BasePage):
         exemplars = self.cxt.library.get_collection_exemplars(name)
         if not exemplars:
             return
+        exemp_ids = list(exemplars.keys())
         index, score = t.wta_min_map_MSAM_direct(self.centres, exemplars, self.current_obj.bands)
         match_name = [
-                self.cxt.library.get_sample_name(i) if i > 0 else "No match"
+                self.cxt.library.get_sample_name(exemp_ids[i]) if i > 0 else "No match"
                 for i in index
                 ]
         for i in range(self.centres.shape[0]):
@@ -333,11 +343,14 @@ class ClusterWindow(BasePage):
         exemplars = self.cxt.library.get_collection_exemplars(name)
         if not exemplars:
             return
+        exemp_ids = list(exemplars.keys())
         index, score = t.wta_min_map_SAM_direct(self.centres, exemplars, self.current_obj.bands)
+        
         match_name = [
-                self.cxt.library.get_sample_name(i) if i > 0 else "No match"
+                self.cxt.library.get_sample_name(exemp_ids[i]) if i > 0 else "No match"
                 for i in index
                 ]
+        print(index, match_name)
         for i in range(self.centres.shape[0]):
             self.matches_sam[i] = (index[i], match_name[i], score[i])
         self._update_matches_in_table()
@@ -358,9 +371,10 @@ class ClusterWindow(BasePage):
         exemplars = self.cxt.library.get_collection_exemplars(name)
         if not exemplars:
             return
+        exemp_ids = list(exemplars.keys())
         index, score = t.wta_min_map_direct(self.centres, exemplars, self.current_obj.bands)
         match_name = [
-                self.cxt.library.get_sample_name(i) if i > 0 else "No match"
+                self.cxt.library.get_sample_name(exemp_ids[i]) if i > 0 else "No match"
                 for i in index
                 ]
         for i in range(self.centres.shape[0]):
