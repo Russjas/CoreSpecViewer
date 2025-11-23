@@ -74,8 +74,8 @@ class VisualisePage(BasePage):
                 title = "CR Spectrum Viewer"
                 self.spec_win.plot_spectrum(self.current_obj.bands, spec, title=title)
             self.dispatcher.set_right_click(_right_click, temporary=False)
-
-            self._set_cache()
+            self.refresh_cache_table()
+            
 
     def teardown(self):
         super().teardown()
@@ -99,7 +99,7 @@ class VisualisePage(BasePage):
             return
         self.left_canvas.show_rgb(self.current_obj.savgol, self.current_obj.bands)
 
-        self._set_cache()
+        self.refresh_cache_table()
 
         # Mineral map branch
         if key.endswith("INDEX"):
@@ -164,11 +164,14 @@ class VisualisePage(BasePage):
         # --- categorize keys from current cache ---
         base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
         unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
-        non_vis_suff = {'LEGEND',  "stats", "bands" }
+        non_vis_suff = {'LEGEND',  "stats", "bands", "metadata" }
         base = []
         unwrapped = []
         products = []
         non_vis = []
+        self.cache = set(self.current_obj.datasets.keys()) | set(self.current_obj.temp_datasets.keys())
+       
+        
         if self.current_obj is not None and not self.current_obj.is_raw:
             try:
                 table_title = f'{self.current_obj.metadata["borehole id"]} {self.current_obj.metadata["box number"]}'
@@ -226,18 +229,7 @@ class VisualisePage(BasePage):
 
         self.table.resizeRowsToContents()
 
-    def _set_cache(self):
-        keys = set(self.current_obj.datasets.keys()) | set(self.current_obj.temp_datasets.keys())
-        for key in keys:
-            try:
-                data = self.current_obj.get_data(key)  # only ndarray keys succeed
-            except KeyError:
-                continue
-
-            if hasattr(data, "shape") and getattr(data, "shape", ())[0] > 1:
-                self.cache.add(key)
-        self.refresh_cache_table()
-
+    
     def _bind_mpl(self, canvas, event, handler):
         cid = canvas.mpl_connect(event, handler)
         self._mpl_cids.append((canvas, cid))

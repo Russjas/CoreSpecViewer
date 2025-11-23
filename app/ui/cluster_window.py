@@ -62,9 +62,9 @@ class ClusterWindow(BasePage):
 
         self.centres: np.ndarray | None = None     # (m, B)
         self.pixel_counts: np.ndarray | None = None
-        self.matches_msam: dict[int, list[tuple[int, str, float]]] = {} # class_id -> [(label, score), ...]
-        self.matches_sam: dict[int, list[tuple[int,str, float]]] = {} # class_id -> [(label, score), ...]
-        self.matches_pearson: dict[int, list[tuple[int,str, float]]] = {} # class_id -> [(label, score), ...]
+        self.matches_msam: dict[int, tuple[int, str, float]] = {} # class_id : (lib_id, min name, confidence)
+        self.matches_sam: dict[int, tuple[int, str, float]] = {}
+        self.matches_pearson: dict[int, tuple[int, str, float]] = {}
 
         self._loaded: bool = False  # have we pulled data from self.po yet?
 
@@ -248,75 +248,61 @@ class ClusterWindow(BasePage):
     def _on_row_double_clicked(self, index):
         if not index.isValid():
             return
-        col_idx_map = {0 : "Class",
-        1 : "Pixels",
-        2 : "Pearson Match",
-        3 : "Pearson confidence",
-        4 : "SAM Match",
-        5 : "SAM confidence",
-        6 : "MSAM Match",
-        7 : "MSAM confidence",
-        8 : "User match"}
+    
         row = index.row()
         col = index.column()
         class_id = self._row_to_class_id(row)
+    
         if col in (0, 1):
             self._show_cluster_spectrum(class_id)
-        if col in (2, 3):
-            if not self.matches_pearson:
-                return
-            self.show_show_lib_spec(class_id, 'pears')
-        if col in (4, 5):
-            if not self.matches_sam:
-                return
-            self.show_show_lib_spec(class_id, 'sam')
-        if col in (6, 7):
-            if not self.matches_msam:
-                return
-            self.show_show_lib_spec(class_id, 'msam')
-        return
+            return
+    
+        metric_by_col = {
+            2: "pearson", 3: "pearson",
+            4: "sam",     5: "sam",
+            6: "msam",    7: "msam",
+        }
+    
+        metric = metric_by_col.get(col)
+        if metric is None:
+            return
+    
+        self._show_lib_spec(class_id, metric)
 
-    def show_show_lib_spec(self, class_id, kind = 'pears'):
-        if self.centres is None:
+    def _show_lib_spec(self, class_id: int, metric: str):
+        if self.centres is None or self.po is None or not self.cxt.library:
             return
-        if class_id < 0 or class_id >= self.centres.shape[0]:
+        if not (0 <= class_id < self.centres.shape[0]):
             return
-
-        po = self.po
-        if po is None:
+    
+        metric_map = {
+            "pearson": self.matches_pearson,
+            "sam": self.matches_sam,
+            "msam": self.matches_msam,
+        }
+        matches = metric_map.get(metric)
+        if not matches:
             return
-        bands = getattr(po, "bands", None)
-        if kind == 'pears':
-            if not self.matches_pearson:
-                return
-            sample_id = self.matches_pearson[class_id][0]
-            if sample_id<0:
-                return
-            sample_name = self.cxt.library.get_sample_name(sample_id)
-            x_nm, y = self.cxt.library.get_spectrum(sample_id)
-        if kind == 'sam':
-            if not self.matches_sam:
-                return
-            sample_id = self.matches_sam[class_id][0]
-            if sample_id<0:
-                return
-            sample_name = self.cxt.library.get_sample_name(sample_id)
-            x_nm, y = self.cxt.library.get_spectrum(sample_id)
-        if kind == 'msam':
-            if not self.matches_msam:
-                return
-            sample_id = self.matches_msam[class_id][0]
-            if sample_id<0:
-                return
-            sample_name = self.cxt.library.get_sample_name(sample_id)
-            x_nm, y = self.cxt.library.get_spectrum(sample_id)
-        
-        
+    
+        tup = matches.get(class_id)
+        if tup is None:
+            return
+    
+        sample_id, sample_name, _score = tup
+        if sample_id < 0:
+            return
+    
+        bands = getattr(self.po, "bands", None)
+        if bands is None:
+            return
+    
+        x_nm, y = self.cxt.library.get_spectrum(sample_id)
         display_spectra = t.match_spectra(x_nm, y, bands)
+    
         title = f"CR Spectra for: {sample_name} (ID: {sample_id})"
         if self.spec_win is None:
             self.spec_win = SpectrumWindow(self)
-
+    
         self.spec_win.plot_spectrum(bands, t.get_cr(display_spectra), title)
         self.spec_win.ax.set_ylabel("CR Reflectance (Unitless)")
 
@@ -356,89 +342,73 @@ class ClusterWindow(BasePage):
     # ------------------------------------------------------------------ #
     # Correlation to library                                             #
     # ------------------------------------------------------------------ #
+    def _select_collection_exemplars(self):
+        """Return (exemp_ids, exemplars, bands) or None if user cancels / no data."""
+        if not self.cxt.library:
+            return None
+    
+        names = sorted(self.cxt.library.collections.keys())
+        if not names:
+            QMessageBox.information(
+                self,
+                "No collections",
+                "Create a collection first via 'Add Selected → Collection'.",
+            )
+            return None
+    
+        if len(names) == 1:
+            name = names[0]
+        else:
+            name, ok = QInputDialog.getItem(
+                self, "Select Collection", "Collections:", names, 0, False
+            )
+            if not ok:
+                return None
+    
+        if not name:
+            return None
+    
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            return None
+    
+        exemp_ids = list(exemplars.keys())
+        bands = getattr(self.po, "bands", None)
+        if bands is None:
+            QMessageBox.warning(self, "No bands", "Pinned ProcessedObject has no 'bands' attribute.")
+            return None
+    
+        return exemp_ids, exemplars, bands
+    
+    def _run_lib_match(self, fn, match_store: dict[int, tuple[int, str, float]]):
+        if self.centres is None:
+            return
+    
+        sel = self._select_collection_exemplars()
+        if sel is None:
+            return
+        exemp_ids, exemplars, bands = sel
+    
+        index, score = fn(self.centres, exemplars, bands)
+    
+        for i, (idx_val, s) in enumerate(zip(index, score)):
+            if idx_val < 0:
+                match_store[i] = (-999, "No match", s)
+            else:
+                sample_id = exemp_ids[idx_val]
+                name = self.cxt.library.get_sample_name(sample_id)
+                match_store[i] = (sample_id, name, s)
+    
+        self._update_matches_in_table()
+    
     def _msam_lib(self):
-        if not self.cxt.library:
-            return
-        names = sorted(self.cxt.library.collections.keys())
-        if not names:
-            QMessageBox.information(self, "No collections", "Create a collection first via 'Add Selected → Collection'.")
-            return None
-        if len(names) == 1:
-            name =  names[0]
-        else:
-            name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
-        if not name:
-            return
-        exemplars = self.cxt.library.get_collection_exemplars(name)
-        if not exemplars:
-            return
-        exemp_ids = list(exemplars.keys())
-        index, score = t.wta_min_map_MSAM_direct(self.centres, exemplars, self.current_obj.bands)
-        match_ids = [exemp_ids[i] if i >= 0 else -999 for i in index]
-        match_name = [
-                self.cxt.library.get_sample_name(exemp_ids[i]) if i >= 0 else "No match"
-                for i in index
-                ]
-        for i in range(self.centres.shape[0]):
-            self.matches_msam[i] = (match_ids[i], match_name[i], score[i])
-        self._update_matches_in_table()
-        
-        
-        
+        self._run_lib_match(t.wta_min_map_MSAM_direct, self.matches_msam)
+    
     def _sam_lib(self):
-        if not self.cxt.library:
-            return
-        names = sorted(self.cxt.library.collections.keys())
-        if not names:
-            QMessageBox.information(self, "No collections", "Create a collection first via 'Add Selected → Collection'.")
-            return None
-        if len(names) == 1:
-            name =  names[0]
-        else:
-            name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
-        if not name:
-            return
-        exemplars = self.cxt.library.get_collection_exemplars(name)
-        if not exemplars:
-            return
-        exemp_ids = list(exemplars.keys())
-        index, score = t.wta_min_map_SAM_direct(self.centres, exemplars, self.current_obj.bands)
-        match_ids = [exemp_ids[i] if i >= 0 else -999 for i in index]
-        match_name = [
-                self.cxt.library.get_sample_name(exemp_ids[i]) if i >= 0 else "No match"
-                for i in index
-                ]
-        print(index, match_name)
-        for i in range(self.centres.shape[0]):
-            self.matches_sam[i] = (match_ids[i] if i >=0 else -999, match_name[i], score[i])
-        self._update_matches_in_table()
-        
+        self._run_lib_match(t.wta_min_map_SAM_direct, self.matches_sam)
+    
     def _pearson_lib(self):
-        if not self.cxt.library:
-            return
-        names = sorted(self.cxt.library.collections.keys())
-        if not names:
-            QMessageBox.information(self, "No collections", "Create a collection first via 'Add Selected → Collection'.")
-            return None
-        if len(names) == 1:
-            name =  names[0]
-        else:
-            name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
-        if not name:
-            return
-        exemplars = self.cxt.library.get_collection_exemplars(name)
-        if not exemplars:
-            return
-        exemp_ids = list(exemplars.keys())
-        index, score = t.wta_min_map_direct(self.centres, exemplars, self.current_obj.bands)
-        match_ids = [exemp_ids[i] if i >= 0 else -999 for i in index]
-        match_name = [
-                self.cxt.library.get_sample_name(exemp_ids[i]) if i >= 0 else "No match"
-                for i in index
-                ]
-        for i in range(self.centres.shape[0]):
-            self.matches_pearson[i] = (match_ids[i] if i >=0 else -999, match_name[i], score[i])
-        self._update_matches_in_table()
+        self._run_lib_match(t.wta_min_map_direct, self.matches_pearson)
 
     def _update_matches_in_table(self):
         """

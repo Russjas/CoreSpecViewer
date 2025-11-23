@@ -249,8 +249,6 @@ class MainRibbonController(QMainWindow):
     
     def update_display(self, key = 'mask'):
         p = self._active_page()
-        if hasattr(p, "cache"):
-            p.add_to_cache(key)
         p.update_display(key = key)
 
 
@@ -489,7 +487,7 @@ class MainRibbonController(QMainWindow):
 
     def undo_unsaved(self):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Undo", "No Current Scan")
             return
         self.cxt.current = t.reset(self.cxt.current)
         self._distribute_context()
