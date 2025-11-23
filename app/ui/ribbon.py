@@ -148,20 +148,72 @@ class Groups(QTabWidget):
     def _populate(self, bar: QToolBar, spec):
         """
         Populate the given toolbar with actions from the spec.
+    
+        Each entry in spec can be:
+    
+          ("button", label, callback)
+          ("button", label, callback, tooltip)
+    
+          ("menu", label, submenu_list)
+          ("menu", label, submenu_list, tooltip)
+    
+        where submenu_list is:
+          [
+            (sublabel, subcb),
+            (sublabel, subcb, subtooltip),
+            ...
+          ]
         """
-        for kind, label, payload in spec:
+        for entry in spec:
+            if not entry:
+                continue
+    
+            kind = entry[0]
+    
             if kind == "button":
+                # ("button", label, callback[, tooltip])
+                if len(entry) == 4:
+                    _kind, label, callback, tooltip = entry
+                else:
+                    _kind, label, callback = entry
+                    tooltip = None
+    
                 act = QAction(label, bar)
-                act.triggered.connect(payload)
+                act.triggered.connect(callback)
+                if tooltip:
+                    act.setToolTip(tooltip)
+                    act.setStatusTip(tooltip)
                 bar.addAction(act)
-
+    
             elif kind == "menu":
+                # ("menu", label, submenu_list[, tooltip])
+                if len(entry) == 4:
+                    _kind, label, submenu, tooltip = entry
+                else:
+                    _kind, label, submenu = entry
+                    tooltip = None
+    
                 top = QAction(label, bar)
+                if tooltip:
+                    top.setToolTip(tooltip)
+                    top.setStatusTip(tooltip)
+    
                 menu = QMenu(label, bar)
-                for sublabel, subcb in payload:
-                    sub = QAction(sublabel, bar)
-                    sub.triggered.connect(subcb)
-                    menu.addAction(sub)
+    
+                for sub in submenu:
+                    if len(sub) == 3:
+                        sublabel, subcb, subtip = sub
+                    else:
+                        sublabel, subcb = sub
+                        subtip = None
+    
+                    sub_act = QAction(sublabel, bar)
+                    sub_act.triggered.connect(subcb)
+                    if subtip:
+                        sub_act.setToolTip(subtip)
+                        sub_act.setStatusTip(subtip)
+                    menu.addAction(sub_act)
+    
                 top.setMenu(menu)
                 bar.addAction(top)
 

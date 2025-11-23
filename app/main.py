@@ -109,20 +109,26 @@ class MainRibbonController(QMainWindow):
         self.open_act = QAction("Open", self)
         self.open_act.setShortcut("Ctrl+O")
         self.open_act.triggered.connect(self.load_from_disk)
-
+        self.open_act.setToolTip("Open a raw, processed or hole dataset")
+        
         self.save_act = QAction("Save", self)
         self.save_act.setShortcut("Ctrl+S")
         self.save_act.triggered.connect(self.save_clicked)
+        self.save_act.setToolTip("Save the current working scan")
 
         self.save_as_act = QAction("Save As", self)
         self.save_as_act.triggered.connect(self.save_as_clicked)
+        self.save_as_act.setToolTip("Save the current working scan in a new location")
 
         self.undo_act = QAction("Undo", self)
         self.undo_act.setShortcut("Ctrl+Z")
         self.undo_act.triggered.connect(self.undo_unsaved)
+        self.undo_act.setToolTip("Removes ALL unsaved data")
 
         self.multibox_act = QAction("Process Raw Multibox", self)
         self.multibox_act.triggered.connect(self.process_multi_raw)
+        self.multibox_act.setToolTip("Select a directory to process All raw data inside")
+        
         everpresents = [self.open_act, self.multibox_act, self.save_act, self.save_as_act, self.undo_act]
 
         self.ribbon.add_global_actions(everpresents)
@@ -180,22 +186,21 @@ class MainRibbonController(QMainWindow):
         """Create actions for each tab; all callbacks route to controller methods."""
         # --- RAW TAB ---
         self.ribbon.add_tab('Raw',[
-            ("button", "Auto Crop", self.automatic_crop),
-            ("button", "Crop",        self.crop_current_image),
-
-            ("button", "Process",     self.process_raw),
+            ("button", "Auto Crop", self.automatic_crop, "Faster on Raw than Processed data.\nUses image analysis to automatically detect core box - NB. is very flaky"),
+            ("button", "Crop",        self.crop_current_image, "Faster on Raw than Processed data.\nManually crop the image"),
+            ("button", "Process",     self.process_raw, "Produce a processed dataset from this raw dataset"),
         ])
 
         # --- MASK TAB ---
         self.ribbon.add_tab('Masking', [
-            ("button", "New mask", lambda: self.act_mask_point('new')),
-            ("button", "Enhance mask", lambda: self.act_mask_point('enhance')),
-            ("button", "Mask line", lambda: self.act_mask_point('line')),
-            ("button", "Mask region", self.act_mask_rect),
-            ("button", "Freehand mask region", self.act_mask_polygon),
-            ("button", "Improve", self.act_mask_improve),
-            ("button", "Calc stats", self.act_mask_calc_stats),
-            ("button", "unwrap preview", self.unwrap)
+            ("button", "New mask", lambda: self.act_mask_point('new'), "Creates a blank mask,\n then masks by correlation with selected pixel."),
+            ("button", "Enhance mask", lambda: self.act_mask_point('enhance'), "Adds to existing mask by correlation with selected pixel"),
+            ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
+            ("button", "Mask region", self.act_mask_rect, "Adds a masked rectangle to existing mask"),
+            ("button", "Freehand mask region", self.act_mask_polygon, "With exising mask, masks all pixels outside of selected region"),
+            ("button", "Improve", self.act_mask_improve, "Heuristically improves the mask"),
+            ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping"),
+            ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom')
         ])
 
         # --- VISUALISE TAB ---
@@ -203,16 +208,16 @@ class MainRibbonController(QMainWindow):
         for key in feature_keys:
             self.extract_feature_list.append((key, lambda _, k=key: self.run_feature_extraction(k)))
         self.ribbon.add_tab('Visualise', [
-            ("button", "Quick Cluster", self.act_kmeans),
+            ("button", "Quick Cluster", self.act_kmeans, "Performs unsupervised k-means clustering"),
             ("menu",   "Correlation", [
-                ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors")),
-                ("MineralMap SAM (Winner-takes-all)", self.act_vis_sam),
-                ("MineralMap MSAM (Winner-takes-all)", self.act_vis_msam),
+                ("MineralMap Pearson (Winner-takes-all)", self.act_vis_correlation, "Performs Pearson correlation against selected collection from the library"),
+                ("MineralMap SAM (Winner-takes-all)", self.act_vis_sam, "Performs Spectral Angle Mapping against selected collection from the library"),
+                ("MineralMap MSAM (Winner-takes-all)", self.act_vis_msam, "Performs Modified Spectral Angle Mapping against selected collection from the library"),
                 
                 
                ]),
-            ("menu",   "Features", self.extract_feature_list),
-            ("button", "Generate Images", self.gen_images),
+            ("menu",   "Features", self.extract_feature_list, "Performs Minimum Wavelength Mapping"),
+            ("button", "Generate Images", self.gen_images, "Generates full size images of all products and base datasets in an outputs folder"),
             ])
         
         # --- HOLE TAB ---
@@ -220,12 +225,12 @@ class MainRibbonController(QMainWindow):
         for key in feature_keys:
             self.extract_feature_list_multi.append((key, lambda _, k=key: self.run_feature_extraction(k, multi=True)))
         self.ribbon.add_tab('Hole operations',[
-                            ("button", "Previous", self.hole_prev_box),
-                            ("button", "Next", self.hole_next_box),
-                            ("button", "Return to Raw", self.hole_return_to_raw),
+                            ("button", "Previous", self.hole_prev_box, "View previous box in hole"),
+                            ("button", "Next", self.hole_next_box, "View next box in hole"),
+                            ("button", "Return to Raw", self.hole_return_to_raw, "Open the raw dataset to replace this box"),
                             ("button", "Quick Cluster", lambda: self.act_kmeans(multi = True)),
                             ("menu",   "Fullhole Correlations", [
-                                ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation("gpt vectors", multi=True)),
+                                ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation(multi=True)),
                                 ("MineralMap SAM (Winner-takes-all)", lambda: self.act_vis_sam( multi=True)),
                                 ("MineralMap MSAM (Winner-takes-all)", lambda: self.act_vis_msam(multi=True)),
                                ]),
@@ -695,7 +700,7 @@ class MainRibbonController(QMainWindow):
         self.update_display()
 
 
-    def act_vis_correlation(self, kind: str, multi = False):
+    def act_vis_correlation(self, multi = False):
         if multi:
             if self.cxt.ho is None: 
                 QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
@@ -730,7 +735,7 @@ class MainRibbonController(QMainWindow):
         if not exemplars:
             return
         with busy_cursor('correlation...', self):
-            self.cxt.current = t.wta_min_map(self.cxt.current, exemplars, name, kind)
+            self.cxt.current = t.wta_min_map(self.cxt.current, exemplars, name)
 
         self.choose_view('vis')
         self.update_display()

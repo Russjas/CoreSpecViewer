@@ -137,15 +137,6 @@ class VisualisePage(BasePage):
             return
         self.update_display(key=key)
 
-    def add_to_cache(self, key: str):
-        if not key:
-            return
-
-        # single source of truth
-        self.cache.add(str(key))
-        # build grouped view from cache
-        self.refresh_cache_table()
-
     def remove_product(self, key: str):
         if key in self.cache:
             self.cache.discard(key)
