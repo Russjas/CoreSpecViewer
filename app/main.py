@@ -88,7 +88,7 @@ class MainRibbonController(QMainWindow):
 
         self.setWindowTitle("CoreSpecViewer")
         self.resize(1400, 900)
-               
+        
         # --- Data shared across modes (filled as user works) ---
         self.cxt = CurrentContext()
         self._catalogue_window = None
@@ -681,7 +681,7 @@ class MainRibbonController(QMainWindow):
             if self.cxt.ho is None: 
                 return
             for po in self.cxt.ho:
-                new = t.run_feature_extraction(po, key)
+                t.run_feature_extraction(po, key)
                 po.save_all()
                 po.reload_all()
                 po.load_thumbs()
@@ -713,7 +713,7 @@ class MainRibbonController(QMainWindow):
                 return
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
-                    new = t.wta_min_map(po, exemplars, name)
+                    t.wta_min_map(po, exemplars, name)
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -754,7 +754,7 @@ class MainRibbonController(QMainWindow):
                 return
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
-                    new = t.wta_min_map_SAM(po, exemplars, name)
+                    t.wta_min_map_SAM(po, exemplars, name)
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -794,7 +794,7 @@ class MainRibbonController(QMainWindow):
                 return
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
-                    new = t.wta_min_map_MSAM(po, exemplars, name)
+                    t.wta_min_map_MSAM(po, exemplars, name)
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -993,15 +993,23 @@ class MainRibbonController(QMainWindow):
         win.setWindowFlag(Qt.Window, True)
         win.setAttribute(Qt.WA_DeleteOnClose, True)
         win.setWindowTitle(cluster_key)
-        # Keep a reference so it doesn't get GC'd
         self.cluster_windows.append(win)
     
-        # When Qt destroys the window, prune our list
         win.destroyed.connect(
             lambda _obj=None, w=win: self._on_cluster_window_destroyed(w)
         )
     
-        win.activate()  # BasePage.activate(): loads centres from pinned PO
+        # ---- Half-screen-ish sizing ----
+        main_geo = self.geometry()
+        half_width = max(400, main_geo.width() // 2)
+    
+        # Resize to half width, full height
+        win.resize(half_width, main_geo.height())
+    
+        # Move it to the left side of the main window
+        win.move(main_geo.x(), main_geo.y())
+    
+        win.activate()
         win.show()
         win.raise_()
     
@@ -1015,5 +1023,5 @@ class MainRibbonController(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     win = MainRibbonController()
-    win.show()
+    win.showMaximized()  
     sys.exit(app.exec())

@@ -18,7 +18,6 @@ from PIL import Image
 import scipy as sc
 import spectral as sp
 import spectral.io.envi as envi
-
 from ..config import con_dict  # live shared dict
 
 my_map = matplotlib.colormaps['viridis']
@@ -1128,7 +1127,7 @@ def mineral_map_wta_msam_strict(data, members, thresh=0.70, invalid_value=-999):
 
     return idx.reshape(H, W), best_score.reshape(H, W).astype(np.float32)
 
-
+# ==== Clustering functions ===================================================
 def kmeans_spectral_wrapper(data, clusters, iters):
     """
     Run k-means clustering on spectral data using Spectral Python (SPy).
@@ -1140,6 +1139,7 @@ def kmeans_spectral_wrapper(data, clusters, iters):
     m, c = sp.kmeans(data, clusters, iters)
     return m, c
 
+# ==== minimim wavelenth mapping =============================================
 
 def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
                  thresh=0.2):
@@ -1367,6 +1367,12 @@ def est_peaks_cube_scipy(data, bands, wavrange=(2300, 2340)):
                 else:
                     arr[i,j] = -999
     return arr
+
+
+
+
+
+
 
 #=============Functions I dont think are actually called=======================
 
