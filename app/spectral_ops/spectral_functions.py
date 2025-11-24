@@ -1,7 +1,9 @@
 """
-Created on Tue Oct  7 16:46:18 2025
+Large, monolithic module for performing operations. A few of these functions are
+useless without the GUI (con_dict, slice_from_sensor), but the vast majority are
+UI agnostic and can be run on any hyperspectral cube in npy format.
 
-@author: russj
+NB. This will be broken up in a re-factor eventually.
 """
 import time
 import xml.etree.ElementTree as ET
@@ -906,6 +908,130 @@ def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
 
 #========= Functions for interpreting reflectance data ========================
 ##        Functions currently used in the app =================================
+
+def mineral_map_multirange(
+    cube: np.ndarray,            # (H, W, B_data)
+    exemplars: np.ndarray,       # (K, B_lib)
+    wl_data: np.ndarray,         # (B_data,)
+    #windows: list[tuple[float, float]],  # [(wmin, wmax), ...]
+    mode: str = "pearson",       # "pearson", "sam", "msam"
+    invalid_value: int = -999,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    windows = [
+        (1350, 1500),  # 1.4 µm OH / hydration
+        (1850, 2000),  # 1.9 µm H2O
+        (2140, 2230),  # Al-OH clays / micas
+        (2230, 2320),  # Mg/Fe-OH, chlorite/epidote/amphiboles
+        (2305, 2500),  # carbonates + Mg/Fe-OH long-λ structure
+    ]
+    """
+    Multi-range winner-takes-all mineral map.
+
+    For each wavelength window:
+      - resample library to instrument wavelengths (once),
+      - slice cube & library to that window,
+      - continuum-remove both,
+      - run the chosen minmap_wta_*_strict,
+      - keep the best score across windows per pixel.
+
+    The definition of "best" depends on the mode:
+
+      - pearson, msam: larger score = better match
+      - sam: smaller angle (degrees) = better match
+
+    Returns
+    -------
+    best_idx : (H, W) int
+        Index into exemplar stack, or invalid_value where no match.
+    best_score : (H, W) float
+        Score of the winning match in the metric's natural units:
+          - pearson: correlation coefficient
+          - msam   : 0..1 (1 = perfect)
+          - sam    : angle in degrees (0 = perfect)
+    best_window : (H, W) int
+        Index of the window that produced the winning match
+        (0..len(windows)-1), or -1 where no match.
+    """
+    H, W, B = cube.shape
+
+    # --- Choose underlying WTA function and comparison semantics ---
+    if mode == "pearson":
+        wta = mineral_map_wta_strict
+        # For Pearson, larger score is better, so initialise best_score very low.
+        best_score = np.full((H, W), -np.inf, dtype=np.float32)
+
+        def is_better(score_w: np.ndarray, best_score: np.ndarray) -> np.ndarray:
+            """Return mask where new score is better (Pearson: larger is better)."""
+            return score_w > best_score
+
+    elif mode == "msam":
+        wta = mineral_map_wta_msam_strict
+        # For MSAM, larger score is better (1 = perfect), same as Pearson.
+        best_score = np.full((H, W), -np.inf, dtype=np.float32)
+
+        def is_better(score_w: np.ndarray, best_score: np.ndarray) -> np.ndarray:
+            """Return mask where new score is better (MSAM: larger is better)."""
+            return score_w > best_score
+
+    elif mode == "sam":
+        wta = mineral_map_wta_sam_strict
+        # For SAM, smaller angle (degrees) is better, so initialise best_score very high.
+        best_score = np.full((H, W), np.inf, dtype=np.float32)
+
+        def is_better(score_w: np.ndarray, best_score: np.ndarray) -> np.ndarray:
+            """Return mask where new score is better (SAM: smaller angle is better)."""
+            return score_w < best_score
+
+    else:
+        raise ValueError(f"Unknown mode {mode!r}; expected 'pearson', 'sam' or 'msam'")
+
+    # --- Output arrays: index + winning window ---
+    best_idx = np.full((H, W), invalid_value, dtype=np.int32)
+    best_window = np.full((H, W), -1, dtype=np.int16)
+
+    # --- Resample library to instrument wavelengths once ---
+    
+    # ex_resampled: (K, B_data)
+
+    # --- Loop over wavelength windows ---
+    for w_idx, (wmin, wmax) in enumerate(windows):
+
+        # Select bands in this window
+        band_mask = (wl_data >= wmin) & (wl_data <= wmax)
+        if not np.any(band_mask):
+            # No bands in this range for this instrument; skip.
+            continue
+
+        cube_slice = cube[:, :, band_mask]          # (H, W, Bw)
+        ex_slice = exemplars[:, band_mask]       # (K, Bw)
+
+        cube_cr = cr(cube_slice)
+        ex_cr = cr(ex_slice)
+
+        # Run chosen strict WTA matcher on this window
+        idx_w, score_w = wta(
+            cube_cr,
+            ex_cr,
+            )
+
+        # Mask of pixels that have a valid match in this window
+        valid = idx_w != invalid_value
+        # Optional safety: ignore NaNs in score_w
+        valid &= np.isfinite(score_w)
+
+        # Decide where this window's match is better than the current best
+        better = valid & is_better(score_w, best_score)
+
+        # Update winners
+        best_idx[better] = idx_w[better]
+        best_score[better] = score_w[better]
+        best_window[better] = w_idx
+
+    return best_idx, best_score, best_window
+
+
+
+
 
 def mineral_map_wta_strict(data, exemplar_stack, thresh=0.70, invalid_value=-999):
     """

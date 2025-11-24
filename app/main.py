@@ -93,6 +93,7 @@ class MainRibbonController(QMainWindow):
         self.cxt = CurrentContext()
         self._catalogue_window = None
         self.cluster_windows: list[ClusterWindow] = []
+        self.legend_mapping_path = None
 
         # --- UI shell: ribbon + stacked pages ---
         central = QWidget(self)
@@ -213,6 +214,8 @@ class MainRibbonController(QMainWindow):
                 ("MineralMap Pearson (Winner-takes-all)", self.act_vis_correlation, "Performs Pearson correlation against selected collection from the library"),
                 ("MineralMap SAM (Winner-takes-all)", self.act_vis_sam, "Performs Spectral Angle Mapping against selected collection from the library"),
                 ("MineralMap MSAM (Winner-takes-all)", self.act_vis_msam, "Performs Modified Spectral Angle Mapping against selected collection from the library"),
+                ("Multi-range check (Winner-takes-all)", self.act_vis_multirange, "Performs custom multi-window matching"),
+                ("Re-map legends", self._remap_legends)
                 
                 
                ]),
@@ -780,6 +783,56 @@ class MainRibbonController(QMainWindow):
         self.choose_view('vis')
         self.update_display()
 
+    def act_vis_multirange(self, multi = False):
+        modes = ['pearson', 'sam', 'msam']
+        if multi:
+            if self.cxt.ho is None: 
+                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
+                return
+            name = self.ask_collection_name()
+            if not name:
+                return
+            exemplars = self.cxt.library.get_collection_exemplars(name)
+            if not exemplars:
+                return
+            mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
+            if not ok or not mode:
+                return
+            with busy_cursor('correlation...', self):
+                for po in self.cxt.ho:
+                    t.wta_multi_range_minmap(po, exemplars, name, mode=mode)
+                    po.save_all()
+                    po.reload_all()
+                    po.load_thumbs()
+                    
+            self.choose_view('hol')
+            self.update_display()
+            return
+        
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
+            return
+        name = self.ask_collection_name()
+        if not name:
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            return
+        
+        mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
+        if not ok or not mode:
+            return
+        with busy_cursor('correlation...', self):
+            self.cxt.current = t.wta_multi_range_minmap(self.cxt.current, exemplars, name, mode=mode)
+
+        self.choose_view('vis')
+        self.update_display()
+        
+        
+        
 
     def act_vis_msam(self, multi = False):
         if multi:
@@ -863,6 +916,41 @@ class MainRibbonController(QMainWindow):
     
         self.update_display(key=f'kmeans-{clusters}-{iters}INDEX')
 
+    def _remap_legends(self):
+        if self.legend_mapping_path is None:
+            QMessageBox.information(
+            self,
+            "Legend remapping",
+            "Legend remapping groups detailed spectral hits into "
+            "interpretable mineral classes.\n\n"
+            "You can choose *any* JSON file that defines these classes.\n"
+            "A recommended default lives in the 'resources' folder.\n\n"
+            "Please select a remapping file now."
+        )
+
+        # Default directory for the QFileDialog
+        
+
+            path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Select legend mapping JSON",
+                ".",
+                "JSON files (*.json)"
+            )
+            if not path:
+                return  # user cancelled — do nothing safely
+            self.legend_mapping_path = path
+        
+        if self.cxt.current is None or self.cxt.current.is_raw:
+            QMessageBox.warning(self, "Open dataset", f"There is no processed dataset loaded")
+        #try:
+        self.cxt.current = t.clean_legends(self.cxt.current, self.legend_mapping_path)
+        #except Exception as e:
+            #QMessageBox.warning(self, "Failed operation", f"Failed to remap legends: {e}")
+            #return
+        self._distribute_context()
+        self.update_display()
+        
 
             # --- HOLE actions ---
     def hole_next_box(self):

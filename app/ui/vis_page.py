@@ -115,7 +115,11 @@ class VisualisePage(BasePage):
                 return
 
         # Fallback for everything else
-        self.right_canvas.show_rgb(self.current_obj.get_data(key))
+        try:
+            disp_data = self.current_obj.get_data(key)
+        except KeyError:
+            return
+        self.right_canvas.show_rgb(disp_data)
 
 
     def _on_row_activated(self, row: int, col: int):
@@ -155,7 +159,7 @@ class VisualisePage(BasePage):
         # --- categorize keys from current cache ---
         base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
         unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
-        non_vis_suff = {'LEGEND',  "stats", "bands", "metadata" }
+        non_vis_suff = {'LEGEND',  "stats", "bands", "metadata", "MAPPING" }
         base = []
         unwrapped = []
         products = []

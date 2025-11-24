@@ -10,6 +10,7 @@ import numpy as np
 from .. import config
 from ..models import ProcessedObject, RawObject
 from ..spectral_ops import spectral_functions as sf
+from ..spectral_ops import remap_legend as rl
 
 #======Getting and setting app configs ========================================
 
@@ -385,6 +386,31 @@ def _colorize_indexed(class_idx: np.ndarray, labels: list[str]):
     return rgb, colors_rgb
 
 
+def wta_multi_range_minmap(obj, exemplars, coll_name, mode='pearson'):
+    coll_name = coll_name.replace('_', '')
+    key_prefix = f"MinMapMulti-{mode}-{coll_name}"
+    data = obj.savgol
+    bands_nm = obj.bands
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    best_idx, best_score, best_window = sf.mineral_map_multirange(data,
+                                                               exemplar_stack,
+                                                               bands_nm,
+                                                               mode=mode
+                                                               )
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+    obj.add_temp_dataset(f"{key_prefix}INDEX", best_idx.astype(np.int16),  ".npy")
+    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
+    obj.add_temp_dataset(f'{key_prefix}CONF', best_score, '.npy',)
+    obj.add_temp_dataset(f'{key_prefix}WINDOW', best_window, '.npy')
+    
+    return obj
 
 def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
     """
@@ -605,6 +631,41 @@ def wta_min_map_direct(arr, exemplars, bands,  mode='numpy'):
     legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
 
     return np.squeeze(index), np.squeeze(confidence)
+
+
+def clean_legends(obj, onto_path):
+    """
+    Function for creating new mineral mapping datasets with ontologically re-mapped
+    legends. A default ontology is provided, but the path to it, or to user created mapping
+    must be supplied
+    """
+    
+    for key in obj.keys():
+        if key.endswith('LEGEND'):
+            leg_key = key
+            base_key = key[:-6]
+            ind_key = key[:-6] + "INDEX"
+            print(ind_key)
+            index_array = obj[ind_key].data
+            
+            legend = obj[leg_key].data
+                        
+            new_index, new_legend, debug_map = rl.remap_index_with_ontology(
+                index_array=index_array,
+                legend = legend,
+                ontology_path = onto_path,
+                keep_unmatched_as_original = False,
+                unknown_label = "Unclassified"
+            )
+            clean_key_prefix = base_key+"-clean-"
+            obj.add_temp_dataset(f"{clean_key_prefix}INDEX", new_index.astype(np.int16),  ".npy")
+            obj.add_temp_dataset(f"{clean_key_prefix}LEGEND", new_legend, ".json")
+            obj.add_temp_dataset(f'{clean_key_prefix}MAPPING', debug_map, '.json')
+    return obj
+
+
+
+
 
 def match_spectra(spectra_x, spectra_y, bands_nm):
     """

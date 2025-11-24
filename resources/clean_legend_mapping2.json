@@ -1,0 +1,696 @@
+{
+  "Al-OH clay/mica": {
+    "classes": {
+      "Kaolin group": {
+        "members": [
+          "Dickite Al_2Si_2O_5(OH)_4",
+          "Kaolinite Al2Si2O5(OH)4",
+          "Kaolinite Al_2Si_2O_5(OH)_4"
+        ],
+        "patterns": [
+          "dickite",
+          "kaolinite"
+        ]
+      },
+      "Pyrophyllite": {
+        "members": [
+          "Pyrophyllite Al2Si4010(OH)2",
+          "Pyrophyllite Al_2Si_4O_10(OH)_2"
+        ],
+        "patterns": [
+          "pyrophyllite"
+        ]
+      },
+      "Smectite": {
+        "members": [
+          "Montmorillonite (Na,Ca)0.33(Al,Mg)2Si4O10(OH)2.nH2O",
+          "Montmorillonite (Na,Ca)_0.33(Al,Mg)_2Si_4O_10(OH)_2.H_2O",
+          "Nontronite Na0.33Fe2+3(Si,Al)4O10.3H2O",
+          "Nontronite Na_0.33Fe_2^3+(Si,Al)_4O_10(OH)_2.H_2O",
+          "Saponite (Ca/2,Na)0.33(Mg,Fe+2)3(Si,Al)4O10(OH)2.H2O",
+          "Saponite (Ca/2,Na)_0.33(Mg,Fe^2+)_3(Si,Al)_4O_10(OH)_2.4H_2O",
+          "Smectite Na0.33Fe2+3(Si,Al)4 O10.3H2O",
+          "Vermiculite (Mg,Fe+2,Al)3(Al,Si)4O10(OH)2.4H2O",
+          "Vermiculite (Mg,Fe^2+,Al)_3(Al,Si)_4O_10(OH)_2.4H_2O"
+        ],
+        "patterns": [
+          "montmorillonite",
+          "nontronite",
+          "saponite",
+          "smectite",
+          "vermiculite"
+        ]
+      },
+      "White mica": {
+        "members": [
+          "Buddingtonite (Feldspar) (NH_4)AlSi_3O_8.0.5H_2O",
+          "Glauconite (K,Na)(Fe^3+,Al,Mg)_2(Si,Al)_4O_10(OH)_2",
+          "Illite (K,H3O)(Al,Mg,Fe)2(Si,Al)4O10[(OH)2,H2O]",
+          "Illite (K,H_3O)(Al,Mg,Fe)_2(Si,Al)_4O_10((OH)_2,H_2O)",
+          "Muscovite KAl2(Si3Al)O10(OH,F)2",
+          "Muscovite KAl_2(Si_3Al)O_10(OH,F)_2"
+        ],
+        "patterns": [
+          "buddingtonite",
+          "glauconite",
+          "illite",
+          "muscovite"
+        ]
+      }
+    }
+  },
+  "Arsenate": {
+    "classes": {
+      "non-swir": {
+        "members": [
+          "Mimetite Pb_5(AsO_4)_3Cl",
+          "Scorodite Fe^3+AsO_4.2H_2O"
+        ],
+        "patterns": [
+          "mimetite",
+          "scorodite"
+        ]
+      }
+    }
+  },
+  "Borate": {
+    "classes": {
+      "non-swir": {
+        "members": [
+          "Borax Na_2B_4O_5(OH)_4.8H_2O",
+          "Colemanite Ca_2B_6O_11.5H_2O",
+          "Howlite Ca_2B_5SiO_9(OH)_5",
+          "Inderite MgB3O3(OH)5 * 5H2O",
+          "Kaliborite KHMg2B12O16(OH)10 * 4H2O",
+          "Kernite  Na2B4O6(OH)2 * 3H2O",
+          "Kernite Na_2B_4O_6(OH)_2.3H_2O",
+          "Meyerhofferite Ca2B6O6(OH)10 * H2O",
+          "Pinnoite MgB2O4 * 3H2O",
+          "Rivadavite Na6MgB24O40 * 22H2O",
+          "Tincalconite Na_2B_4O_5(OH)_4.3H_2O",
+          "Ulexite NaCaB5O6(OH)6 * 5H2O",
+          "Ulexite NaCaB_5O_6(OH)_6.5H_2O"
+        ],
+        "patterns": [
+          "borax",
+          "colemanite",
+          "howlite",
+          "inderite",
+          "kaliborite",
+          "kernite",
+          "meyerhofferite",
+          "pinnoite",
+          "rivadavite",
+          "tincalconite",
+          "ulexite"
+        ]
+      }
+    }
+  },
+  "Carbonate": {
+    "classes": {
+      "Alkali carbonate": {
+        "members": [
+          "Burkeite Na6(CO3)(SO4)2",
+          "Gaylussite Na2Ca(CO3)2 * 5H2O",
+          "Natron Na2CO3\u00b710H2O",
+          "Trona Na3(CO)(HCO3) * 2H2O",
+          "Trona Na_3(CO_3)(HCO_3).2H_2O"
+        ],
+        "patterns": [
+          "burkeite",
+          "gaylussite",
+          "natron",
+          "trona"
+        ]
+      },
+      "Calcite": {
+        "members": [
+          "Aragonite CaCO3",
+          "Calcite CaCO3",
+          "Calcite CaCO_3"
+        ],
+        "patterns": [
+          "aragonite",
+          "calcite"
+        ]
+      },
+      "Cu carbonate": {
+        "members": [
+          "Azurite Cu_3(CO_3)_2(OH)_2",
+          "Malachite Cu_2(CO_3)(OH)_2"
+        ],
+        "patterns": [
+          "azurite",
+          "malachite"
+        ]
+      },
+      "Dolomite": {
+        "members": [
+          "Dolomite CaMg(CO3)2",
+          "Dolomite CaMg(CO_3)_2"
+        ],
+        "patterns": [
+          "dolomite"
+        ]
+      },
+      "Fe\u2013Mn carbonate": {
+        "members": [
+          "Rhodochrosite MnCO_3",
+          "Siderite Fe^2+CO_3"
+        ],
+        "patterns": [
+          "rhodochrosite",
+          "siderite"
+        ]
+      },
+      "Indistinct Carbonate": {
+        "members": [
+          "Cerussite PbCO_3",
+          "Cerussite, PbCO3",
+          "Smithsonite PbCO_3"
+        ],
+        "patterns": [
+          "cerussite",
+          "smithsonite"
+        ]
+      },
+      "Indistinct carbonate": {
+        "members": [
+          "Magnesite MgCO_3"
+        ],
+        "patterns": [
+          "magnesite"
+        ]
+      },
+      "Sr/Ba carbonate": {
+        "members": [
+          "Strontianite SrCO_3",
+          "Witherite BaCO_3"
+        ],
+        "patterns": [
+          "strontianite",
+          "witherite"
+        ]
+      }
+    }
+  },
+  "Chloride": {
+    "classes": {
+      "Indistinct Chloride": {
+        "members": [
+          "Carnallite KMgCl3 * 6H2O",
+          "Kainite MgSO4 * KCL * 3H2O"
+        ],
+        "patterns": [
+          "carnallite",
+          "kainite"
+        ]
+      }
+    }
+  },
+  "Element": {
+    "classes": {
+      "non-swir": {
+        "members": [
+          "Graphite C",
+          "Sulphur S"
+        ],
+        "patterns": [
+          "graphite",
+          "sulphur"
+        ]
+      }
+    }
+  },
+  "Halide": {
+    "classes": {
+      "non-swire": {
+        "members": [
+          "Atacamite Cu_2Cl(OH)_3",
+          "AtacamiteCu_2Cl(OH)_3",
+          "Cryolite Na_3AlF_6",
+          "Fluorite CaF2",
+          "Fluorite CaF_2",
+          "Halite NaCl"
+        ],
+        "patterns": [
+          "atacamite",
+          "atacamitecu_2cl(oh)_3",
+          "cryolite",
+          "fluorite",
+          "halite"
+        ]
+      }
+    }
+  },
+  "Hydroxide": {
+    "classes": {
+      "Indistinct Hydroxide": {
+        "members": [
+          "Brucite Mg(OH)_2",
+          "Gibbsite Al(OH)_3",
+          "Goethite a-Fe+3O(OH)",
+          "Goethite alpha Fe^3+O(OH)"
+        ],
+        "patterns": [
+          "brucite",
+          "gibbsite",
+          "goethite"
+        ]
+      }
+    }
+  },
+  "Mg-Fe silicate": {
+    "classes": {
+      "Amphibole": {
+        "members": [
+          "Actinolite Ca_2(Mg,Fe^2+)_5Si_8O_22(OH)_2",
+          "Anthophyllite (Mg,Fe^2+)_7Si_8O_22(OH)_2",
+          "Glaucophane Na_2(Mg,Fe^2+)_3Al_2Si_8O_22(OH)_2",
+          "Hornblende Ca2(Fe+2,Mg)4Al(Si7Al)O22(OH,F)2",
+          "Hornblende Ca2(Fe2+,Mg)4Al(Si7,Al)O22(OH,F)2",
+          "Tremolite Ca2(Mg, Fe+2)5Si8O22(OH)2",
+          "Tremolite Ca_2(Mg,Fe^2+)_5Si_8O_22(OH)_2"
+        ],
+        "patterns": [
+          "actinolite",
+          "anthophyllite",
+          "glaucophane",
+          "hornblende",
+          "tremolite"
+        ]
+      },
+      "Chlorite group": {
+        "members": [
+          "Chlorite",
+          "Chlorite (Mg,Al)_6(Si,Al)_4O_10(OH)_8",
+          "Clinochlore (Chlorite) (Mg,Al)_6(Si,Al)_4O_10(OH)_8",
+          "Clinochlore (Fe+2,Mg)5Al(Si3Al)O10(OH)8",
+          "Clinochlore (Mg,Fe+2)5Al(Si3Al)O10(OH)8"
+        ],
+        "patterns": [
+          "chlorite",
+          "clinochlore"
+        ]
+      },
+      "Olivine": {
+        "members": [
+          "Fayalite Fe_2SiO_4",
+          "Forsterite Mg_2SiO_4",
+          "Olivine (Fo11) (Fe+2,Mg)2SiO4",
+          "Olivine (Fo18) (Fe+2,Mg)2SiO4",
+          "Olivine (Fo29) (Fe+2,Mg)2SiO4",
+          "Olivine (Fo41) (Fe+2,Mg)2SiO4",
+          "Olivine (Fo51) (Fe+2,Mg)2SiO4",
+          "Olivine (Fo60) (Fe+2,Mg)2SiO4",
+          "Olivine (Fo66) (Fe+2,Mg)2SiO4",
+          "Olivine (Fo88) (Fe+2,Mg)2SiO4",
+          "Olivine (Fo92) (Fe+2,Mg)2SiO4"
+        ],
+        "patterns": [
+          "fayalite",
+          "forsterite",
+          "olivine"
+        ]
+      },
+      "Pyroxene": {
+        "members": [
+          "Acmite NaFe+3 Si2O6",
+          "Acmite NaFe+3Si2O6",
+          "Augite (Ca,Na)(Mg,Fe,Al,Ti)(Si,Al)2O6",
+          "Augite (Ca,Na)(Mg,Fe,Al,Ti)(Si,Al)_2O_6",
+          "Diopside CaMg(SiO_3)_2",
+          "Diopside CaMgSi2O6",
+          "Enstatite Mg2Si2O6",
+          "Enstatite Mg_2(SiO_3)_2",
+          "Hedenbergite CaFe+2Si2O6",
+          "Hypersthene (Mg,Fe+2)2Si2O6",
+          "Hypersthene (Mg,Fe^2+)_2Si_2O_6"
+        ],
+        "patterns": [
+          "acmite",
+          "augite",
+          "diopside",
+          "enstatite",
+          "hedenbergite",
+          "hypersthene"
+        ]
+      },
+      "Serpentine/Talc": {
+        "members": [
+          "Antigorite (Mg, Fe+2)3 Si2O5(OH)4",
+          "Chrysotile Mg3Si2O5(OH)4",
+          "Lizardite Mg3Si2O5(OH)4",
+          "Serpentine (Mg,Fe^2+,Ni)Si_2O_5(OH)_4",
+          "Talc Mg3Si4O10(OH)2",
+          "Talc Mg_3Si_4O_10(OH)_2"
+        ],
+        "patterns": [
+          "antigorite",
+          "chrysotile",
+          "lizardite",
+          "serpentine",
+          "talc"
+        ]
+      }
+    }
+  },
+  "Oxide": {
+    "classes": {
+      "non-swir": {
+        "members": [
+          "Anatase TiO_2",
+          "Cassiterite SnO_2",
+          "Chromite Fe+2Cr2O4",
+          "Columbite Fe^2+Nb_2O_6",
+          "Corundum Al_2O_3",
+          "Gahnite ZnAl_2O_4",
+          "Hematite a-Fe2O3",
+          "Hematite alpha Fe_2O_3",
+          "Ilmenite Fe+2TiO3",
+          "Magnesiochromite MgCr_2O_4",
+          "Magnetite Fe+2Fe2+3O4",
+          "Magnetite Fe^2+Fe_2^3+O_4",
+          "Periclase MgO",
+          "Pyrolusite MnO_2",
+          "Rutile TiO2",
+          "Rutile TiO_2",
+          "Zincite (Zn,Mn)O"
+        ],
+        "patterns": [
+          "anatase",
+          "cassiterite",
+          "chromite",
+          "columbite",
+          "corundum",
+          "gahnite",
+          "hematite",
+          "ilmenite",
+          "magnesiochromite",
+          "magnetite",
+          "periclase",
+          "pyrolusite",
+          "rutile",
+          "zincite"
+        ]
+      }
+    }
+  },
+  "Phosphate": {
+    "classes": {
+      "non-swir": {
+        "members": [
+          "Amblygonite (Li,Na)Al(PO_4)(F,OH)",
+          "Apatite Ca_5(PO_4)_3F",
+          "Montebrasite LiAlPO_4(OH)",
+          "Triphylite Li(Mn,Fe)PO_4"
+        ],
+        "patterns": [
+          "amblygonite",
+          "apatite",
+          "montebrasite",
+          "triphylite"
+        ]
+      }
+    }
+  },
+  "Silicate": {
+    "classes": {
+      "Indistinct Silicate": {
+        "members": [
+          "Albite (Feldspar) (K,Na)AlSi_3O_8",
+          "Albite NaAlSi3O8",
+          "Almandine Fe3+2Al2(SiO4)3",
+          "Almandine Garnet Fe_3Al_2(SiO_4)_3",
+          "Analcime NaAlSi2O6.H2O",
+          "Analcime NaAlSi_2O_6.H_2O",
+          "Andalusite Al2SiO5",
+          "Andesine (Feldspar) (NaSi,CaAl)AlSi_2O_8",
+          "Andradite Ca3Fe2+3 (SiO4)3",
+          "Anorthite (Feldspar) (NaSi,CaAl)AlSi_2O_8",
+          "Anorthite CaAl2Si2O8",
+          "Beryl Be3Al2Si6O18",
+          "Beryl Be_3Al_2Si_6O_18",
+          "Biotite K(Mg,Fe+2)3(Al,Fe+3)Si3O10(OH,F)2",
+          "Biotite K(Mg,Fe^2+)_3(Al,Fe^3+)Si_3O_10(OH,F)_2",
+          "Bustamite (Mn,Ca)3Si3O9",
+          "Bytownite (Feldspar) (NaSi,CaAl)AlSi_2O_8",
+          "Chabazite CaAl2Si4O12.6H2O",
+          "Chabazite CaAl_2Si_4O_12.6H_2O",
+          "Clinoptilolite (Na,K,Ca)2-3Al3(Al,Si)2Si13O36.12H2O",
+          "Clinozoisite Ca2Al3(SiO4)3(OH)",
+          "Clinozoisite Ca_2Al_3(SiO_4)_3(OH)",
+          "Cookeite LiAl_4(Si_3Al)O_10(OH)_8",
+          "Cordierite Mg2Al4Si5O18",
+          "Cordierite Mg_2Al_3(Si_5Al)O_18",
+          "Corrensite (Mg,Fe)_9(Si,Al)_8O_20(OH)_10._xH_2O",
+          "Cristobalite SiO_2",
+          "Cummingtonite (Mg,Fe^2+)_7Si_8O_22(OH)_2",
+          "Datolite CaBSiO4(OH)",
+          "Epidote Ca2(Al,Fe+3)3(SiO4)3(OH)",
+          "Epidote Ca_2(Al,Fe^3+)_3O.SiO_4.Si_2O_7.OH",
+          "Erionite (K2,Ca,Na2)2Al4Si14O36.15H2O",
+          "Ferroaxinite Ca_2Fe^2+Al_2BSi_4O_15(OH)",
+          "Grossular Ca3Al2(Si04)3",
+          "Grossular Garnet Ca_3Al_2(SiO_4)_3",
+          "Hemimorphite Zn4Si2O7(OH)2.H2O",
+          "Hemimorphite Zn_4Si_2O_7(OH)_2.H_2O",
+          "Heulandite (Na,Ca)2-3Al3(Al,Si)2Si13O36.12H2O",
+          "Hydroxyapophyllite KCa_4Si_8O_20(OH,F).8H_2O",
+          "Illite/smectite (K,H3O)(Al,Mg,Fe)2(Si,Al)4 O10 [(OH)2,H2O]",
+          "Jadeite Na(Al,Fe+3)Si2O6",
+          "Johannsenite Ca(Mn,Fe^2+)(SiO_3)_2",
+          "Kyanite Al2SiO5",
+          "Labradorite (Feldspar) (NaSi,CaAl)AlSi_2O_8",
+          "Labradorite (Na,Ca)Al(Al,Si)Si2O8",
+          "Lepidolite K(Li,Al)3(Si,Al)_4O_10(F,OH)_2",
+          "Leucite KAlSi2O6",
+          "Microcline (Feldspar) (K,Na)AlSi_3O_8",
+          "Microcline KAlSi3O8",
+          "Monticellite CaMgSiO4",
+          "Mordenite (Ca,Na2,K2)Al2Si10O24.7H2O",
+          "Natrolite Na2Al2Si3O10.2H2O",
+          "Natrolite Na_2Al_2Si_3O_10.2H_2O",
+          "Nepheline (Na,K)AlSiO4",
+          "Nepheline (Na,K)AlSiO_4",
+          "Oligoclase (Feldspar) (NaSi,CaAl)AlSi_2O_8",
+          "Orthoclase (Feldspar) (K,Na)AlSi_3O_8",
+          "Orthoclase KAlSi3O8",
+          "Palygorskite (Mg,Al)_2Si_4O_10(OH).4H_2O",
+          "Pectolite NaCa2Si308(OH)",
+          "Phlogopite KMg3Si3Al010(F,OH)2",
+          "Phlogopite KMg3Si3AlO10(F, OH)2",
+          "Prehnite Ca2Al2Si3O10(OH)2",
+          "Prehnite Ca_2Al_2Si_3O_10(OH)_2",
+          "Pyrope Mg3Al2(SiO4)3",
+          "Quartz SiO2",
+          "Quartz SiO_2",
+          "Rhodonite (Mn+2,Fe+2,Mg,Ca)SiO3",
+          "Rhodonite (Mn,Ca)SiO_3",
+          "Richterite Na2Ca(Mg,Fe+2)5Si8O22(OH)2",
+          "Riebeckite Na2(Fe+2,Mg)3Fe2+3Si8O22(OH)2",
+          "Riebeckite Na_2(Fe^2+,Mg)_3,Fe_2^3+Si_8O_22(OH)_2",
+          "Sanidine (Feldspar) (K,Na)AlSi_3O_8",
+          "Sanidine (K,Na)Al3O8",
+          "Sepiolite Mg4Si6O15(OH)2.6H2)",
+          "Sepiolite Mg_4Si_6O_15(OH)_2.6H_2O",
+          "Sillimanite Al_2SiO_5",
+          "Sodalite Na8Al6Si6O24Cl2",
+          "Sodalite Na_8Al_6Si_6O_24Cl_2",
+          "Spessartine Mn3Al2 (SiO4)3",
+          "Spodumene LiAlS_2O_6",
+          "Spodumene LiAlSi2O6",
+          "Staurolite (Fe+2,Mg,Zn)2Al9(Si,Al)4O22(OH)2",
+          "Stilbite NaCa_2Al_5Si_3O_36.14H_2O",
+          "Titanite (Sphene) CaTiSiO_5",
+          "Topaz Al2SiO4(F,OH)2",
+          "Topaz Al_2SiO_4(F,OH)_2",
+          "Tourmaline (Elbaite) Na(Li,Al)3Al6(BO3)3Si6018(OH)4",
+          "Tourmaline (Schorl) NaFe3+2Al6(BO3)3Si6O18(OH)4",
+          "Tourmaline Na(Mg_3,Fe_3^2+)Al_6(BO_3)_3Si_6O_18(OH)_4",
+          "Vesuvianite Ca10Mg2Al4(SiO4)5(Si2O7)2(OH)4",
+          "Vesuvianite Ca_10(Mg,Fe^2+)_2Al_4(Si_2O_7)_2(SiO_4)_5(OH,F)_4",
+          "Wollastonite CaSiO3",
+          "Wollastonite CaSiO_3",
+          "Zircon ZrSiO_4",
+          "Zoisite (var. tanzanite) Ca2Al3(SiO4)3(OH)"
+        ],
+        "patterns": [
+          "albite",
+          "almandine",
+          "analcime",
+          "andalusite",
+          "andesine",
+          "andradite",
+          "anorthite",
+          "beryl",
+          "biotite",
+          "bustamite",
+          "bytownite",
+          "chabazite",
+          "clinoptilolite",
+          "clinozoisite",
+          "cookeite",
+          "cordierite",
+          "corrensite",
+          "cristobalite",
+          "cummingtonite",
+          "datolite",
+          "epidote",
+          "erionite",
+          "ferroaxinite",
+          "grossular",
+          "hemimorphite",
+          "heulandite",
+          "hydroxyapophyllite",
+          "illite/smectite",
+          "jadeite",
+          "johannsenite",
+          "kyanite",
+          "labradorite",
+          "lepidolite",
+          "leucite",
+          "microcline",
+          "monticellite",
+          "mordenite",
+          "natrolite",
+          "nepheline",
+          "oligoclase",
+          "orthoclase",
+          "palygorskite",
+          "pectolite",
+          "phlogopite",
+          "prehnite",
+          "pyrope",
+          "quartz",
+          "rhodonite",
+          "richterite",
+          "riebeckite",
+          "sanidine",
+          "sepiolite",
+          "sillimanite",
+          "sodalite",
+          "spessartine",
+          "spodumene",
+          "staurolite",
+          "stilbite",
+          "titanite",
+          "topaz",
+          "tourmaline",
+          "vesuvianite",
+          "wollastonite",
+          "zircon",
+          "zoisite"
+        ]
+      }
+    }
+  },
+  "Sulfate": {
+    "classes": {
+      "non-swir": {
+        "members": [
+          "Alunite (ammonioalunite) NH4Al3(SO4)2(OH)6",
+          "Alunite (potassium alunite) KAl3(SO4)2(OH)6",
+          "Alunite (sodium alunite) NaAl3(SO4)2(OH)6",
+          "Alunite KAl_3(SO_4)_2(OH)_6",
+          "Anglesite PbSO_4",
+          "Anhydrite CaSO4",
+          "Anhydrite CaSO_4",
+          "Antlerite Cu_3(SO_4)(OH)_4",
+          "Aphthitalite (K,Na)_3Na(SO_4)_2",
+          "Barite BaSO_4",
+          "Barite, BaSO4",
+          "Bloedite Na2Mg(So4)2 * 3H2O",
+          "Celestite SrSO_4",
+          "Epsomite MgSO4\u00b77H2O",
+          "Eugsterite Na4Ca(SO4)3 * 2H2O",
+          "Glauberite Na_2Ca(SO_4)_2",
+          "Gypsum (alabaster) CaSO4.2H20",
+          "Gypsum (selenite) CaSO4.2H2O",
+          "Gypsum CaSO4 * 2H2O",
+          "Gypsum CaSO_4.2H_2O",
+          "Hexahydrite MgSO4\u00b76H2O",
+          "Jarosite KFe_3^3+(SO_4)_2(OH)_6",
+          "Mirabilite Na2SO4\u00b710H2O",
+          "Natrojarosite NaFe_3^3+(SO_4)_2(OH)_6",
+          "Plumbojarosite PbFe_3^3+(SO_4)_4(OH)_12",
+          "Polyhalite K2Ca2Mg(SO4)4 * 2H2O",
+          "Thenardite Na2SO4",
+          "Tschermigite (NH_4)Al(SO_4)_2.12H_2O"
+        ],
+        "patterns": [
+          "alunite",
+          "anglesite",
+          "anhydrite",
+          "antlerite",
+          "aphthitalite",
+          "barite",
+          "bloedite",
+          "celestite",
+          "epsomite",
+          "eugsterite",
+          "glauberite",
+          "gypsum",
+          "hexahydrite",
+          "jarosite",
+          "mirabilite",
+          "natrojarosite",
+          "plumbojarosite",
+          "polyhalite",
+          "thenardite",
+          "tschermigite"
+        ]
+      }
+    }
+  },
+  "Sulfide": {
+    "classes": {
+      "non-swir": {
+        "members": [
+          "Arsenopyrite FeAsS",
+          "Bornite Cu_5FeS_4",
+          "Chalcocite Cu_2S",
+          "Chalcopyrite CuFeS_2",
+          "Galena PbS",
+          "Marcasite FeS_2",
+          "Molybdenite MoS_2",
+          "Pyrite FeS2",
+          "Pyrite FeS_2",
+          "Pyrrhotite Fe(1-x)S",
+          "Pyrrhotite Fe_1-xS",
+          "Pyrrhotite, Fe(1-x)S",
+          "Realgar AsS",
+          "Sphalerite (Zn,Fe)S",
+          "Stibnite Sb_2S_3"
+        ],
+        "patterns": [
+          "arsenopyrite",
+          "bornite",
+          "chalcocite",
+          "chalcopyrite",
+          "galena",
+          "marcasite",
+          "molybdenite",
+          "pyrite",
+          "pyrrhotite",
+          "realgar",
+          "sphalerite",
+          "stibnite"
+        ]
+      }
+    }
+  },
+  "Tungstate": {
+    "classes": {
+      "non-swir": {
+        "members": [
+          "Scheelite CaWO_4"
+        ],
+        "patterns": [
+          "scheelite"
+        ]
+      }
+    }
+  }
+}
