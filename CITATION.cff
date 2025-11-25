@@ -6,7 +6,10 @@ authors:
     given-names: "Russell"
 version: "1.1.0"
 date-released: 2025-01-01
-doi: ""
+doi: "10.5281/zenodo.17711872"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.17711872"
 url: "https://github.com/Russjas/CoreSpecViewer"
 license: "GPL-3.0"
 keywords:
