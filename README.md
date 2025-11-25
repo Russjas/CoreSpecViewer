@@ -303,3 +303,16 @@ Because it depends on PyQt5, redistribution and derivative works must also compl
 ## Author
 
 Developed by **Russell Rogers**  
+
+## Citation  
+
+If this has been useful in your research please cite as  
+Rogers, R. (2025). CoreSpecViewer: An Open-Source Hyperspectral Drill-Core Visualisation and Interpretation Tool (Version 1.1.0) [Computer software]. https://doi.org/10.5281/zenodo.17711872  
+
+## Disclaimer  
+
+CoreSpecViewer is an open-source research tool for hyperspectral drill-core visualisation and interpretation. It is not certified as a commercial mineralogical analysis product.
+
+Outputs may include uncertainties and should be interpreted within the broader context of geological knowledge and dataset characteristics.
+
+CoreSpecViewer is provided as is, without warranty, and the authors and contributors are not liable for any use of the software or results obtained from it.
