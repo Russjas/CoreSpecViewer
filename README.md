@@ -303,3 +303,8 @@ Because it depends on PyQt5, redistribution and derivative works must also compl
 ## Author
 
 Developed by **Russell Rogers**  
+
+## Citation  
+
+If this has been useful in your research please cite as  
+Rogers, R. (2025). CoreSpecViewer: An Open-Source Hyperspectral Drill-Core Visualisation and Interpretation Tool (Version 1.1.0) [Computer software]. https://doi.org/10.5281/zenodo.17711872
