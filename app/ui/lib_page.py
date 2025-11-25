@@ -70,6 +70,8 @@ class LibraryPage(BasePage):
         self.table_view.setSelectionMode(QTableView.ExtendedSelection)
         self.table_view.doubleClicked.connect(self.handle_double_click)
         self.table_view.rightClicked.connect(self.handle_right_click)
+        self.table_view.setSearchColumn(NAME_COLUMN_INDEX)
+        
         self._add_left(self.table_view)
         
         self._proxy = IdSetFilterProxy(ID_COLUMN_INDEX, parent=self)

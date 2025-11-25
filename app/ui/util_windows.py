@@ -16,7 +16,12 @@ from matplotlib.widgets import PolygonSelector, RectangleSelector
 
 import numpy as np
 
-from PyQt5.QtCore import QSortFilterProxyModel, Qt, pyqtSignal, QModelIndex
+from PyQt5.QtCore import (
+        QSortFilterProxyModel, 
+        Qt, 
+        pyqtSignal, 
+        QModelIndex, 
+        QDateTime)
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
@@ -60,7 +65,12 @@ def busy_cursor(msg=None, window=None):
 
 class RightClick_Table(QTableView):
     rightClicked = pyqtSignal(QModelIndex)
-
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        self._search_column = 0
+        self._type_ahead = ""
+        self._last_key_time = 0
+        
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
             index = self.indexAt(event.pos())
@@ -68,6 +78,41 @@ class RightClick_Table(QTableView):
                 self.rightClicked.emit(index)
             # Important: still pass it on so selection/focus/double-click logic works
         super().mousePressEvent(event)
+    
+    
+    def setSearchColumn(self, col: int):
+        """Column index (in the *proxy* model) to use for type-ahead search."""
+        self._search_column = max(0, int(col))
+        
+        
+    def keyPressEvent(self, event):
+        text = event.text()
+        if text and not text.isspace():
+            now = QDateTime.currentMSecsSinceEpoch()
+            if now - self._last_key_time > 1000:
+                self._type_ahead = ""
+            self._last_key_time = now
+
+            self._type_ahead += text.lower()
+
+            model = self.model()
+            if model is not None:
+                row_count = model.rowCount()
+                if row_count:
+                    current = self.currentIndex()
+                    start_row = current.row() if current.isValid() else 0
+                    for offset in range(1, row_count + 1):
+                        r = (start_row + offset) % row_count
+                        idx = model.index(r, self._search_column)
+                        val = model.data(idx)
+                        if val is None:
+                            continue
+                        if str(val).lower().startswith(self._type_ahead):
+                            self.setCurrentIndex(idx)
+                            self.scrollTo(idx, QTableView.PositionAtCenter)
+                            break
+            return
+        super().keyPressEvent(event)
 
 
 class IdSetFilterProxy(QSortFilterProxyModel):
