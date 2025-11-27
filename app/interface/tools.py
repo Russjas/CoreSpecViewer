@@ -268,7 +268,7 @@ def mask_point(obj, mode, y, x):
         return obj
 
 
-def mask_polygon(obj, vertices_rc):
+def mask_polygon(obj, vertices_rc, mode = "mask outside"):
     """
     Given polygon vertices in (row, col) image indices, set outside to 1 (masked).
     Creates/updates a temp 'mask' dataset.
@@ -291,10 +291,13 @@ def mask_polygon(obj, vertices_rc):
     pts = np.column_stack([grid_c.ravel(), grid_r.ravel()])  # (H*W,2) in (x=col, y=row)
     inside = mpl_path(poly[:, ::-1]).contains_points(pts)        # flip to (x,y)
     inside = inside.reshape(H, W)
-
-    # outside = ~inside  -> set to 1
-    msk = np.array(obj.mask)
-    msk[~inside] = 1
+    if mode == "mask outside":
+        # outside = ~inside  -> set to 1
+        msk = np.array(obj.mask)
+        msk[~inside] = 1
+    elif mode == "mask inside":
+        msk = np.array(obj.mask)
+        msk[inside] = 1
     obj.add_temp_dataset('mask', data = msk)
     return obj
 

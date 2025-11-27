@@ -437,7 +437,7 @@ class SpectralImageCanvas(QWidget):
 
     # -------- Double-click → spectrum (per-canvas window) --------
     def on_image_click(self, event):
-        print(self._poly_selector)
+        
         if event.inaxes is not self.ax or event.xdata is None or event.ydata is None:
             return
         if getattr(self.toolbar, "mode", "") or self.rect_selector is not None:
@@ -475,8 +475,6 @@ class SpectralImageCanvas(QWidget):
 
         def _on_select(verts):
             # verts is [(x,y), ...] in data coords
-            print("[canvas] _on_select called; verts:", len(verts))
-            print("[canvas] on_polygon_finished is", self.on_polygon_finished)
             if callable(self.on_polygon_finished):
                 v_rc = [(int(round(y)), int(round(x))) for (x, y) in verts]
                 self.on_polygon_finished(v_rc)
@@ -494,12 +492,14 @@ class SpectralImageCanvas(QWidget):
         draw_bounding_box=False,
     )
 
-
-        self.canvas.widgetlock(self._poly_selector)
-        self.canvas.draw()
+        try:
+            self.canvas.widgetlock(self._poly_selector)
+            self.canvas.draw()
+        except ValueError:
+            return
 
     def cancel_polygon_select(self):
-        print("[canvas] cancel_polygon_select()")
+        
         """Tear down an active polygon tool, if any."""
         if self._poly_selector is not None:
             try:

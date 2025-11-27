@@ -198,7 +198,10 @@ class MainRibbonController(QMainWindow):
             ("button", "Enhance mask", lambda: self.act_mask_point('enhance'), "Adds to existing mask by correlation with selected pixel"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
             ("button", "Mask region", self.act_mask_rect, "Adds a masked rectangle to existing mask"),
-            ("button", "Freehand mask region", self.act_mask_polygon, "With exising mask, masks all pixels outside of selected region"),
+            ("menu",   "Freehand mask region", [
+                ("Mask outside selected", lambda: self.act_mask_polygon(mode = "mask outside"), "With exising mask, masks all pixels outside of selected region"),
+                ("Mask inside selected", lambda: self.act_mask_polygon(mode = "mask inside"), "With exising mask, masks all pixels outside of selected region")
+            ]),
             ("button", "Improve", self.act_mask_improve, "Heuristically improves the mask"),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom')
@@ -622,7 +625,7 @@ class MainRibbonController(QMainWindow):
         self.update_display()
 
 
-    def act_mask_polygon(self):
+    def act_mask_polygon(self, mode = "mask outside"):
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
@@ -630,7 +633,7 @@ class MainRibbonController(QMainWindow):
         if not p or not p.dispatcher or self.cxt.current is None:
             return
         def _on_finish(vertices_rc):
-            self.cxt.current = t.mask_polygon(self.cxt.current, vertices_rc)
+            self.cxt.current = t.mask_polygon(self.cxt.current, vertices_rc, mode = mode)
             self._distribute_context()
             self.update_display()
             p.dispatcher.clear_all_temp()
