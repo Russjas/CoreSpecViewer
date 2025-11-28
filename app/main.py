@@ -241,6 +241,8 @@ class MainRibbonController(QMainWindow):
                                 ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation(multi=True)),
                                 ("MineralMap SAM (Winner-takes-all)", lambda: self.act_vis_sam( multi=True)),
                                 ("MineralMap MSAM (Winner-takes-all)", lambda: self.act_vis_msam(multi=True)),
+                                ("Multi-range check (Winner-takes-all)", lambda: self.act_vis_multirange(multi = True), "Performs custom multi-window matching"),
+                                ("select range", lambda: self.act_subrange_corr(multi = True), "Performs correlation on a chosed wavelength range"),
                                ]),
                             ("menu",   "Fullhole Features", self.extract_feature_list_multi),
                             ("button", "Save All", self.save_all_changes),
@@ -891,8 +893,42 @@ class MainRibbonController(QMainWindow):
         self.update_display()
         
         
-    def act_subrange_corr(self):
+    def act_subrange_corr(self, multi = False):
         modes = ['pearson', 'sam', 'msam']
+        if multi:
+            if self.cxt.ho is None: 
+                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
+                return
+            name = self.ask_collection_name()
+            if not name:
+                return
+            exemplars = self.cxt.library.get_collection_exemplars(name)
+            if not exemplars:
+                return
+            mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
+            if not ok or not mode:
+                return
+            ok, start_nm, stop_nm = WavelengthRangeDialog.get_range(
+                parent=self,
+                start_default=0,
+                stop_default=20000,
+            )
+            if not ok:
+                return
+            with busy_cursor('correlation...', self):
+                for po in self.cxt.ho:
+                    try:
+                        t.wta_min_map_user_defined(po, exemplars, name, [start_nm, stop_nm], mode=mode)
+                        po.save_all()
+                        po.reload_all()
+                        po.load_thumbs()
+                        print('done one')
+                    except ValueError:
+                        continue
+                    
+            self.choose_view('hol')
+            self.update_display()
+            return
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return

@@ -7,7 +7,7 @@ import sys
 
 import numpy as np
 from PyQt5.QtCore import QSize, Qt, pyqtSignal
-from PyQt5.QtGui import QIcon, QPixmap, QStandardItem
+from PyQt5.QtGui import QIcon, QPixmap, QStandardItem, QPalette 
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -20,12 +20,19 @@ from PyQt5.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QStyledItemDelegate,
+    QStyle
 )
 
 from ..models import HoleObject
 from .base_page import BasePage
 from .util_windows import ClosableWidgetWrapper, busy_cursor
 
+class NoSelectionDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        # Remove the State_Selected flag so Qt won't draw highlight
+        option.state &= ~QStyle.State_Selected
+        super().paint(painter, option, index)
 
 class HoleBoxTable(QTableWidget):
     """
@@ -58,7 +65,7 @@ class HoleBoxTable(QTableWidget):
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setShowGrid(False)
-
+        self.setItemDelegate(NoSelectionDelegate(self))
         # thumbnail display defaults
         self.setIconSize(QSize(400, 120))
         self.verticalHeader().setDefaultSectionSize(80)
