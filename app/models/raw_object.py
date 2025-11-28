@@ -147,19 +147,271 @@ class RawObject:
     #TODO Might need a refactor when QAQC functions are integrated - not yet.
     def get_reflectance_QAQC(self, QAQC=True):
         """Load reflectance with optional QA/QC metrics (SNR)."""
-        self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=QAQC)
+        self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=QAQC,
+                                                                         data_data_path = self.files['data raw'],
+                                                                         white_data_path = self.files['white raw'],
+                                                                         dark_data_path = self.files['dark raw'])
         return self.reflectance, self.snr
 
     def get_reflectance(self):
         """Return or compute the reflectance cube (without QA/QC)."""
         if getattr(self, "reflectance", None) is None:
-            self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=False)
+            self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=False,
+                                                                             data_data_path = self.files['data raw'],
+                                                                             white_data_path = self.files['white raw'],
+                                                                             dark_data_path = self.files['dark raw'])
         return self.reflectance
     def get_false_colour(self, bands=None):
         """Generate a false-colour RGB composite for visualization."""
         if hasattr(self, "reflectance") and self.reflectance is not None:
             return sf.get_false_colour(self.reflectance, bands=bands)
-
+        
+    
+    @classmethod  
+    def manual_create_from_multiple_paths(
+        cls, 
+        data_head_path,
+        white_head_path,
+        dark_head_path,
+        metadata_path: str | Path = ""
+    ):
+        """
+        Manually build a RawObject from explicit header paths.
+    
+        Parameters
+        ----------
+        data_head_path : str | Path
+            Path to the DATA header file (e.g., *.hdr).
+        white_head_path : str | Path
+            Path to the WHITE reference header file.
+        dark_head_path : str | Path
+            Path to the DARK reference header file.
+        metadata_path : str | Path, optional
+            Optional path to a metadata/header file (can be empty).
+    
+        Notes
+        -----
+        - The corresponding RAW files are inferred by swapping the suffix
+          of each header path to '.raw'.
+        - Critical files (data/white/dark head+raw) must exist and be
+          non-zero size or a ValueError is raised.
+        - Non-critical issues (e.g., missing metadata) are stored on
+          `raw_object.file_issues` and printed as warnings.
+        """
+        from pathlib import Path
+    
+        # Normalise inputs to Path objects
+        data_head_path = Path(data_head_path)
+        white_head_path = Path(white_head_path)
+        dark_head_path = Path(dark_head_path)
+        metadata_path = Path(metadata_path) if metadata_path else None
+    
+        # Infer a box_id and root_dir from the data header
+        box_id = data_head_path.stem.lower()
+        root_dir = data_head_path.parent
+    
+        files: dict[str, str] = {}
+        missing: list[str] = []
+        duplicates: dict[str, list[str]] = {}  # no real duplicates in manual mode, but keep shape
+        zero_byte: dict[str, str] = {}
+        critical_missing: list[str] = []
+    
+        # CRITICAL file roles (same semantics as from_Lumo_directory)
+        CRITICAL_FILES = ["data head", "data raw", "white head", "white raw", "dark head", "dark raw"]
+    
+        def _check_and_add_head_and_raw(role_head: str, head_path: Path) -> None:
+            """Validate a head file and its inferred raw companion."""
+            nonlocal files, missing, zero_byte, critical_missing
+    
+            if head_path is None:
+                missing.append(role_head)
+                critical_missing.append(role_head)
+                return
+    
+            if not head_path.exists():
+                missing.append(role_head)
+                critical_missing.append(role_head)
+                return
+    
+            if head_path.stat().st_size <= 0:
+                zero_byte[role_head] = str(head_path)
+                critical_missing.append(role_head)
+                return
+    
+            # Store the header
+            files[role_head] = str(head_path)
+    
+            # Now infer and validate the RAW file
+            role_raw = role_head.replace("head", "raw")
+            raw_path = head_path.with_suffix(".raw")
+    
+            if not raw_path.exists():
+                missing.append(role_raw)
+                critical_missing.append(role_raw)
+                return
+    
+            if raw_path.stat().st_size <= 0:
+                zero_byte[role_raw] = str(raw_path)
+                critical_missing.append(role_raw)
+                return
+    
+            files[role_raw] = str(raw_path)
+    
+        # --- Validate critical triplets: data / white / dark ---
+        _check_and_add_head_and_raw("data head", data_head_path)
+        _check_and_add_head_and_raw("white head", white_head_path)
+        _check_and_add_head_and_raw("dark head", dark_head_path)
+    
+        # --- Optional metadata (non-critical) ---
+        if metadata_path is not None:
+            if not metadata_path.exists():
+                missing.append("metadata")
+            elif metadata_path.stat().st_size <= 0:
+                zero_byte["metadata"] = str(metadata_path)
+            else:
+                files["metadata"] = str(metadata_path)
+    
+        # CRITICAL CHECK: Still raise an error if any critical files are missing/invalid
+        if critical_missing:
+            raise ValueError(
+                f"Cannot create raw dataset: Critical files are missing or invalid: {critical_missing}"
+            )
+    
+        # Create the instance
+        raw_object = cls(basename=box_id, root_dir=root_dir, files=files)
+    
+        # Store non-critical issues on the object for inspection/logging
+        raw_object.file_issues = {
+            "missing": missing,
+            "duplicates": duplicates,
+            "zero_byte": zero_byte,
+        }
+    
+        # Optional: print warnings about non-critical issues
+        if missing or duplicates or zero_byte:
+            print(f"⚠️ Warning: Non-critical file issues found for {box_id}:")
+            if missing:
+                print(f"  Missing (Skipped): {missing}")
+            if duplicates:
+                print(f"  Duplicates (Skipped): {duplicates}")
+            if zero_byte:
+                print(f"  Zero Byte (Skipped): {zero_byte}")
+    
+        return raw_object
+    
+    
+    @classmethod
+    def manual_create_from_critical_paths(
+        cls,
+        data_head_path,
+        data_raw_path,
+        white_head_path,
+        white_raw_path,
+        dark_head_path,
+        dark_raw_path,
+        metadata_path: str | Path | None = None,
+    ):
+        """
+        Build a RawObject from explicitly provided paths to the six critical
+        Specim files, plus an optional metadata file.
+    
+        Critical roles:
+            - data head
+            - data raw
+            - white head
+            - white raw
+            - dark head
+            - dark raw
+    
+        Any problem with these critical files (missing or zero-byte)
+        leads to a ValueError. The metadata file is optional and only
+        generates non-critical file_issues.
+        """
+        from pathlib import Path
+    
+        # Normalise to Path objects
+        paths = {
+            "data head": Path(data_head_path),
+            "data raw": Path(data_raw_path),
+            "white head": Path(white_head_path),
+            "white raw": Path(white_raw_path),
+            "dark head": Path(dark_head_path),
+            "dark raw": Path(dark_raw_path),
+        }
+    
+        missing = []
+        zero_byte = {}
+        duplicates = {}          # manual mode → never duplicates, but keep structure
+        critical_missing = []
+    
+        # --- Validate critical files ---
+        for role, p in paths.items():
+            if not p.exists():
+                missing.append(role)
+                critical_missing.append(role)
+            else:
+                if p.stat().st_size <= 0:
+                    zero_byte[role] = str(p)
+                    critical_missing.append(role)
+    
+        # Raise for *any* critical failure
+        if critical_missing:
+            raise ValueError(
+                f"Cannot create raw dataset: Critical files are missing or invalid: {critical_missing}"
+            )
+    
+        # Build the files dict for RawObject
+        files = {role: str(p.resolve()) for role, p in paths.items()}
+    
+        # --- Optional metadata (non-critical) ---
+        if metadata_path:
+            m = Path(metadata_path)
+            if not m.exists():
+                missing.append("metadata")
+            else:
+                if m.stat().st_size <= 0:
+                    zero_byte["metadata"] = str(m)
+                else:
+                    files["metadata"] = str(m.resolve())
+    
+        # --- Infer basename + root_dir ---
+        data_head = paths["data head"]
+        parent_dirs = {p.parent for p in paths.values()}
+    
+        if len(parent_dirs) == 1:
+            root_dir = parent_dirs.pop()
+        else:
+            # Mangled set → default to data head location
+            root_dir = data_head.parent
+    
+        box_id = data_head.stem.lower()
+    
+        # --- Create the RawObject ---
+        raw_object = cls(
+            basename=box_id,
+            root_dir=root_dir,
+            files=files
+        )
+    
+        # --- Attach the file_issues report (non-critical only) ---
+        raw_object.file_issues = {
+            "missing": missing,
+            "duplicates": duplicates,
+            "zero_byte": zero_byte,
+        }
+    
+        # Optional warning summary
+        if missing or duplicates or zero_byte:
+            print(f"⚠️ Warning: Non-critical file issues for {box_id}:")
+            if missing:
+                print(f"  Missing: {missing}")
+            if duplicates:
+                print(f"  Duplicates: {duplicates}")
+            if zero_byte:
+                print(f"  Zero-byte: {zero_byte}")
+    
+        return raw_object
+    
     def process(self):
         """
         Generate a ProcessedObject containing derived products.

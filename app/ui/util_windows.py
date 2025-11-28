@@ -248,10 +248,27 @@ class ImageCanvas2D(QWidget):
         if not shp or len(shp) == 1:
             return  # ignore 1D/unknown
 
+# =============================================================================
+#         if len(shp) == 2:
+#             rgb = image
+#             self.ax.clear()
+#             self.ax.imshow(rgb, cmap=my_map, origin="upper", vmin = np.min(rgb), vmax = np.max(rgb))
+# =============================================================================
+
         if len(shp) == 2:
-            rgb = image
+            a = image.astype(float)
+            amin = np.nanmin(a)
+            amax = np.nanmax(a)
+        
+            if amax > amin:
+                norm = (a - amin) / (amax - amin)
+            else:
+                norm = np.zeros_like(a, dtype=float)
+        
+            
             self.ax.clear()
-            self.ax.imshow(rgb, cmap=my_map, origin="upper", vmin = np.min(rgb), vmax = np.max(rgb))
+            self.ax.imshow(norm, cmap=my_map, origin="upper", vmin=0.0, vmax=1.0)
+
 
         elif len(shp) == 3 and shp[2] == 3:
             rgb = image
@@ -694,6 +711,79 @@ class MetadataDialog(QDialog):
             "depth_from": self.from_edit.text().strip(),
             "depth_to": self.to_edit.text().strip(),
         }
+
+
+class WavelengthRangeDialog(QDialog):
+    """
+    Dialog to request a start/stop wavelength (nm).
+    Usage:
+        ok, start, stop = WavelengthRangeDialog.get_values(parent, 2100, 2300)
+    """
+
+    def __init__(self, parent=None, start_default=None, stop_default=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Select Wavelength Range")
+
+        # --- Widgets ---
+        start_label = QLabel("Start (nm):")
+        stop_label = QLabel("Stop (nm):")
+
+        self.start_edit = QLineEdit()
+        self.stop_edit = QLineEdit()
+
+        if start_default is not None:
+            self.start_edit.setText(str(start_default))
+        if stop_default is not None:
+            self.stop_edit.setText(str(stop_default))
+
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+            orientation=Qt.Horizontal,
+            parent=self,
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        # --- Layout ---
+        start_layout = QHBoxLayout()
+        start_layout.addWidget(start_label)
+        start_layout.addWidget(self.start_edit)
+
+        stop_layout = QHBoxLayout()
+        stop_layout.addWidget(stop_label)
+        stop_layout.addWidget(self.stop_edit)
+
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(start_layout)
+        main_layout.addLayout(stop_layout)
+        main_layout.addWidget(buttons)
+
+        self.setLayout(main_layout)
+
+    def get_values(self):
+        """Return (start_nm, stop_nm) as floats, or (None, None) if invalid."""
+        try:
+            start = float(self.start_edit.text())
+            stop = float(self.stop_edit.text())
+        except ValueError:
+            return None, None
+        return start, stop
+
+    @classmethod
+    def get_range(cls, parent=None, start_default=None, stop_default=None):
+        """
+        Convenience one-shot:
+            ok, start, stop = WavelengthRangeDialog.get_range(...)
+        """
+        dlg = cls(parent, start_default, stop_default)
+        result = dlg.exec_()
+        if result == QDialog.Accepted:
+            start, stop = dlg.get_values()
+            return True, start, stop
+        return False, None, None
+
 
 
 class AutoSettingsDialog(QDialog):

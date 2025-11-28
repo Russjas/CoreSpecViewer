@@ -258,7 +258,10 @@ def mk_thumb(
     else:
         if arr.ndim == 2:
             # 2D → colormap
-            a = arr.astype(float)
+            if mask is not None:
+                a = np.ma.masked_array(arr, mask = mask).astype(float)
+            else:
+                a = np.array(arr).astype(float)
             checkpoint("after arr.astype(float)")
 
             amin = np.nanmin(a)
@@ -481,7 +484,10 @@ def bands_from_snr(white, dark, wavelengths=None, snr_thresh=20.0, min_run=20):
 
 
 # TODO: When the separate QAQC GUIS get integrated, they can call this func with QAQC=True to check SNR
-def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False): 
+def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False,
+                         data_data_path = None,
+                         white_data_path = None,
+                         dark_data_path = None): 
     """
     Load raw data and references, pick a band window from SNR, and compute reflectance.
 
@@ -496,6 +502,8 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False):
     QAQC : Boolean. 
         If true will calculate bands above threshold, if False will use fixed slice
         for technique
+        
+    optional data path arguments, for mangled datasets with inconsistent file names.
 
     Returns
     -------
@@ -511,9 +519,20 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False):
     reflectance correction.
     """
 
-    box = envi.open(header_path)
-    white_ref = envi.open(white_path)
-    dark_ref  = envi.open(dark_path)
+    if data_data_path:
+        box = envi.open(header_path, image=data_data_path)
+    else:
+        box = envi.open(header_path)
+
+    if white_data_path:
+        white_ref = envi.open(white_path, image=white_data_path)
+    else:
+        white_ref = envi.open(white_path)
+
+    if dark_data_path:
+        dark_ref = envi.open(dark_path, image=dark_data_path)
+    else:
+        dark_ref = envi.open(dark_path)
 
     header = envi.read_envi_header(header_path)
 
@@ -909,6 +928,38 @@ def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
 #========= Functions for interpreting reflectance data ========================
 ##        Functions currently used in the app =================================
 
+
+def mineral_map_subrange(cube: np.ndarray,            # (H, W, B_data)
+    exemplar_stack: np.ndarray,       # (K, B_lib)
+    wl_data: np.ndarray,         # (B_data,)
+    ranges: list[tuple[float, float]],  # [(wmin, wmax), ...]
+    mode: str = "pearson",       # "pearson", "sam", "msam"
+    invalid_value: int = -999,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    selected-range winner-takes-all mineral map.
+    """
+    try:
+        if ranges[1]>ranges[0]:
+            start = np.argmin(np.abs(wl_data - ranges[0]))
+            stop = np.argmin(np.abs(wl_data - ranges[1]))
+        else:
+            start = np.argmin(np.abs(wl_data - ranges[1]))
+            stop = np.argmin(np.abs(wl_data - ranges[0]))
+        cube = cube[..., start:stop]
+        exemplar_stack = exemplar_stack[..., start:stop]
+    except IndexError:
+        raise ValueError("range selection failed on this data")
+    if mode=='pearson' :  
+        index, confidence = mineral_map_wta_strict(cube, exemplar_stack)
+    elif mode == "msam":
+        index, confidence = mineral_map_wta_sam_strict(cube, exemplar_stack)
+    elif mode == "sam":
+        index, confidence = mineral_map_wta_msam_strict(cube, exemplar_stack)
+    else:
+        raise ValueError(f"Unknown mode {mode!r}; expected 'pearson', 'sam' or 'msam'")
+    return index, confidence
+
 def mineral_map_multirange(
     cube: np.ndarray,            # (H, W, B_data)
     exemplars: np.ndarray,       # (K, B_lib)
@@ -916,7 +967,7 @@ def mineral_map_multirange(
     #windows: list[tuple[float, float]],  # [(wmin, wmax), ...]
     mode: str = "pearson",       # "pearson", "sam", "msam"
     invalid_value: int = -999,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     windows = [
         (1350, 1500),  # 1.4 µm OH / hydration
         (1850, 2000),  # 1.9 µm H2O

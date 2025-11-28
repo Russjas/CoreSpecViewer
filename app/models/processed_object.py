@@ -281,12 +281,12 @@ class ProcessedObject:
                         resize=False
                     )
                 final_path = output_dir / f'{self.basename}-{key}.jpg'
-                im.save(str(final_path))
+                im.save(str(final_path), quality = 95)
                 return True
             elif ds.ext == ".npz":
                 im = sf.mk_thumb(ds.data.data, mask=ds.data.mask, resize=False)
                 final_path = output_dir / f'{self.basename}-{key}.jpg'
-                im.save(str(final_path))
+                im.save(str(final_path), quality = 95)
                 return True
                 
             return False
@@ -337,7 +337,9 @@ class ProcessedObject:
                 ds.thumb = im
 
             elif ds.ext == ".npz":
+                print(key, type(ds.data))
                 im = sf.mk_thumb(ds.data.data, mask=ds.data.mask)
+                #im = sf.mk_thumb(ds.data)
                 ds.thumb = im
             else:
                 return

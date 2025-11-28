@@ -47,7 +47,7 @@ from PyQt5.QtWidgets import (
 )
 
 from .interface import tools as t
-from .models import CurrentContext, HoleObject
+from .models import CurrentContext, HoleObject, RawObject
 from .ui.cluster_window import ClusterWindow
 from .ui import (
     AutoSettingsDialog,
@@ -63,6 +63,7 @@ from .ui import (
     choice_box,
     multi_box,
     two_choice_box,
+    WavelengthRangeDialog
 )
 
 feature_keys = [
@@ -218,6 +219,7 @@ class MainRibbonController(QMainWindow):
                 ("MineralMap SAM (Winner-takes-all)", self.act_vis_sam, "Performs Spectral Angle Mapping against selected collection from the library"),
                 ("MineralMap MSAM (Winner-takes-all)", self.act_vis_msam, "Performs Modified Spectral Angle Mapping against selected collection from the library"),
                 ("Multi-range check (Winner-takes-all)", self.act_vis_multirange, "Performs custom multi-window matching"),
+                ("select range", self.act_subrange_corr, "Performs correlation on a chosed wavelength range"),
                 ("Re-map legends", self._remap_legends)
                 
                 
@@ -376,10 +378,63 @@ class MainRibbonController(QMainWindow):
     def load_from_disk(self):
         '''loads PO or RO only, HO and db are loaded from control panel on
         thei respective games'''
-        clicked_button = choice_box( "What would you like to open?", ["Processed dataset", "Raw directory", "Hole directory"])
+        clicked_button = choice_box( "What would you like to open?", ["Processed dataset", "Raw directory", "Hole directory", "Mangled Dataset"])
 
         if clicked_button is None:
             return
+        
+        if clicked_button == 3:
+            data_head_path, _ = QFileDialog.getOpenFileName(
+            self, "Open Data header file", "", "header files (*.hdr)")
+            if not data_head_path:
+                return
+            white_head_path, _ = QFileDialog.getOpenFileName(
+            self, "Open White header file", "", "header files (*.hdr)")
+            if not data_head_path:
+                return
+            dark_head_path, _ = QFileDialog.getOpenFileName(
+            self, "Open Dark header file", "", "header files (*.hdr)")
+            if not data_head_path:
+                return
+            metadata_path, _ = QFileDialog.getOpenFileName(
+            self, "Optional lumo metadata", "", "header files (*.xml)")
+            try:
+                self.cxt.current = RawObject.manual_create_from_multiple_paths(data_head_path, data_head_path, data_head_path, metadata_path = metadata_path)
+                self.choose_view('raw')
+                self.update_display()
+                return
+            except ValueError as e:
+                QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}/n manually add raw paths if file names are inconsistent")
+                data_raw_path, _ = QFileDialog.getOpenFileName(
+                self, "Open Data raw", "", "raw files (*)")
+                if not data_raw_path:
+                    return
+                white_raw_path, _ = QFileDialog.getOpenFileName(
+                self, "Open White raw", "", "raw files (*)")
+                if not white_raw_path:
+                    return
+                dark_raw_path, _ = QFileDialog.getOpenFileName(
+                self, "Open Dark raw", "", "raw files (*)")
+                if not dark_raw_path:
+                    return
+                try:
+                    self.cxt.current = RawObject.manual_create_from_critical_paths(data_head_path,
+                                                                                data_raw_path,
+                                                                                white_head_path,
+                                                                                white_raw_path,
+                                                                                dark_head_path,
+                                                                                dark_raw_path,
+                                                                                metadata_path= metadata_path) 
+                    self.choose_view('raw')
+                    self.update_display()
+                    return
+                except ValueError as e:
+                    QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}")
+                    return
+                    
+        
+        
+        
         if clicked_button == 1 or clicked_button == 2:
             path = QFileDialog.getExistingDirectory(
                        self,
@@ -686,14 +741,15 @@ class MainRibbonController(QMainWindow):
         if multi:
             if self.cxt.ho is None: 
                 return
-            for po in self.cxt.ho:
-                t.run_feature_extraction(po, key)
-                po.save_all()
-                po.reload_all()
-                po.load_thumbs()
+            with busy_cursor('feature extraction {key}....', self):
+                for po in self.cxt.ho:
+                    t.run_feature_extraction(po, key)
+                    po.save_all()
+                    po.reload_all()
+                    po.load_thumbs()
                 
-            self.choose_view('hol')
-            self.update_display()
+                self.choose_view('hol')
+                self.update_display()
             return
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
@@ -835,7 +891,40 @@ class MainRibbonController(QMainWindow):
         self.update_display()
         
         
+    def act_subrange_corr(self):
+        modes = ['pearson', 'sam', 'msam']
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Correlation", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
+            return
+        name = self.ask_collection_name()
+        if not name:
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            return
         
+        mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
+        if not ok or not mode:
+            return
+        ok, start_nm, stop_nm = WavelengthRangeDialog.get_range(
+            parent=self,
+            start_default=0,
+            stop_default=20000,
+        )
+        if not ok:
+            return
+        with busy_cursor('correlation...', self):
+            try:
+                self.cxt.current = t.wta_min_map_user_defined(self.cxt.current, exemplars, name, [start_nm, stop_nm], mode=mode)
+            except Exception as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to use band range: {e}")
+                return
+
+        self.choose_view('vis')
+        self.update_display()
 
     def act_vis_msam(self, multi = False):
         if multi:
@@ -946,11 +1035,11 @@ class MainRibbonController(QMainWindow):
         
         if self.cxt.current is None or self.cxt.current.is_raw:
             QMessageBox.warning(self, "Open dataset", f"There is no processed dataset loaded")
-        #try:
-        self.cxt.current = t.clean_legends(self.cxt.current, self.legend_mapping_path)
-        #except Exception as e:
-            #QMessageBox.warning(self, "Failed operation", f"Failed to remap legends: {e}")
-            #return
+        try:
+            self.cxt.current = t.clean_legends(self.cxt.current, self.legend_mapping_path)
+        except Exception as e:
+            QMessageBox.warning(self, "Failed operation", f"Failed to remap legends: {e}")
+            return
         self._distribute_context()
         self.update_display()
         

@@ -192,7 +192,7 @@ def crop_auto(obj):
                 ds = obj.datasets.get(key)
                 src = getattr(ds, "data", None) if ds else None
 
-            if not (isinstance(src, np.ndarray) and src.ndim > 1):
+            if getattr(src, "ndim", 0) <= 1:
                 continue
             try:
                 cropped = src[slicer]
@@ -354,7 +354,7 @@ def run_feature_extraction(obj, key):
     for a specified short-wave infrared absorption feature using multiple
     possible fitting techniques.
     """
-    pos, dep, feat_mask = sf.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'QUAD')
+    pos, dep, feat_mask = sf.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'POLY')
     obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
     obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
@@ -414,6 +414,46 @@ def wta_multi_range_minmap(obj, exemplars, coll_name, mode='pearson'):
     obj.add_temp_dataset(f'{key_prefix}WINDOW', best_window, '.npy')
     
     return obj
+
+
+def wta_min_map_user_defined(obj, exemplars, coll_name, ranges, mode='pearson'):
+    """
+    Compute a winner-takes-all map on a user selected range.
+
+    Parameters
+    ----------
+    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    coll_name : str text name of the collection passed
+    ranges : list[float(min), float(max)]
+    mode : str (pearson, sam, msam)
+    
+    
+    """
+    coll_name = coll_name.replace('_', '')
+    key_prefix = f"MinMap-{ranges[0]}-{ranges[1]}-{mode}-{coll_name}"
+    data = obj.savgol_cr
+    bands_nm = obj.bands
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_subrange(data, exemplar_stack, bands_nm, ranges, mode=mode)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+
+    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
+    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
+    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
+
+    return obj
+
+
 
 def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
     """
