@@ -261,7 +261,7 @@ def mk_thumb(
             if mask is not None:
                 a = np.ma.masked_array(arr, mask = mask).astype(float)
             else:
-                a = np.array(arr).astype(float)
+                a = np.ma.array(arr, dtype=float)
             checkpoint("after arr.astype(float)")
 
             amin = np.nanmin(a)
@@ -273,7 +273,7 @@ def mk_thumb(
             else:
                 norm = np.zeros_like(a, dtype=float)
             checkpoint("after normalisation")
-
+            norm = np.ma.array(norm, mask=a.mask)
             rgb = my_map(norm)[..., :3]
             checkpoint("after colormap call (my_map(norm))")
 
