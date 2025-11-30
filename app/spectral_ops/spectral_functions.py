@@ -850,79 +850,77 @@ def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
 
     return concatenated
 
-def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
+#====== Functions for working with unwrapped datasets =========================
+def compute_downhole_mineral_fractions(
+    index_map: np.ndarray,
+    mask: np.ndarray,
+    legend: list[dict],
+) -> tuple[np.ndarray, np.ndarray]:
     """
-    Extract bounding boxes from component stats, pad to a common width,
-    and stack them vertically (right-to-left, then top-to-bottom ordering).
+    Compute row-based mineral fractions and dominant mineral per row.
 
-    Parameters
-    ----------
-    image : ndarray
-        Input 2D or 3D image to segment.
-    stats : ndarray, shape (N, 5)
-        (x, y, width, height, area) rows from `cv2.connectedComponentsWithStats`.
-    MIN_AREA : int, optional
-        Minimum area to keep.
-    MIN_WIDTH : int, optional
-        Minimum width to keep.
-
-    Returns
-    -------
-    ndarray
-        Vertically concatenated segments (plain array; padding filled with zeros).
-
-    Notes
-    -----
-    Segments are sorted into columns using an x-based binning tolerance,
-    then into rows by ascending y. 
+    - Uses mask to exclude non-core pixels (mask==1).
+    - Fractions are normalised over *core* pixels only in each row.
+    - Columns 0..K-1 correspond to legend entries (in order).
+    - Column K is 'unclassified': core pixels whose index is not in legend.
+    - dominant[i] is index into legend (0..K-1), or -1 if no classified pixels.
+    
+    - Legend must be an ordered list of dictionaries ["index" : idx,
+                                                      "label" : "label text"]
+    
+    
     """
+    if index_map.ndim != 2:
+        raise ValueError(f"index_map must be 2D, got {index_map.shape}")
+    if mask.shape != index_map.shape:
+        raise ValueError("mask and index_map must have the same shape")
 
+    idx = np.asarray(index_map, dtype=int)
+    msk = np.asarray(mask, dtype=bool)
+    H, W = idx.shape
 
-    segments = []
+    class_ids = np.array([row["index"] for row in legend], dtype=int)
+    K = len(class_ids)
 
-    for i in range(1, stats.shape[0]): # Skip background (label 0)
-        x, y, w, h, area = stats[i]
-        if area < MIN_AREA or w < MIN_WIDTH:
-            continue # Skip small regions
+    fractions = np.zeros((H, K + 1), dtype=float)
+    dominant = np.full(H, -1, dtype=int)
+
+    for i in range(H):
+        row = idx[i]
+        row_mask = msk[i]
+
+        # core pixels only: not masked, and index >= 0
+        valid_mask = (~row_mask) & (row >= 0)
+        if not np.any(valid_mask):
+            continue  # leave zeros; dominant[i] stays -1
+
+        valid_vals = row[valid_mask]
+        total_valid = valid_vals.size
+
+        # Count *all* core values in this row
+        max_val = int(valid_vals.max())
+        counts_all = np.bincount(valid_vals, minlength=max_val + 1)
+
+        # Extract counts for legend classes in legend order
+        counts = np.zeros(K, dtype=float)
+        for j, cid in enumerate(class_ids):
+            if 0 <= cid < counts_all.size:
+                counts[j] = counts_all[cid]
+
+        total_classified = counts.sum()
+        unclassified = total_valid - total_classified
+
+        # Fractions over core width
+        fractions[i, :K] = counts / total_valid
+        fractions[i, K] = unclassified / total_valid
+
+        if total_classified > 0:
+            dominant[i] = int(np.argmax(fractions[i, :K]))
         else:
-            segment = image[y:y+h, x:x+w]
-                        # Store top-left x, y for sorting
-            segments.append(((x, y), segment))
+            dominant[i] = -1
 
-    # Sort segments: right to left (x descending), top to bottom (y ascending)
-    tolerance = 15
-    segments_sorted = sorted(segments, key=lambda s: (round(-s[0][0]/tolerance), s[0][1]))
+    return fractions, dominant
 
-
-
-    # Determine max width
-    max_width = max(s[1].shape[1] for s in segments_sorted)
-    # Pad segments to same width
-    padded_segments = []
-
-    for _, seg in segments_sorted:
-        h, w = seg.shape[:2]
-        pad_total = max_width - w
-
-        if pad_total > 0:
-            pad_left = pad_total // 2
-            pad_right = pad_total - pad_left
-            if seg.ndim == 2:
-                pad_shape = ((0, 0), (pad_left, pad_right))
-            else:
-                pad_shape = ((0, 0), (pad_left, pad_right), (0, 0))
-
-            seg_padded = np.pad(seg, pad_shape, mode='constant', constant_values=0)
-        else:
-            seg_padded = seg
-
-        padded_segments.append(seg_padded)
-
-
-    # Stack vertically
-    concatenated = np.vstack(padded_segments)
-
-    return concatenated
 
 
 #========= Functions for interpreting reflectance data ========================
@@ -2150,7 +2148,80 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     return output_data, output_image
 
 
+# Older version of unwrap_from_stats, not mask aware. Dont think it is used in GUI
+def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
+    """
+    Extract bounding boxes from component stats, pad to a common width,
+    and stack them vertically (right-to-left, then top-to-bottom ordering).
 
+    Parameters
+    ----------
+    image : ndarray
+        Input 2D or 3D image to segment.
+    stats : ndarray, shape (N, 5)
+        (x, y, width, height, area) rows from `cv2.connectedComponentsWithStats`.
+    MIN_AREA : int, optional
+        Minimum area to keep.
+    MIN_WIDTH : int, optional
+        Minimum width to keep.
+
+    Returns
+    -------
+    ndarray
+        Vertically concatenated segments (plain array; padding filled with zeros).
+
+    Notes
+    -----
+    Segments are sorted into columns using an x-based binning tolerance,
+    then into rows by ascending y. 
+    """
+
+
+    segments = []
+
+    for i in range(1, stats.shape[0]): # Skip background (label 0)
+        x, y, w, h, area = stats[i]
+        if area < MIN_AREA or w < MIN_WIDTH:
+            continue # Skip small regions
+        else:
+            segment = image[y:y+h, x:x+w]
+                        # Store top-left x, y for sorting
+            segments.append(((x, y), segment))
+
+    # Sort segments: right to left (x descending), top to bottom (y ascending)
+    tolerance = 15
+    segments_sorted = sorted(segments, key=lambda s: (round(-s[0][0]/tolerance), s[0][1]))
+
+
+
+    # Determine max width
+    max_width = max(s[1].shape[1] for s in segments_sorted)
+    # Pad segments to same width
+    padded_segments = []
+
+    for _, seg in segments_sorted:
+        h, w = seg.shape[:2]
+        pad_total = max_width - w
+
+        if pad_total > 0:
+            pad_left = pad_total // 2
+            pad_right = pad_total - pad_left
+            if seg.ndim == 2:
+                pad_shape = ((0, 0), (pad_left, pad_right))
+            else:
+                pad_shape = ((0, 0), (pad_left, pad_right), (0, 0))
+
+            seg_padded = np.pad(seg, pad_shape, mode='constant', constant_values=0)
+        else:
+            seg_padded = seg
+
+        padded_segments.append(seg_padded)
+
+
+    # Stack vertically
+    concatenated = np.vstack(padded_segments)
+
+    return concatenated
 
 
 

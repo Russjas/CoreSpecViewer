@@ -248,13 +248,6 @@ class ImageCanvas2D(QWidget):
         if not shp or len(shp) == 1:
             return  # ignore 1D/unknown
 
-# =============================================================================
-#         if len(shp) == 2:
-#             rgb = image
-#             self.ax.clear()
-#             self.ax.imshow(rgb, cmap=my_map, origin="upper", vmin = np.min(rgb), vmax = np.max(rgb))
-# =============================================================================
-
         if len(shp) == 2:
             a = image.astype(float)
             amin = np.nanmin(a)
@@ -403,7 +396,108 @@ class ImageCanvas2D(QWidget):
             leg.set_draggable(True)  # users can move it if they want
 
         self.canvas.draw_idle()
+    
+    
+    def show_fraction_stack(
+        self,
+        depths: np.ndarray,
+        fractions: np.ndarray,   # (H, K+1)
+        legend: list[dict],      # length K, same order used in fractions
+        include_unclassified: bool = True,
+    ):
+        """
+        Show a vertical stacked mineral-fraction log.
 
+        Parameters
+        ----------
+        depths : (H,)
+            Depth per row (same length as fractions.shape[0]).
+        fractions : (H, K+1)
+            Output from compute_fullhole_mineral_fractions.
+            Columns 0..K-1 correspond to legend entries (in order).
+            Column K is 'unclassified' remainder.
+        legend : list of dict
+            [{'index': int, 'label': str}, ...], length K.
+        include_unclassified : bool
+            If False, hides the last 'unclassified' column.
+        """
+        depths = np.asarray(depths)
+        frac = np.asarray(fractions)
+        H, C = frac.shape
+        K = len(legend)
+
+        if C != K + 1:
+            return
+        if depths.shape[0] != H:
+            return
+
+        # Ensure depth increases downward visually
+        if depths[0] > depths[-1]:
+            depths = depths[::-1]
+            frac = frac[::-1, :]
+
+        self.ax.clear()
+        # give some room for a legend on the right, but not as much as the map
+        self.canvas.figure.subplots_adjust(right=0.80)
+        self.ax.set_axis_on()
+
+        # Which columns to plot
+        cols_to_plot = list(range(K))
+        if include_unclassified:
+            cols_to_plot.append(K)  # last column = remainder
+
+        frac_use = frac[:, cols_to_plot]      # (H, M)
+        cum = np.cumsum(frac_use, axis=1)    # (H, M)
+        left = np.hstack([np.zeros((H, 1)), cum[:, :-1]])
+        right = cum
+
+        cmap = matplotlib.colormaps.get("tab20") or matplotlib.colormaps["tab10"]
+        handles = []
+
+        for band_idx, col_idx in enumerate(cols_to_plot):
+            if col_idx < K:
+                cid = int(legend[col_idx]["index"])   # library ID
+                name = str(legend[col_idx]["label"])
+                color = cmap(cid % 20)
+            else:
+                cid = None
+                name = "Unclassified"
+                color = (0.3, 0.3, 0.3, 1.0)  # dark grey
+
+            self.ax.fill_betweenx(
+                depths,
+                left[:, band_idx],
+                right[:, band_idx],
+                step="pre",
+                facecolor=color,
+                edgecolor="none",
+                label=name,
+            )
+
+        self.ax.set_xlim(0.0, 1.0)
+        self.ax.invert_yaxis()
+        self.ax.set_xlabel("Fraction of row width")
+        self.ax.set_ylabel("Depth")
+        self.ax.grid(True, axis="x", alpha=0.2)
+
+        # Legend: one entry per band
+        self.ax.legend(
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1.0),
+            borderaxespad=0.0,
+            frameon=True,
+            framealpha=0.9,
+            fontsize=9,
+            handlelength=1.8,
+            handletextpad=0.6,
+        )
+
+        self.canvas.draw_idle()
+    
+    
+    
+    
+    
     def clear_memmap_refs(self):
         """Clear any matplotlib artists that might hold data references."""
         self.ax.clear()
