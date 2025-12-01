@@ -68,13 +68,13 @@ class Dataset:
             self.load_dataset()
 
     def close_handle(self) -> None:
-        print('close called')
+        
         """
         Explicitly close any outstanding memmap file handle to release the OS lock.
         Attempt to fix an annoying save bug
         """
         if self._memmap_ref is not None:
-            print('actually closing')
+            
             self._memmap_ref.close()
         gc.collect()
         self._memmap_ref = None
@@ -142,11 +142,11 @@ class Dataset:
 
         elif self.ext == '.npy':
             # If it's a memmap and we're not creating new, just return
-            print(type(self.data), self.key)
+            
             if isinstance(self.data, np.memmap) and not new:
                 return
 
-            print((self._memmap_ref is None), 'mem ref is None')
+            
 
             np.save(self.path, self.data)
 

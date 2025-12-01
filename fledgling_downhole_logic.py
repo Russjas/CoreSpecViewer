@@ -12,9 +12,10 @@ from app.models.hole_object import HoleObject
 import spectral as sp
 import numpy as np
 
-hole = HoleObject.build_from_parent_dir('D:/Clonminch_uncropped')
-
-
+hole = HoleObject.build_from_parent_dir('D:/#A1_newhole')
+#%%
+for key in hole.base_datasets.keys():
+    hole.base_datasets[key].save_dataset()
 
 #%%
 full_fractions = None    # will become (H_total, K+1)

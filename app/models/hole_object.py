@@ -12,7 +12,11 @@ import json
 from pathlib import Path
 from typing import Union
 
+import numpy as np
+
+from ..spectral_ops import spectral_functions as sf
 from .processed_object import ProcessedObject
+from .dataset import Dataset
 
 
 def combine_timestamp(meta: dict) -> datetime | None:
@@ -41,6 +45,157 @@ class HoleObject:
     last_box: int
     hole_meta: dict[int, dict] = field(default_factory=dict)
     boxes: dict[int, "ProcessedObject"] = field(default_factory=dict)
+    base_datasets: dict = field(default_factory=dict)
+    product_datasets: dict = field(default_factory=dict)
+    step: float = 0.1
+    
+    #==================fullhole dataset operations=============================
+    """
+    Hole owned datasets will always have hole_id as the basename
+    path = self.root_dir / f"{self.hole_id}_{key}{ext}"
+    #ds = Dataset(base=self.hole_id, key=key, path=path, suffix=key, ext=ext, data=data)
+    """
+    def load_hole_datasets(self):
+        for fp in self.root_dir.iterdir():
+            if not fp.is_file():
+                continue
+            s = fp.stem
+            base, sep, key = s.rpartition("_")
+            
+            if base is None or base != self.hole_id:
+                continue  # not fullhole dataset
+            
+            ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
+
+            print(key, ext, base)
+            ds = Dataset(base=self.hole_id, key=key, path=fp, suffix=key, ext=ext)
+            base = ["depths", "AvSpectra"]
+            if key in base:
+                self.base_datasets[key] = ds
+            else:
+                self.product_datasets[key] = ds
+        return
+    
+    
+    def create_base_datasets(self):
+        """
+        This function will only work if every po in hole has had unwrapped stats calculated
+        and .....
+        """
+        if not self.check_for_all_keys('stats'):
+            return
+        full_depths = None
+        full_average = None
+        try:
+            for po in self:
+                img = sf.unwrap_from_stats(po.mask, po.savgol, po.stats)
+                depths = np.linspace(float(po.metadata['core depth start']), 
+                                         float(po.metadata['core depth stop']),
+                                         img.shape[0])
+                if full_depths is None:
+                    full_depths = depths      
+                    full_average = np.ma.mean(img, axis=1)
+                else:
+                    full_depths = np.concatenate((full_depths, depths))
+                    full_average = np.vstack((full_average, np.ma.mean(img, axis=1)))
+                po.save_all()
+                po.reload_all()
+        except Exception as e:
+            print('many, many things could have gone wrong - new code.')
+            return self
+        self.base_datasets['depths'] = Dataset(base=self.hole_id, 
+                                          key="depths", 
+                                          path=self.root_dir / f"{self.hole_id}_depths.npy", 
+                                          suffix="depths", 
+                                          ext=".npy", 
+                                          data=full_depths)
+        self.base_datasets['AvSpectra'] = Dataset(base=self.hole_id, 
+                                          key="AvSpectra", 
+                                          path=self.root_dir / f"{self.hole_id}_AvSpectra.npy", 
+                                          suffix="AvSpectra", 
+                                          ext=".npy", 
+                                          data=full_average.data)
+        
+        
+        for ds in self.base_datasets.values():
+            ds.save_dataset()
+        return self
+        
+    def create_dhole_minmap(self, key):
+        print('called')
+        print(key)
+        if not self.check_for_all_keys(key):
+            print("bounced on not all keys")
+            return
+        if not (key.endswith("INDEX") or key.endswith("LEGEND")):
+            print("bounced on endswith")
+            return
+        
+        if key.endswith("INDEX"):
+            leg_key = key.replace("INDEX", "LEGEND")
+            ind_key = key
+        elif key.endswith("LEGEND"):
+            leg_key = key
+            ind_key = key.replace("LEGEND", "INDEX")
+        #check all legends are the same, not working with different versions
+        dicts = [po.datasets[leg_key].data for po in self]
+        if not all(d == dicts[0] for d in dicts[1:]):
+            print("bounced on dict uniqueness")
+            return
+        full_fractions = None    # will become (H_total, K+1)
+        full_dominant  = None 
+        legend = dicts[0]
+        for po in self:
+            seg = sf.unwrap_from_stats(po.mask, po.datasets[ind_key].data, po.stats)
+            fractions, dominant = sf.compute_downhole_mineral_fractions(seg.data, seg.mask, 
+                                                                     po.datasets[leg_key].data)
+            if full_fractions is None:
+                # First box → just take it as-is
+                full_fractions = fractions      # shape (H_box, K+1)
+                full_dominant  = dominant       # shape (H_box,)
+            else:
+                # Append this box below the existing full arrays
+                full_fractions = np.vstack((full_fractions, fractions))
+                full_dominant  = np.concatenate((full_dominant, dominant))
+            po.reload_all()
+        
+        fracs_key = ind_key.replace("INDEX", "FRACTIONS")
+        dom_key = ind_key.replace("INDEX", "DOM-MIN")
+        self.product_datasets[fracs_key] = Dataset(base=self.hole_id, 
+                                          key=fracs_key, 
+                                          path=self.root_dir / f"{self.hole_id}_{fracs_key}.npy", 
+                                          suffix=fracs_key, 
+                                          ext=".npy", 
+                                          data=full_fractions)
+        self.product_datasets[dom_key] = Dataset(base=self.hole_id, 
+                                          key=dom_key, 
+                                          path=self.root_dir / f"{self.hole_id}_{dom_key}.npy", 
+                                          suffix=dom_key, 
+                                          ext=".npy", 
+                                          data=full_dominant)
+        self.product_datasets[leg_key] = Dataset(base=self.hole_id, 
+                                          key=leg_key, 
+                                          path=self.root_dir / f"{self.hole_id}_{leg_key}.json", 
+                                          suffix=leg_key, 
+                                          ext=".json", 
+                                          data=legend)
+        print("done")
+        
+# =============================================================================
+#TODO list
+#         figure out how to handle missing boxes - particularly important when I start resampling, 
+#but plots will be misleading now
+#         Implement building feature product_datasets
+#         implement resampling logic as HoleObject method
+# 
+#         Add plotting methods to the gui architecture
+#         Wire up the GUI for downhole plots
+# =============================================================================
+        
+        
+#================box level functions ==========================================
+    
+    
 
     @classmethod
     def build_from_box(cls, obj):
@@ -90,7 +245,7 @@ class HoleObject:
 
         if hole.num_box == 0:
             raise ValueError(f"No boxes in {root} matched borehole id '{hole_id}'.")
-
+        hole.load_hole_datasets()
         return hole
 
     @classmethod

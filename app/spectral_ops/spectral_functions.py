@@ -203,18 +203,18 @@ def mk_thumb(
     PIL.Image.Image
         RGB thumbnail image, ready to save as JPEG.
     """
-    print("make thumb called")
+    
     t0 = time.perf_counter()
 
     def checkpoint(label: str):
         print(f"[mk_thumb] {label}: {time.perf_counter() - t0:.4f}s")
 
-    checkpoint("start")
+    
 
     # ---- to ndarray + sanity checks
     arr = np.asarray(arr)
     print(arr.shape, 'shape check after asarray')
-    checkpoint("after np.asarray(arr)")
+    
 
     if arr.ndim not in (2, 3):
         raise ValueError(f"Unsupported array shape {arr.shape}; expected 2D or 3D.")
@@ -231,14 +231,14 @@ def mk_thumb(
             raise ValueError(
                 f"Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}."
             )
-    checkpoint("after mask validation")
+    
 
     # ---- orientation flip
     if arr.shape[0] > arr.shape[1]:
         arr = np.flip(np.swapaxes(arr, 0, 1), axis=0)
         if mask is not None:
             mask = np.flip(np.swapaxes(mask, 0, 1), axis=0)
-    checkpoint("after optional orientation flip")
+    
 
     # ------------------------------------------------------------------
     # 1) INDEX MODE: use classification colour map (tab20)
@@ -250,7 +250,7 @@ def mk_thumb(
             )
 
         rgb8 = index_to_rgb(arr, mask=mask)
-        checkpoint("after index_to_rgb()")
+        
 
     # ------------------------------------------------------------------
     # 2) NORMAL MODE: original mk_thumb behaviour
@@ -262,11 +262,11 @@ def mk_thumb(
                 a = np.ma.masked_array(arr, mask = mask).astype(float)
             else:
                 a = np.ma.array(arr, dtype=float)
-            checkpoint("after arr.astype(float)")
+            
 
             amin = np.nanmin(a)
             amax = np.nanmax(a)
-            checkpoint("after nanmin/max")
+            
 
             if amax > amin:
                 norm = (a - amin) / (amax - amin)
@@ -292,17 +292,17 @@ def mk_thumb(
             if C > 3:
                 # hyperspectral false-colour conversion
                 fc = get_false_colour(arr)
-                checkpoint("after get_false_colour(arr)")
+                
 
                 fc = np.asarray(fc)
-                checkpoint("after np.asarray(fc)")
+                
 
                 if fc.ndim != 3 or fc.shape[2] != 3:
                     raise ValueError("get_false_colour must return (H, W, 3) array.")
 
                 if np.issubdtype(fc.dtype, np.integer):
                     rgb8 = np.clip(fc, 0, 255).astype(np.uint8)
-                    checkpoint("after clip+astype for integer false-colour")
+                    
                 else:
                     vmin = np.nanmin(fc)
                     vmax = np.nanmax(fc)
@@ -320,7 +320,7 @@ def mk_thumb(
                         posinf=255.0,
                         neginf=0.0,
                     ).astype(np.uint8)
-                    checkpoint("after false-colour float→uint8")
+                    
 
             else:
                 # C == 1 or C == 3
@@ -328,21 +328,21 @@ def mk_thumb(
 
                 if C == 1:
                     a = np.repeat(a, 3, axis=2)
-                    checkpoint("after repeat single band to RGB")
+                    
 
                 if np.issubdtype(a.dtype, np.integer):
                     rgb8 = np.clip(a, 0, 255).astype(np.uint8)
-                    checkpoint("after integer RGB clip+astype")
+                    
                 else:
                     vmin = np.nanmin(a)
                     vmax = np.nanmax(a)
-                    checkpoint("after nanmin/max for RGB")
+                    
 
                     if vmax > vmin:
                         rgb = (a - vmin) / (vmax - vmin)
                     else:
                         rgb = np.zeros_like(a, dtype=float)
-                    checkpoint("after float RGB normalisation")
+                    
 
                     rgb8 = np.nan_to_num(
                         rgb * 255.0,
@@ -364,13 +364,13 @@ def mk_thumb(
     new_h = max(1, int(round(h * scale)))
 
     im = Image.fromarray(rgb8, mode="RGB")
-    checkpoint("after Image.fromarray")
+    
 
     if (new_w, new_h) != (w, h) and resize:
         im = im.resize((new_w, new_h), Image.LANCZOS)
-    checkpoint("after resize (LANCZOS)")
+    
 
-    checkpoint("END")
+    
     return im
 
 
