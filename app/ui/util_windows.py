@@ -63,6 +63,22 @@ def busy_cursor(msg=None, window=None):
         if window and hasattr(window, "statusBar"):
             window.statusBar().clearMessage()
 
+class PopoutWindow(QMainWindow):
+    """
+    A simple top-level window to host a popped-out widget.
+    It takes ownership of the content widget and ensures it's resized.
+    """
+    def __init__(self, content_widget: QWidget, title: str = "Popout Window", parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        content_widget.setParent(self) 
+        
+        self.setCentralWidget(content_widget)
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        
+        self.resize(content_widget.sizeHint() * 1.5)
+
+
 class RightClick_Table(QTableView):
     rightClicked = pyqtSignal(QModelIndex)
     def __init__(self, parent = None):
@@ -705,8 +721,8 @@ class ClosableWidgetWrapper(QWidget):
     """
     # Signal emitted when the close button is clicked, carries a reference to self
     closed = pyqtSignal(object)
-
-    def __init__(self, wrapped_widget: QWidget, title: str = "", parent=None, closeable = True):
+    popout_requested = pyqtSignal(object)
+    def __init__(self, wrapped_widget: QWidget, title: str = "", parent=None, closeable = True, popoutable = False):
         super().__init__(parent)
         self.wrapped_widget = wrapped_widget
 
@@ -719,8 +735,13 @@ class ClosableWidgetWrapper(QWidget):
         self.label = QLabel(title); self.toolbar.addWidget(self.label)
         self.toolbar.addSeparator()
         #self.toolbar.addStretch()
-
-        # 3. Add the close action
+        
+        if popoutable:
+            popout_action = QAction("⇱", self) # Using U+21f1 (North West Arrow and South East Arrow)
+            popout_action.setToolTip(f"Show {title} in a separate window")
+            popout_action.triggered.connect(self._emit_popout)
+            self.toolbar.addAction(popout_action)
+        
         if closeable:
             close_action = QAction("✕ Close", self)
             close_action.setToolTip(f"Close {title}")
@@ -741,7 +762,10 @@ class ClosableWidgetWrapper(QWidget):
     def _emit_closed(self):
         """Emits the signal that the parent should handle."""
         self.closed.emit(self)
-
+        
+    def _emit_popout(self):
+        """Emits the signal that the parent should handle to undock the widget."""
+        self.popout_requested.emit(self)
 
 class SpectrumWindow(QMainWindow):
     def __init__(self, parent=None):

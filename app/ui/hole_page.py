@@ -665,10 +665,12 @@ class HolePage(BasePage):
         
     def add_dhole_display(self, key, depths, values, legend = None):
         canvas = ImageCanvas2D(self)
-        self._add_closable_widget(
+        wrapper = self._add_closable_widget(
             canvas,
-            title=f"Downhole: {key}"
+            title=f"Downhole: {key}",
+            popoutable = True
         )
+        wrapper.popout_requested.connect(self._handle_popout_request)
         if legend:
             canvas.show_fraction_stack(depths, values, legend, 
                                       include_unclassified=True)
