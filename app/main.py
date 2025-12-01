@@ -749,6 +749,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('feature extraction {key}....', self):
                 for po in self.cxt.ho:
                     t.run_feature_extraction(po, key)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -781,6 +782,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map(po, exemplars, name)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -822,6 +824,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map_SAM(po, exemplars, name)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -865,6 +868,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_multi_range_minmap(po, exemplars, name, mode=mode)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -922,6 +926,7 @@ class MainRibbonController(QMainWindow):
                 for po in self.cxt.ho:
                     try:
                         t.wta_min_map_user_defined(po, exemplars, name, [start_nm, stop_nm], mode=mode)
+                        po.commit_temps()
                         po.save_all()
                         po.reload_all()
                         po.load_thumbs()
@@ -979,6 +984,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map_MSAM(po, exemplars, name)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -1022,6 +1028,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('clustering...', self):
                 for po in self.cxt.ho:
                     t.kmeans_caller(po, clusters, iters)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()

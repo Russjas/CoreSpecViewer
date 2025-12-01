@@ -131,7 +131,7 @@ class ProcessedObject:
 
             ds = Dataset(base=basename, key=key, path=fp, suffix=key, ext=ext)
             datasets[key] = ds
-            print(key)
+            
 
         return cls(basename=basename, root_dir=root, datasets=datasets)
 
@@ -163,7 +163,7 @@ class ProcessedObject:
         path = self.root_dir / f"{self.basename}_{key}{ext}"
         ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
         self.temp_datasets[key] = ds
-        print('calling build thum with {key}')
+        
         self.build_thumb(key)
 
     def update_root_dir(self, path):
@@ -307,7 +307,7 @@ class ProcessedObject:
             else:
                 mask_to_use = getattr(self, 'mask', None)
                 mask_data = mask_to_use
-                print(f"Default key: {key}")
+                
             try:
                 processed = process_and_save(ds, key, mask_data)
                 if not processed:
@@ -319,7 +319,7 @@ class ProcessedObject:
     
     
     def build_thumb(self, key):
-        print(f'build thumb {key}')
+        
         ds = self.temp_datasets.get(key)
         if ds is None:
             ds = self.datasets.get(key)
@@ -337,7 +337,7 @@ class ProcessedObject:
                 ds.thumb = im
 
             elif ds.ext == ".npz":
-                print(key, type(ds.data))
+                
                 im = sf.mk_thumb(ds.data.data, mask=ds.data.mask)
                 #im = sf.mk_thumb(ds.data)
                 ds.thumb = im
