@@ -11,31 +11,6 @@ from app.models.processed_object import ProcessedObject
 from app.models.hole_object import HoleObject
 import spectral as sp
 import numpy as np
-
-hole = HoleObject.build_from_parent_dir('D:/#A1_newhole')
-#%%
-for key in hole.base_datasets.keys():
-    hole.base_datasets[key].save_dataset()
-
-#%%
-full_fractions = None    # will become (H_total, K+1)
-full_dominant  = None 
-for po in hole:
-    seg = sf.unwrap_from_stats(po.mask, po.datasets['MinMap-pearson-in rangeINDEX'].data, po.stats)
-    fractions, dominant = sf.compute_downhole_mineral_fractions(seg.data, seg.mask, 
-                                                             po.datasets['MinMap-pearson-in rangeLEGEND'].data)
-    if full_fractions is None:
-        # First box → just take it as-is
-        full_fractions = fractions      # shape (H_box, K+1)
-        full_dominant  = dominant       # shape (H_box,)
-    else:
-        # Append this box below the existing full arrays
-        full_fractions = np.vstack((full_fractions, fractions))
-        full_dominant  = np.concatenate((full_dominant, dominant))
-    po.reload_all()
-#%%
-import matplotlib.pyplot as plt
-import matplotlib
 def plot_fullhole_mineral_stack(
     depths: np.ndarray,
     fractions: np.ndarray,     # (H, K+1) from compute_fullhole_mineral_fractions
@@ -127,28 +102,105 @@ def plot_fullhole_mineral_stack(
 
     plt.tight_layout()
     return ax
-from app.interface import tools as t
-fullhole_depths = None
-for po in hole:
-    t.unwrapped_output(po)
-    depths = po.DholeDepths
-    if fullhole_depths is None:
-        # First box → just take it as-is
-        fullhole_depths = depths      # shape (H_box, K+1)
-    else:
-        # Append this box below the existing full arrays
-        fullhole_depths = np.concatenate((fullhole_depths, depths))
-    po.commit_temps()
-    po.save_all()   
-    po.reload_all()
+
+hole = HoleObject.build_from_parent_dir('D:/#A1_newhole')
+#%%
+from app.spectral_ops import downhole_resampling as dr
+from app.spectral_ops import downhole_resampling_claude_skip_boxes as drC
+from app.spectral_ops import downhole_resampling_gemini_skip_boxes as drG
+hole.step = 0.01
+
+Cldepths_bin, Clfractions_bin, Cldominant_bin = drC.resample_fractions_and_dominant_by_step(
+                                      hole.base_datasets["depths"].data,
+                                      hole.product_datasets['MinMap-pearson-in rangeFRACTIONS'].data, 
+                                      hole.step)
+GEdepths_bin, GEfractions_bin, GEdominant_bin = drG.resample_fractions_and_dominant_by_step(
+                                      hole.base_datasets["depths"].data,
+                                      hole.product_datasets['MinMap-pearson-in rangeFRACTIONS'].data, 
+                                      hole.step)
+
+
+# =============================================================================
+# depths1cm, fracs1cm, dom1cm = dr.resample_fractions_and_dominant_by_step(
+#     hole.base_datasets["depths"].data,
+#     hole.product_datasets['MinMap-pearson-in rangeFRACTIONS'].data,
+#     hole.step,
+# )
+# =============================================================================
+
+plot_fullhole_mineral_stack(
+    Cldepths_bin, 
+    Clfractions_bin, 
+    hole.product_datasets['MinMap-pearson-in rangeLEGEND'].data
+    )
+
+plot_fullhole_mineral_stack(
+    GEdepths_bin, 
+    GEfractions_bin, 
+    hole.product_datasets['MinMap-pearson-in rangeLEGEND'].data
+    )
+
+#%%
+hole.step = 0.05
+Cldepths, Clfeat = drC.bin_features_by_step(
+    hole.base_datasets["depths"].data,
+    hole.product_datasets['2320WPOS'].data,
+    hole.step)
+
+
+import matplotlib.pyplot as plt
+plt.figure()
+plt.plot(Clfeat,
+         Cldepths
+         )
+ax = plt.gca()
+ax.set_ylim(ax.get_ylim()[::-1])
+#%%
+for box in hole:
+    print(box.metadata['box number'], box.metadata['core depth start'], box.metadata['core depth stop'])
+
 
 
 #%%
-plot_fullhole_mineral_stack(
-    fullhole_depths,
-    full_fractions,
-    hole[0].datasets['MinMap-pearson-in rangeLEGEND'].data
-    )
+
+plt.figure()
+plt.plot(hole.product_datasets["2320WPOS"].data, 
+         hole.base_datasets["depths"].data)
+ax = plt.gca()
+ax.set_ylim(ax.get_ylim()[::-1])
+
+#%%
+po = hole[4957]
+key = "2320WPOS"
+seg = sf.unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats)
+plt.imshow(seg)
+#%%
+for key in hole.base_datasets.keys():
+    hole.base_datasets[key].save_dataset()
+
+#%%
+full_fractions = None    # will become (H_total, K+1)
+full_dominant  = None 
+for po in hole:
+    seg = sf.unwrap_from_stats(po.mask, po.datasets['MinMap-pearson-in rangeINDEX'].data, po.stats)
+    fractions, dominant = sf.compute_downhole_mineral_fractions(seg.data, seg.mask, 
+                                                             po.datasets['MinMap-pearson-in rangeLEGEND'].data)
+    if full_fractions is None:
+        # First box → just take it as-is
+        full_fractions = fractions      # shape (H_box, K+1)
+        full_dominant  = dominant       # shape (H_box,)
+    else:
+        # Append this box below the existing full arrays
+        full_fractions = np.vstack((full_fractions, fractions))
+        full_dominant  = np.concatenate((full_dominant, dominant))
+    po.reload_all()
+#%%
+import matplotlib.pyplot as plt
+import matplotlib
+
+
+#%%
+
 
 #%%
 np.save('D:/DownHole_TestData/a_clonminch_depths.npy', fullhole_depths)

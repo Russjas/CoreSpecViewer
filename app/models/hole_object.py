@@ -15,6 +15,7 @@ from typing import Union
 import numpy as np
 
 from ..spectral_ops import spectral_functions as sf
+from ..spectral_ops import downhole_resampling as res
 from .processed_object import ProcessedObject
 from .dataset import Dataset
 
@@ -49,6 +50,7 @@ class HoleObject:
     product_datasets: dict = field(default_factory=dict)
     step: float = 0.1
     
+    
     #==================fullhole dataset operations=============================
     """
     Hole owned datasets will always have hole_id as the basename
@@ -79,8 +81,9 @@ class HoleObject:
     
     def create_base_datasets(self):
         """
-        This function will only work if every po in hole has had unwrapped stats calculated
-        and .....
+        This function will only work if every po in hole has had unwrapped stats calculated.
+        Returns HoleObject with unwrapped, concatenated downhole datasets.
+        Does not account for missing boxes in this step
         """
         if not self.check_for_all_keys('stats'):
             return
@@ -101,7 +104,7 @@ class HoleObject:
                 po.save_all()
                 po.reload_all()
         except Exception as e:
-            print('many, many things could have gone wrong - new code.')
+            print(f'many, many things could have gone wrong - new code.{e}')
             return self
         self.base_datasets['depths'] = Dataset(base=self.hole_id, 
                                           key="depths", 
@@ -122,6 +125,12 @@ class HoleObject:
         return self
         
     def create_dhole_minmap(self, key):
+        """
+        Returns HoleObject with unwrapped, concatenated Mineral map datasets.
+        Requires all boxes to have a ...INDEX and ...LEGEND style mineral map,
+        and that all boxes have identical legends.
+        Does not account for missing boxes in this step
+        """
         print('called')
         print(key)
         if not self.check_for_all_keys(key):
@@ -179,19 +188,75 @@ class HoleObject:
                                           suffix=leg_key, 
                                           ext=".json", 
                                           data=legend)
-        print("done")
         
+        
+    def create_dhole_features(self, key):
+        """
+        Returns HoleObject with unwrapped, concatenated feature datasets.
+        Pos and dep datasets must be passed separately, no discovery is included.
+        Datasets must me masked arrays.
+        Does not account for missing boxes in this step
+        """
+        if not self.check_for_all_keys(key):
+            print("bounced on not all keys")
+            return
+        
+        full_feature = None    # will become (H_total, K+1)
+        for po in self:
+            if po.datasets[key].ext != ".npz":
+                print("bounced not passed a masked array")
+                return
+            seg = sf.unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats)
+            feat_row = np.ma.mean(seg, axis=1)
+            feat_row = np.ma.masked_less(feat_row, 1)
+            if full_feature is None:
+                # First box → just take it as-is
+                full_feature = feat_row
+                
+            else:
+                full_feature  = np.ma.concatenate((full_feature, feat_row))
+            po.reload_all()
+        
+        self.product_datasets[key] = Dataset(base=self.hole_id, 
+                                          key=key, 
+                                          path=self.root_dir / f"{self.hole_id}_{key}", 
+                                          suffix=key, 
+                                          ext=".npz", 
+                                          data=full_feature)
+
+
+    def step_product_dataset(self, key):
+        if key not in self.product_datasets.keys():
+            print("bounced no dataset")
+            return
+        if (key.endswith("FRACTIONS") or key.endswith("DOM-MIN")):
+            if key.endswith("FRACTIONS"):
+                dom_key = key.replace("FRACTIONS", "DOM-MIN")
+                frac_key = key
+            elif key.endswith("DOM-MIN"):
+                frac_key = key
+                dom_key = key.replace("DOM-MIN", "FRACTIONS")
+                depths_stepped, fractions_stepped, dominant_stepped = res.resample_fractions_and_dominant_by_step(
+                                                                    self.base_datasets["depths"].data,
+                                                                    self.product_datasets[frac_key].data,
+                                                                    self.step)
+                return depths_stepped, fractions_stepped, dominant_stepped
+        else:
+            depths_stepped, feature_stepped = res.bin_features_by_step(
+                          self.base_datasets["depths"].data,
+                          self.product_datasets[key].data,
+                          self.step)
+            return depths_stepped, feature_stepped, None
 # =============================================================================
 #TODO list
-#         figure out how to handle missing boxes - particularly important when I start resampling, 
-#but plots will be misleading now
-#         Implement building feature product_datasets
-#         implement resampling logic as HoleObject method
+
 # 
 #         Add plotting methods to the gui architecture
 #         Wire up the GUI for downhole plots
 # =============================================================================
-        
+    def save_product_datasets(self):
+        for key in self.product_datasets.keys():
+            self.product_datasets[key].save_dataset()
         
 #================box level functions ==========================================
     
