@@ -48,7 +48,7 @@ class HoleObject:
     boxes: dict[int, "ProcessedObject"] = field(default_factory=dict)
     base_datasets: dict = field(default_factory=dict)
     product_datasets: dict = field(default_factory=dict)
-    step: float = 0.1
+    step: float = 0.05
     
     
     #==================fullhole dataset operations=============================
@@ -86,7 +86,7 @@ class HoleObject:
         Does not account for missing boxes in this step
         """
         if not self.check_for_all_keys('stats'):
-            return
+            raise ValueError("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
         full_depths = None
         full_average = None
         try:
@@ -134,11 +134,9 @@ class HoleObject:
         print('called')
         print(key)
         if not self.check_for_all_keys(key):
-            print("bounced on not all keys")
-            return
+            raise ValueError(f"{key} dataset is not available for every box in hole")
         if not (key.endswith("INDEX") or key.endswith("LEGEND")):
-            print("bounced on endswith")
-            return
+            raise ValueError(f"{key} is an invalid dataset for this operation")
         
         if key.endswith("INDEX"):
             leg_key = key.replace("INDEX", "LEGEND")
@@ -149,8 +147,7 @@ class HoleObject:
         #check all legends are the same, not working with different versions
         dicts = [po.datasets[leg_key].data for po in self]
         if not all(d == dicts[0] for d in dicts[1:]):
-            print("bounced on dict uniqueness")
-            return
+            raise ValueError(f"Boxes with {key} have different Legend entries")
         full_fractions = None    # will become (H_total, K+1)
         full_dominant  = None 
         legend = dicts[0]
@@ -188,7 +185,7 @@ class HoleObject:
                                           suffix=leg_key, 
                                           ext=".json", 
                                           data=legend)
-        
+        print("datasets successfully created!") 
         
     def create_dhole_features(self, key):
         """
@@ -198,14 +195,13 @@ class HoleObject:
         Does not account for missing boxes in this step
         """
         if not self.check_for_all_keys(key):
-            print("bounced on not all keys")
-            return
+            raise ValueError(f"{key} dataset is not available for every box in hole")
         
         full_feature = None    # will become (H_total, K+1)
         for po in self:
             if po.datasets[key].ext != ".npz":
-                print("bounced not passed a masked array")
-                return
+                raise ValueError(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
+                
             seg = sf.unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats)
             feat_row = np.ma.mean(seg, axis=1)
             feat_row = np.ma.masked_less(feat_row, 1)
@@ -227,21 +223,23 @@ class HoleObject:
 
     def step_product_dataset(self, key):
         if key not in self.product_datasets.keys():
-            print("bounced no dataset")
-            return
+            raise ValueError("bounced no dataset")
+        print(f"{key} passed successfully!")   
         if (key.endswith("FRACTIONS") or key.endswith("DOM-MIN")):
+            print('on fractions line')
             if key.endswith("FRACTIONS"):
                 dom_key = key.replace("FRACTIONS", "DOM-MIN")
                 frac_key = key
             elif key.endswith("DOM-MIN"):
                 frac_key = key
                 dom_key = key.replace("DOM-MIN", "FRACTIONS")
-                depths_stepped, fractions_stepped, dominant_stepped = res.resample_fractions_and_dominant_by_step(
-                                                                    self.base_datasets["depths"].data,
-                                                                    self.product_datasets[frac_key].data,
-                                                                    self.step)
-                return depths_stepped, fractions_stepped, dominant_stepped
+            depths_stepped, fractions_stepped, dominant_stepped = res.resample_fractions_and_dominant_by_step(
+                                                                self.base_datasets["depths"].data,
+                                                                self.product_datasets[frac_key].data,
+                                                                self.step)
+            return depths_stepped, fractions_stepped, dominant_stepped
         else:
+            print('on features line')
             depths_stepped, feature_stepped = res.bin_features_by_step(
                           self.base_datasets["depths"].data,
                           self.product_datasets[key].data,

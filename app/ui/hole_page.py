@@ -21,12 +21,14 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QStyledItemDelegate,
-    QStyle
+    QStyle,
+    QMessageBox,
+    QInputDialog
 )
 
 from ..models import HoleObject
 from .base_page import BasePage
-from .util_windows import ClosableWidgetWrapper, busy_cursor
+from .util_windows import ClosableWidgetWrapper, busy_cursor, ImageCanvas2D
 
 class NoSelectionDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
@@ -342,41 +344,70 @@ class HoleControlPanel(QWidget):
         info_layout.addRow("Depth range:", self.lbl_depth_range)
         self.layout.addLayout(info_layout)
 
-        # --- Extra column control panel---
-        # Create a local container for the combo + button
+        # --- Box level control panel---
         combo_block = QWidget(self)
         combo_layout = QVBoxLayout(combo_block)
         combo_layout.setContentsMargins(0, 0, 0, 0)
-        combo_layout.setSpacing(1)   # tight vertical spacing
-
+        combo_layout.setSpacing(1)
         # Label
         label = QLabel("Add extra columns:", combo_block)
         combo_layout.addWidget(label)
-
         # Combo box
         self.secondary_combo = QComboBox(combo_block)
         self.secondary_combo.setToolTip(
             "Controls which dataset is used to build thumbnails in the "
-            "new strip table."
-        )
-
+            "new strip table.")
         combo_layout.addWidget(self.secondary_combo)
-
         # Button directly below combo
         self.create_button = QPushButton("Show", combo_block)
         self.create_button.clicked.connect(self._on_display_btn_clicked)
         combo_layout.addWidget(self.create_button)
-
-        # Now add the *whole block* to your main layout
         self.layout.addWidget(combo_block)
-
-
+        
+        # --- full hole datasets control panal
+        combo_block_full = QWidget(self)
+        combo_layout_full = QVBoxLayout(combo_block_full)
+        combo_layout_full.setContentsMargins(0, 0, 0, 0)
+        combo_layout_full.setSpacing(1)
+        # Label
+        label = QLabel("Full hole datasets:", combo_block_full)
+        combo_layout_full.addWidget(label)
+        self.full_data_combo = QComboBox(combo_block_full)
+        self.full_data_combo.setToolTip(
+            "Controls which full downhole datasets can be displayed")
+        combo_layout_full.addWidget(self.full_data_combo)
+        
+        show_dhole_button = QPushButton("Show", combo_block_full)
+        show_dhole_button.clicked.connect(self.show_downhole)
+        combo_layout_full.addWidget(show_dhole_button)
+        
+        gen_base_button = QPushButton("Generate base datasets", combo_block_full)
+        gen_base_button.clicked.connect(self.gen_base_datasets)
+        combo_layout_full.addWidget(gen_base_button)
+        
+        gen_min_map_button = QPushButton("Generate Downhole MinMap datasets", combo_block_full)
+        gen_min_map_button.clicked.connect(self.dhole_minmaps_create)
+        combo_layout_full.addWidget(gen_min_map_button)
+        
+        gen_feats_button = QPushButton("Generate Downhole feature datasets", combo_block_full)
+        gen_feats_button.clicked.connect(self.dhole_feats_create)
+        combo_layout_full.addWidget(gen_feats_button)
+        
+        
+        self.layout.addWidget(combo_block_full)
         self.layout.addStretch(1)
 
+
+
+
+#---------initiation and refresh logic-----------------------------------------
+    #TODO add logic for full hole controller displays
     def _set_dataset_keys(self):
         """Populate the combobox without firing change signals."""
         self.secondary_combo.blockSignals(True)
         self.secondary_combo.clear()
+        self.full_data_combo.blockSignals(True)
+        self.full_data_combo.clear()
         keys = set()
         try:
             if self.cxt.ho.boxes:
@@ -384,19 +415,18 @@ class HoleControlPanel(QWidget):
                     keys = keys | box.datasets.keys() | box.temp_datasets.keys()
         except Exception:
             pass
+        def add_header_item(combo, text):
+            model = combo.model()
+            row = model.rowCount()
+            model.insertRow(row)
+            item = QStandardItem(text)
+            item.setFlags(Qt.ItemIsEnabled)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            model.setItem(row, 0, item)
         if keys:
             combo = self.secondary_combo
-            def add_header_item(combo, text):
-                model = combo.model()
-                row = model.rowCount()
-                model.insertRow(row)
-                item = QStandardItem(text)
-                item.setFlags(Qt.ItemIsEnabled)
-                font = item.font()
-                font.setBold(True)
-                item.setFont(font)
-                model.setItem(row, 0, item)
-
             base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
             unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
             non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands", 'metadata' }
@@ -421,28 +451,18 @@ class HoleControlPanel(QWidget):
             add_header_item(combo, "---Products---")
             for k in products:
                 combo.addItem(k)
-
+        
+        add_header_item(self.full_data_combo, "---Base data---")
+        for k in self.cxt.ho.base_datasets.keys():
+            self.full_data_combo.addItem(k)
+        add_header_item(self.full_data_combo, "---Product data---")
+        for k in self.cxt.ho.product_datasets.keys():
+            self.full_data_combo.addItem(k)
         self.secondary_combo.blockSignals(False)
+        self.full_data_combo.blockSignals(False)
 
-    # ------------------------------------------------------------------
-    def _on_display_btn_clicked(self, key: str):
-        """
-        User changed the dataset key for the secondary strip. Rebuild the
-        second table using this key.
-        """
-        text = self.secondary_combo.currentText()
-
-        key = text.strip()
-        if not key:
-            return
-        self.cxt = self._page.cxt
-        if self.cxt is None or self.cxt.ho is None:
-            return
-
-        self._page.add_column(dataset_key=key)
-
-
-    # ------------------------------------------------------------------
+   # ------------------------------------------------------------------
+    #TODO add display logic for dhole datasets
     def update_for_hole(self):
         """
         Refresh labels and available dataset keys when a new HoleObject is set.
@@ -486,11 +506,114 @@ class HoleControlPanel(QWidget):
         self._set_dataset_keys()
 
 
+# ---------Box level control handlers---------------------------------------------------------
+    def _on_display_btn_clicked(self, key: str):
+        """
+        User changed the dataset key for the secondary strip. Rebuild the
+        second table using this key.
+        """
+        text = self.secondary_combo.currentText()
 
+        key = text.strip()
+        if not key:
+            return
+        self.cxt = self._page.cxt
+        if self.cxt is None or self.cxt.ho is None:
+            return
 
+        self._page.add_column(dataset_key=key)
 
+# ---------Full hole level control handlers---------------------------------------------------------
 
+    def show_downhole(self):
+        if not self.cxt.ho:
+            return
+        text = self.full_data_combo.currentText()
 
+        key = text.strip()
+        if not key:
+            return
+        print(f"{key} from combo box")
+        suffixes = ("LEGEND", "FRACTIONS")
+        if key.endswith(suffixes):    
+            with busy_cursor("Resampling mineral map...", self):
+                try:
+                    depths, values, dominant = self.cxt.ho.step_product_dataset(key)
+                except ValueError as e:
+                    QMessageBox.warning(self, "Failed operation", f"Failed to show data: {e}")
+                    return
+                legend_key = key.replace("FRACTIONS", "LEGEND")
+                legend = self.cxt.ho.product_datasets[legend_key].data
+                
+        else:
+            legend = None
+            with busy_cursor("Resampling mineral map...", self):
+                try:
+                    depths, values, _ = self.cxt.ho.step_product_dataset(key)
+                except ValueError as e:
+                    QMessageBox.warning(self, "Failed operation", f"Failed to show data: {e}")
+                    return
+        self._page.add_dhole_display(key, depths, values, legend = legend)
+        
+    
+    def gen_base_datasets(self):
+        if not self.cxt.ho:
+            return
+        try:
+            self.cxt.ho.create_base_datasets()
+        except ValueError as e:
+            QMessageBox.warning(self, "Failed operation", f"Failed to create base data: {e}")
+            return
+        self.update_for_hole()
+        return
+    
+    def dhole_feats_create(self):
+        if not self.cxt.ho:
+            return
+        keys = set()
+        if not self.cxt.ho.boxes:
+            return
+        for box in self.cxt.ho:
+            keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+        
+        suffixes = ("POS", "DEP")
+        names = [x for x in keys if x.endswith(suffixes)]
+        
+        name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
+        if not name:
+            return
+        try:
+            self.cxt.ho.create_dhole_features(name)
+        except ValueError as e:
+            QMessageBox.warning(self, "Failed operation", f"Failed to create downhole feature: {e}")
+            return
+        self.update_for_hole()   
+        return
+    
+    def dhole_minmaps_create(self):
+        if not self.cxt.ho:
+            return
+        keys = set()
+        if not self.cxt.ho.boxes:
+            return
+        for box in self.cxt.ho:
+            keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+        
+        suffixes = ("INDEX")
+        names = [x for x in keys if x.endswith(suffixes)]
+        
+        name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
+        if not name:
+            return
+        try:
+            self.cxt.ho.create_dhole_minmap(name)
+        except ValueError as e:
+            QMessageBox.warning(self, "Failed operation", f"Failed to create downhole feature: {e}")
+            return
+        self.update_for_hole()   
+        return
+    
+    
 class HolePage(BasePage):
     """
     Hole-level view.
@@ -539,6 +662,20 @@ class HolePage(BasePage):
         self.extra_columns.append(new_col)
         self._register_scroll_table(new_col)
         self._refresh_from_hole()
+        
+    def add_dhole_display(self, key, depths, values, legend = None):
+        canvas = ImageCanvas2D(self)
+        self._add_closable_widget(
+            canvas,
+            title=f"Downhole: {key}"
+        )
+        if legend:
+            canvas.show_fraction_stack(depths, values, legend, 
+                                      include_unclassified=True)
+        else:
+            canvas.show_graph(depths, values, key)
+        # Wrap and add
+        
 
     def remove_widget(self, w: QWidget):
         """
@@ -703,6 +840,7 @@ class HolePage(BasePage):
 
         if self.cxt is not None and self.cxt.ho is not None:
             with busy_cursor('Saving.....', self):
+                self.cxt.ho.save_product_datasets()
                 for po in self.cxt.ho:
                     if po.has_temps:
                         po.commit_temps()

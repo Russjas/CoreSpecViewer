@@ -494,7 +494,23 @@ class ImageCanvas2D(QWidget):
 
         self.canvas.draw_idle()
     
-    
+    def show_graph(self, depths, values, key):
+        if depths.shape != values.shape:
+            print('returned here')
+            return
+        
+        
+        if depths[0] > depths[-1]:
+            depths = depths[::-1]
+            values = values[::-1, :]
+        print(depths, values, key)
+        self.ax.plot(values, depths, 'o-', markersize=3)
+        print('plotted')
+        self.ax.invert_yaxis()
+        self.ax.set_ylabel("Depth (m)")
+        self.ax.set_xlabel(key)
+        self.ax.grid(True, alpha=0.3)
+        self.canvas.draw()
     
     
     
