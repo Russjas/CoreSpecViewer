@@ -392,16 +392,19 @@ class MainRibbonController(QMainWindow):
                 return
             white_head_path, _ = QFileDialog.getOpenFileName(
             self, "Open White header file", "", "header files (*.hdr)")
-            if not data_head_path:
+            if not white_head_path:
                 return
             dark_head_path, _ = QFileDialog.getOpenFileName(
             self, "Open Dark header file", "", "header files (*.hdr)")
-            if not data_head_path:
+            if not dark_head_path:
                 return
             metadata_path, _ = QFileDialog.getOpenFileName(
             self, "Optional lumo metadata", "", "header files (*.xml)")
             try:
-                self.cxt.current = RawObject.manual_create_from_multiple_paths(data_head_path, data_head_path, data_head_path, metadata_path = metadata_path)
+                self.cxt.current = RawObject.manual_create_from_multiple_paths(data_head_path, 
+                                                                               white_head_path, 
+                                                                               dark_head_path, 
+                                                                               metadata_path = metadata_path)
                 self.choose_view('raw')
                 self.update_display()
                 return
