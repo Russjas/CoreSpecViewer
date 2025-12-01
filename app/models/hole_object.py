@@ -204,11 +204,8 @@ class HoleObject:
                 
             seg = sf.unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats)
             feat_row = np.ma.mean(seg, axis=1)
-            feat_row = np.ma.masked_less(feat_row, 1)
             if full_feature is None:
-                # First box → just take it as-is
                 full_feature = feat_row
-                
             else:
                 full_feature  = np.ma.concatenate((full_feature, feat_row))
             po.reload_all()
