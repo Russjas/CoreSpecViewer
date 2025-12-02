@@ -57,6 +57,7 @@ from .ui import (
     InfoTable,
     LibraryPage,
     MetadataDialog,
+    LibMetadataDialog,
     RawPage,
     VisualisePage,
     busy_cursor,
@@ -226,6 +227,10 @@ class MainRibbonController(QMainWindow):
                ]),
             ("menu",   "Features", self.extract_feature_list, "Performs Minimum Wavelength Mapping"),
             ("button", "Generate Images", self.gen_images, "Generates full size images of all products and base datasets in an outputs folder"),
+            ("menu", "Library building", [
+                ("Add spectra", self.act_lib_pix, "Add a single pixel spectra to the current library\n WARNING: This will modify the library on disk, use a back up"),
+                ("Add region average", self.act_lib_region, "Add the average spectra of a region to the current library\n WARNING: This will modify the library on disk, use a back u"),
+                ])
             ])
         
         # --- HOLE TAB ---
@@ -1089,7 +1094,154 @@ class MainRibbonController(QMainWindow):
         self._distribute_context()
         self.update_display()
         
+    def act_lib_pix(self):
+        """Add a single pixel spectrum to the current library."""
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Add to Library", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Add to Library", "Open a processed dataset first.")
+            return
+        if not self.cxt.library or not self.cxt.library.is_open():
+            QMessageBox.warning(self, "Add to Library", "No library database is open.")
+            return
+        
+        p = self._active_page()
+        if not p or not p.dispatcher or not p.left_canvas:
+            return
+        
+        def handle_point_click(y, x):
+            try:
+                spectrum = self.cxt.current.savgol[int(y), int(x), :]
+                wavelengths_nm = self.cxt.current.bands
+                print(type(spectrum), type(wavelengths_nm), 'types in handle point click')
+                
+                # Ask for metadata
+                dlg = LibMetadataDialog(parent=self)
+                if dlg.exec() != QDialog.Accepted:
+                    return  # user cancelled
+                
+                metadata = dlg.get_metadata()
+                name = metadata.get("Name", "").strip()
+                if not name:
+                    QMessageBox.warning(
+                        self, 
+                        "Add to Library", 
+                        "Name is a mandatory field"
+                    )
+                    return
+                
+                metadata['SampleNum'] = f"Hole: {self.cxt.current.metadata.get('borehole id', 'Unknown')} Box: {self.cxt.current.metadata.get('box number', 'Unknown')} Pixel: ({int(y)}, {int(x)})"
+                with busy_cursor('Adding to library...', self):
+                    sample_id = self.cxt.library.add_sample(
+                        name=name,
+                        wavelengths_nm=wavelengths_nm,
+                        reflectance=spectrum,
+                        metadata=metadata
+                    )
+                
+                self.statusBar().showMessage(
+                    f"Added spectrum '{name}' to library (ID: {sample_id})", 
+                    5000
+                )
+                
+            except Exception as e:
+                QMessageBox.warning(
+                    self, 
+                    "Add to Library", 
+                    f"Failed to add spectrum to library: {e}"
+                )
+            finally:
+                p.dispatcher.clear_all_temp()
+        
+        p.dispatcher.set_single_click(handle_point_click)
+        self.statusBar().showMessage("Click a pixel to add its spectrum to the library...")
 
+        
+    def act_lib_region(self):
+        """Add the average spectrum of a region to the current library."""
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Add to Library", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Add to Library", "Open a processed dataset first.")
+            return
+        if not self.cxt.library or not self.cxt.library.is_open():
+            QMessageBox.warning(self, "Add to Library", "No library database is open.")
+            return
+        
+        p = self._active_page()
+        if not p or not p.dispatcher or not p.left_canvas:
+            return
+        
+        def _on_rect(y0, y1, x0, x1):
+            try:
+                # Extract region and compute average spectrum
+                region = self.cxt.current.savgol[y0:y1, x0:x1, :]
+                
+                # Use mask if available to exclude masked pixels
+                if self.cxt.current.has('mask'):
+                    mask_region = self.cxt.current.mask[y0:y1, x0:x1]
+                    valid_pixels = region[mask_region == 0]
+                    if valid_pixels.size == 0:
+                        QMessageBox.warning(
+                            self, 
+                            "Add to Library", 
+                            "Selected region contains no valid (unmasked) pixels."
+                        )
+                        return
+                    avg_spectrum = valid_pixels.mean(axis=0)
+                    pixel_count = len(valid_pixels)
+                else:
+                    avg_spectrum = region.reshape(-1, region.shape[-1]).mean(axis=0)
+                    pixel_count = (y1 - y0) * (x1 - x0)
+                
+                wavelengths_nm = self.cxt.current.bands
+                
+                dlg = LibMetadataDialog(parent=self)
+                
+                if dlg.exec() != QDialog.Accepted:
+                    return  # user cancelled
+                
+                metadata = dlg.get_metadata()
+                name = metadata.get("Name", "").strip()
+                if not name:
+                    QMessageBox.warning(
+                        self, 
+                        "Add to Library", 
+                        "Name is a mandatory field"
+                    )
+                    return
+                metadata['SampleNum'] = f"Hole: {self.cxt.current.metadata.get('borehole id', 'Unknown')} Box: {self.cxt.current.metadata.get('box number', 'Unknown')} Region: ({y0}-{y1},{x0}-{x1})"
+                
+                
+                with busy_cursor('Adding to library...', self):
+                    sample_id = self.cxt.library.add_sample(
+                        name=name,
+                        wavelengths_nm=wavelengths_nm,
+                        reflectance=avg_spectrum,
+                        metadata=metadata
+                    )
+                
+                self.statusBar().showMessage(
+                    f"Added averaged spectrum '{name}' ({pixel_count} pixels) to library (ID: {sample_id})", 
+                    5000
+                )
+                
+            except Exception as e:
+                QMessageBox.warning(
+                    self, 
+                    "Add to Library", 
+                    f"Failed to add spectrum to library: {e}"
+                )
+            finally:
+                p.dispatcher.clear_all_temp()
+        
+        p.dispatcher.set_rect(_on_rect)
+        p.left_canvas.start_rect_select()
+        self.statusBar().showMessage("Draw a rectangle to average and add to library...")
+        
+        
             # --- HOLE actions ---
     def hole_next_box(self):
         if self.cxt.ho is None or self.cxt.current is None:

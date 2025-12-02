@@ -22,6 +22,7 @@ import sqlite3
 from typing import Dict, Iterable, Optional, Set, Tuple
 
 import numpy as np
+from PyQt5.QtCore import QByteArray
 from PyQt5.QtSql import QSqlDatabase, QSqlQuery, QSqlTableModel
 
 # Mirror the constants you currently have in lib_page.py
@@ -134,6 +135,7 @@ class LibraryManager:
         self.collection_ids.clear()
         self.collections.clear()
         self.exemplars_by_collection.clear()
+        
         return model
 
     def close_database(self) -> None:
@@ -551,3 +553,188 @@ class LibraryManager:
     def is_open(self) -> bool:
         """Return True if a DB connection is open and valid."""
         return self.db is not None and self.db.isValid() and self.db.isOpen()
+    
+    #=======Methods for adding to DB
+    def add_sample(
+        self,
+        name: str,
+        wavelengths_nm: np.ndarray,
+        reflectance: np.ndarray,
+        metadata: Optional[Dict[str, any]] = None
+    ) -> int:
+        """
+        Add a new sample to the library database.
+    
+        Parameters
+        ----------
+        name : str
+            Sample name (required).
+        wavelengths_nm : np.ndarray
+            Wavelength array in nanometers.
+        reflectance : np.ndarray
+            Reflectance values corresponding to wavelengths.
+        metadata : dict, optional
+            Additional column values for the Samples table.
+            Keys should match column names in the Samples table.
+    
+        Returns
+        -------
+        int
+            The SampleID of the newly inserted sample.
+    
+        Raises
+        ------
+        RuntimeError
+            If no DB is open or insertion fails.
+        ValueError
+            If wavelengths and reflectance arrays have different lengths.
+        """
+        if not self.is_open():
+            raise RuntimeError("No library DB is open.")
+        
+        if len(wavelengths_nm) != len(reflectance):
+            raise ValueError(
+                f"Wavelength and reflectance arrays must have same length: "
+                f"{len(wavelengths_nm)} vs {len(reflectance)}"
+            )
+        
+        db = self.db
+        assert db is not None
+    
+        # Convert nm to µm for storage (matching your library format)
+        wavelengths_um = np.array(wavelengths_nm / 1000.0).astype(np.float32)
+        reflectance = reflectance.astype(np.float32)
+    
+        # Convert to BLOB format
+        x_blob = np.array(wavelengths_um).tobytes()
+        y_blob = np.array(reflectance).tobytes()
+        
+    
+        try:
+            # Insert into Samples table
+            q = QSqlQuery(db)
+            
+            # Build column list and values
+            cols = ["Name"]
+            vals = [name]
+            
+            if metadata:
+                for key, value in metadata.items():
+                    if key.lower() != "sampleid":  # Skip ID, it's auto-generated
+                        cols.append(key)
+                        vals.append(value)
+            
+            placeholders = ", ".join("?" for _ in vals)
+            col_str = ", ".join(cols)
+            
+            q.prepare(f"INSERT INTO {SAMPLE_TABLE_NAME} ({col_str}) VALUES ({placeholders})")
+            for val in vals:
+                q.addBindValue(val)
+            
+            if not q.exec_():
+                raise RuntimeError(f"Failed to insert sample: {q.lastError().text()}")
+            
+            # Get the newly created SampleID
+            sample_id = q.lastInsertId()
+            if sample_id is None:
+                raise RuntimeError("Failed to retrieve new SampleID")
+            sample_id = int(sample_id)
+            
+            # Insert into Spectra table
+            q2 = QSqlQuery(db)
+            q2.prepare(
+                f"INSERT INTO {SPECTRA_TABLE_NAME} "
+                f"(SampleID, {WAVELENGTH_BLOB_COL}, {REFLECTANCE_BLOB_COL}) "
+                f"VALUES (?, ?, ?)"
+            )
+            q2.addBindValue(sample_id)
+            q2.addBindValue(QByteArray(x_blob))
+            q2.addBindValue(QByteArray(y_blob))
+            
+            if not q2.exec_():
+                # Rollback - delete the sample we just inserted
+                q3 = QSqlQuery(db)
+                q3.exec_(f"DELETE FROM {SAMPLE_TABLE_NAME} WHERE SampleID = {sample_id}")
+                raise RuntimeError(f"Failed to insert spectrum: {q2.lastError().text()}")
+            
+            # Refresh the model to show the new entry
+            if self.model:
+                self.model.select()
+            
+            return sample_id
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to add sample to library: {e}") from e
+    
+    
+    def add_samples_batch(
+        self,
+        samples: list[Dict[str, any]]
+    ) -> list[int]:
+        """
+        Add multiple samples to the library in a single transaction.
+    
+        Parameters
+        ----------
+        samples : list of dict
+            Each dict should contain:
+            - 'name': str (required)
+            - 'wavelengths_nm': np.ndarray (required)
+            - 'reflectance': np.ndarray (required)
+            - Any other keys will be added as metadata columns
+    
+        Returns
+        -------
+        list[int]
+            List of newly created SampleIDs.
+    
+        Raises
+        ------
+        RuntimeError
+            If no DB is open or insertion fails.
+        """
+        if not self.is_open():
+            raise RuntimeError("No library DB is open.")
+        
+        if not samples:
+            return []
+        
+        db = self.db
+        assert db is not None
+    
+        sample_ids = []
+        
+        # Use transaction for efficiency
+        db.transaction()
+        
+        try:
+            for sample_dict in samples:
+                # Extract required fields
+                name = sample_dict.get('name')
+                wavelengths_nm = sample_dict.get('wavelengths_nm')
+                reflectance = sample_dict.get('reflectance')
+                
+                if name is None or wavelengths_nm is None or reflectance is None:
+                    raise ValueError("Each sample must have 'name', 'wavelengths_nm', and 'reflectance'")
+                
+                # Extract metadata (everything except the required fields)
+                metadata = {
+                    k: v for k, v in sample_dict.items()
+                    if k not in ('name', 'wavelengths_nm', 'reflectance')
+                }
+                
+                # Use the single-add method
+                sample_id = self.add_sample(name, wavelengths_nm, reflectance, metadata)
+                sample_ids.append(sample_id)
+            
+            db.commit()
+            
+            # Refresh model once at the end
+            if self.model:
+                self.model.select()
+            
+            return sample_ids
+            
+        except Exception as e:
+            db.rollback()
+            raise RuntimeError(f"Batch insert failed: {e}") from e
