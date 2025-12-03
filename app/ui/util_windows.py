@@ -806,6 +806,58 @@ class SpectrumWindow(QMainWindow):
         self.clear_all()
 
 
+
+class LibMetadataDialog(QDialog):
+    """
+    Dialog that dynamically builds metadata fields from a list of column names.
+    You provide:
+        - columns: list[str] of column names from the Samples table
+        - existing meta: optional dict of pre-filled values
+    """
+    def __init__(self, meta=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Library Metadata")
+        #Naughty hard coded schema
+        columns = ["Name", 
+                   "Type", 
+                   "Class", 
+                   "SubClass",
+                   "ParticleSize", 
+                   "Owner",
+                   "Origin",
+                   "Phase", 
+                   "Description"]
+       
+        layout = QVBoxLayout(self)
+
+        self.edit_fields = {}   # column_name → QLineEdit
+        
+        for col in columns:
+            edit = QLineEdit()
+            edit.setPlaceholderText(col)
+
+            # Pre-fill if metadata exists
+            if meta and col in meta:
+                edit.setText(str(meta[col]))
+
+            self.edit_fields[col] = edit
+            layout.addWidget(edit)
+
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_metadata(self):
+        """
+        Return dict {column_name: value} for all editable fields.
+        Columns with empty text still return "", so caller may filter.
+        """
+        return {col: w.text().strip() for col, w in self.edit_fields.items()}
+
+
+
 class MetadataDialog(QDialog):
     def __init__(self, meta=None, parent=None):
         super().__init__(parent)

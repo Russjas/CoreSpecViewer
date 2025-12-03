@@ -22,6 +22,7 @@ import sqlite3
 from typing import Dict, Iterable, Optional, Set, Tuple
 
 import numpy as np
+from PyQt5.QtCore import QByteArray
 from PyQt5.QtSql import QSqlDatabase, QSqlQuery, QSqlTableModel
 
 # Mirror the constants you currently have in lib_page.py
@@ -134,6 +135,7 @@ class LibraryManager:
         self.collection_ids.clear()
         self.collections.clear()
         self.exemplars_by_collection.clear()
+        
         return model
 
     def close_database(self) -> None:
@@ -551,3 +553,202 @@ class LibraryManager:
     def is_open(self) -> bool:
         """Return True if a DB connection is open and valid."""
         return self.db is not None and self.db.isValid() and self.db.isOpen()
+    
+    #=======Methods for adding to DB
+    def add_sample(
+        self,
+        name: str,
+        wavelengths_nm: np.ndarray,
+        reflectance: np.ndarray,
+        metadata: Optional[Dict[str, any]] = None
+    ) -> int:
+        """
+        Add a new sample to the library database.
+    
+        Parameters
+        ----------
+        name : str
+            Sample name (required).
+        wavelengths_nm : np.ndarray
+            Wavelength array in nanometers.
+        reflectance : np.ndarray
+            Reflectance values corresponding to wavelengths.
+        metadata : dict, optional
+            Additional column values for the Samples table.
+            Keys should match column names in the Samples table.
+    
+        Returns
+        -------
+        int
+            The SampleID of the newly inserted sample.
+    
+        Raises
+        ------
+        RuntimeError
+            If no DB is open or insertion fails.
+        ValueError
+            If wavelengths and reflectance arrays have different lengths.
+        """
+        if not self.is_open():
+            raise RuntimeError("No library DB is open.")
+        
+        if len(wavelengths_nm) != len(reflectance):
+            raise ValueError(
+                f"Wavelength and reflectance arrays must have same length: "
+                f"{len(wavelengths_nm)} vs {len(reflectance)}"
+            )
+        
+        db = self.db
+        assert db is not None
+    
+        # Convert nm to µm for storage (matching your library format)
+        wavelengths_um = np.array(wavelengths_nm / 1000.0).astype(np.float32)
+        reflectance = reflectance.astype(np.float32)
+    
+        # Convert to BLOB format
+        x_blob = np.array(wavelengths_um).tobytes()
+        y_blob = np.array(reflectance).tobytes()
+        
+    
+        try:
+            # Insert into Samples table
+            q = QSqlQuery(db)
+            
+            # Build column list and values
+            cols = ["Name"]
+            vals = [name]
+            
+            if metadata:
+                for key, value in metadata.items():
+                    if key.lower() != "sampleid":  # Skip ID, it's auto-generated
+                        cols.append(key)
+                        vals.append(value)
+            
+            placeholders = ", ".join("?" for _ in vals)
+            col_str = ", ".join(cols)
+            
+            q.prepare(f"INSERT INTO {SAMPLE_TABLE_NAME} ({col_str}) VALUES ({placeholders})")
+            for val in vals:
+                q.addBindValue(val)
+            
+            if not q.exec_():
+                raise RuntimeError(f"Failed to insert sample: {q.lastError().text()}")
+            
+            # Get the newly created SampleID
+            sample_id = q.lastInsertId()
+            if sample_id is None:
+                raise RuntimeError("Failed to retrieve new SampleID")
+            sample_id = int(sample_id)
+            
+            # Insert into Spectra table
+            q2 = QSqlQuery(db)
+            q2.prepare(
+                f"INSERT INTO {SPECTRA_TABLE_NAME} "
+                f"(SampleID, {WAVELENGTH_BLOB_COL}, {REFLECTANCE_BLOB_COL}) "
+                f"VALUES (?, ?, ?)"
+            )
+            q2.addBindValue(sample_id)
+            q2.addBindValue(QByteArray(x_blob))
+            q2.addBindValue(QByteArray(y_blob))
+            
+            if not q2.exec_():
+                # Rollback - delete the sample we just inserted
+                q3 = QSqlQuery(db)
+                q3.exec_(f"DELETE FROM {SAMPLE_TABLE_NAME} WHERE SampleID = {sample_id}")
+                raise RuntimeError(f"Failed to insert spectrum: {q2.lastError().text()}")
+            
+            # Refresh the model to show the new entry
+            if self.model:
+                self.model.select()
+            self.add_to_collection("user-defined", [sample_id])
+            return sample_id
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to add sample to library: {e}") from e
+       
+    def delete_sample(self, sample_id: int) -> None:
+        """
+        Delete a sample and its associated spectrum from the database.
+        
+        Parameters
+        ----------
+        sample_id : int
+            The SampleID to delete.
+        
+        Raises
+        ------
+        RuntimeError
+            If no DB is open or deletion fails.
+        """
+        if not self.is_open():
+            raise RuntimeError("No library DB is open.")
+        
+        db = self.db
+        assert db is not None
+        
+        try:
+            q1 = QSqlQuery(db)
+            q1.prepare(f"DELETE FROM {SPECTRA_TABLE_NAME} WHERE SampleID = ?")
+            q1.addBindValue(int(sample_id))
+            
+            if not q1.exec_():
+                raise RuntimeError(f"Failed to delete spectrum: {q1.lastError().text()}")
+            
+            q2 = QSqlQuery(db)
+            q2.prepare(f"DELETE FROM {SAMPLE_TABLE_NAME} WHERE SampleID = ?")
+            q2.addBindValue(int(sample_id))
+            
+            if not q2.exec_():
+                raise RuntimeError(f"Failed to delete sample: {q2.lastError().text()}")
+            
+            for collection in self.collections.values():
+                collection.discard(sample_id)
+            
+            if self.model:
+                self.model.select()
+                
+        except Exception as e:
+            raise RuntimeError(f"Failed to delete sample {sample_id}: {e}") from e        
+       
+        
+    
+    def new_db(self,
+        dst_path: str,
+    ) -> None:
+        """
+        Create a new SQLite DB with identical schema to source, but no data.
+        """
+        if not self.db_path:
+            raise RuntimeError("No source DB path is known.")
+        if os.path.exists(dst_path):
+            os.remove(dst_path)
+        src_path = self.db_path
+        src = sqlite3.connect(src_path)
+        dst = sqlite3.connect(dst_path)
+    
+        try:
+            src.row_factory = sqlite3.Row
+            s_cur = src.cursor()
+            
+            # Clone schema (tables, indices, triggers, views)
+            schema_rows = s_cur.execute(
+                "SELECT type, name, sql FROM sqlite_master "
+                "WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL "
+                "ORDER BY CASE type "
+                " WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'trigger' THEN 2 "
+                " WHEN 'view' THEN 3 ELSE 4 END, name;"
+            ).fetchall()
+    
+            dst.execute("PRAGMA foreign_keys=OFF;")
+            dst.execute("BEGIN;")
+            for row in schema_rows:
+                sql = row["sql"]
+                if sql:
+                    dst.execute(sql)
+            dst.commit()
+        finally:
+            src.close()
+            dst.close()
+        
+    
+    
