@@ -660,11 +660,95 @@ class LibraryManager:
             # Refresh the model to show the new entry
             if self.model:
                 self.model.select()
-            
+            self.add_to_collection("user-defined", [sample_id])
             return sample_id
             
         except Exception as e:
             raise RuntimeError(f"Failed to add sample to library: {e}") from e
+       
+    def delete_sample(self, sample_id: int) -> None:
+        """
+        Delete a sample and its associated spectrum from the database.
+        
+        Parameters
+        ----------
+        sample_id : int
+            The SampleID to delete.
+        
+        Raises
+        ------
+        RuntimeError
+            If no DB is open or deletion fails.
+        """
+        if not self.is_open():
+            raise RuntimeError("No library DB is open.")
+        
+        db = self.db
+        assert db is not None
+        
+        try:
+            q1 = QSqlQuery(db)
+            q1.prepare(f"DELETE FROM {SPECTRA_TABLE_NAME} WHERE SampleID = ?")
+            q1.addBindValue(int(sample_id))
+            
+            if not q1.exec_():
+                raise RuntimeError(f"Failed to delete spectrum: {q1.lastError().text()}")
+            
+            q2 = QSqlQuery(db)
+            q2.prepare(f"DELETE FROM {SAMPLE_TABLE_NAME} WHERE SampleID = ?")
+            q2.addBindValue(int(sample_id))
+            
+            if not q2.exec_():
+                raise RuntimeError(f"Failed to delete sample: {q2.lastError().text()}")
+            
+            for collection in self.collections.values():
+                collection.discard(sample_id)
+            
+            if self.model:
+                self.model.select()
+                
+        except Exception as e:
+            raise RuntimeError(f"Failed to delete sample {sample_id}: {e}") from e        
+       
+        
     
+    def new_db(self,
+        dst_path: str,
+    ) -> None:
+        """
+        Create a new SQLite DB with identical schema to source, but no data.
+        """
+        if not self.db_path:
+            raise RuntimeError("No source DB path is known.")
+        if os.path.exists(dst_path):
+            os.remove(dst_path)
+        src_path = self.db_path
+        src = sqlite3.connect(src_path)
+        dst = sqlite3.connect(dst_path)
+    
+        try:
+            src.row_factory = sqlite3.Row
+            s_cur = src.cursor()
+            
+            # Clone schema (tables, indices, triggers, views)
+            schema_rows = s_cur.execute(
+                "SELECT type, name, sql FROM sqlite_master "
+                "WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL "
+                "ORDER BY CASE type "
+                " WHEN 'table' THEN 0 WHEN 'index' THEN 1 WHEN 'trigger' THEN 2 "
+                " WHEN 'view' THEN 3 ELSE 4 END, name;"
+            ).fetchall()
+    
+            dst.execute("PRAGMA foreign_keys=OFF;")
+            dst.execute("BEGIN;")
+            for row in schema_rows:
+                sql = row["sql"]
+                if sql:
+                    dst.execute(sql)
+            dst.commit()
+        finally:
+            src.close()
+            dst.close()
+        
     
     

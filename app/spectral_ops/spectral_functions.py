@@ -272,10 +272,10 @@ def mk_thumb(
                 norm = (a - amin) / (amax - amin)
             else:
                 norm = np.zeros_like(a, dtype=float)
-            checkpoint("after normalisation")
+            
             norm = np.ma.array(norm, mask=a.mask)
             rgb = my_map(norm)[..., :3]
-            checkpoint("after colormap call (my_map(norm))")
+            
 
             rgb8 = np.nan_to_num(
                 rgb * 255.0,
@@ -283,7 +283,7 @@ def mk_thumb(
                 posinf=255.0,
                 neginf=0.0,
             ).astype(np.uint8)
-            checkpoint("after rgb→uint8 conversion")
+            
 
         else:
             # 3D
@@ -306,13 +306,13 @@ def mk_thumb(
                 else:
                     vmin = np.nanmin(fc)
                     vmax = np.nanmax(fc)
-                    checkpoint("after nanmin/max on false-colour")
+                    
 
                     if vmax > vmin:
                         rgb = (fc - vmin) / (vmax - vmin)
                     else:
                         rgb = np.zeros_like(fc, dtype=float)
-                    checkpoint("after false-colour normalisation")
+                    
 
                     rgb8 = np.nan_to_num(
                         rgb * 255.0,
@@ -350,12 +350,12 @@ def mk_thumb(
                         posinf=255.0,
                         neginf=0.0,
                     ).astype(np.uint8)
-                    checkpoint("after float RGB→uint8 conversion")
+                    
 
         # ---- apply mask (normal mode only; index_mode already handled it)
         if mask is not None:
             rgb8[mask] = 0
-            checkpoint("after applying mask")
+            
 
     # ---- final resize (PIL, as in original)
     h, w = rgb8.shape[:2]

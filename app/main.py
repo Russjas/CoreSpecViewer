@@ -1222,6 +1222,8 @@ class MainRibbonController(QMainWindow):
                         reflectance=avg_spectrum,
                         metadata=metadata
                     )
+                    self.choose_view('lib')
+                    self.update_display()
                 
                 self.statusBar().showMessage(
                     f"Added averaged spectrum '{name}' ({pixel_count} pixels) to library (ID: {sample_id})", 
