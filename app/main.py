@@ -204,6 +204,7 @@ class MainRibbonController(QMainWindow):
                 ("Mask outside selected", lambda: self.act_mask_polygon(mode = "mask outside"), "With exising mask, masks all pixels outside of selected region"),
                 ("Mask inside selected", lambda: self.act_mask_polygon(mode = "mask inside"), "With exising mask, masks all pixels outside of selected region")
             ]),
+            ("button", "Despeckle", self.despeck_mask, "Remove speckles from mask"),
             ("button", "Improve", self.act_mask_improve, "Heuristically improves the mask"),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom')
@@ -640,7 +641,7 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_rect(self):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Masking", "No Current Scan")
             return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
@@ -661,7 +662,7 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_point(self, mode):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Masking", "No Current Scan")
             return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
@@ -683,16 +684,23 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_improve(self):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Masking", "No Current Scan")
             return
         self.cxt.current = t.improve_mask(self.cxt.current)
         self._distribute_context()
         self.update_display()
 
+    def despeck_mask(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Masking", "No Current Scan")
+            return
+        self.cxt.current = t.despeckle_mask(self.cxt.current)
+        self._distribute_context()
+        self.update_display()
 
     def act_mask_polygon(self, mode = "mask outside"):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Masking", "No Current Scan")
             return
         p = self._active_page()
         if not p or not p.dispatcher or self.cxt.current is None:

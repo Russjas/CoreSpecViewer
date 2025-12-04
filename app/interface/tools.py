@@ -311,6 +311,15 @@ def improve_mask(obj):
     obj.add_temp_dataset('mask', data = msk)
     return obj
 
+def despeckle_mask(obj):
+    """
+    Heuristically thicken a mask column-wise using simple occupancy.
+    Mask values follow the convention 0 = valid, 1 = masked.
+    """
+    msk = sf.despeckle_mask(obj.mask)
+    obj.add_temp_dataset('mask', data = msk)
+    return obj
+
 #============ Unwrapping tools ================================================
 
 def calc_unwrap_stats(obj):
