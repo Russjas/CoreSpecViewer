@@ -13,6 +13,7 @@ import cv2
 from gfit.util import remove_hull
 import hylite
 from hylite.analyse import minimum_wavelength
+from hylite.sensors import Fenix as HyliteFenix
 import matplotlib
 from numba import jit
 import numpy as np
@@ -39,6 +40,8 @@ def _slice_from_sensor(sensor_type: str):
         start, stop = con_dict["rgb_slice_start"], con_dict["rgb_slice_stop"]
     elif "FX50" in s:
         start, stop = con_dict["mwir_slice_start"], con_dict["mwir_slice_stop"]
+    elif "FENIX" in s:
+        start, stop = con_dict["fenix_slice_start"], con_dict["fenix_slice_stop"]
     else:
         start, stop = con_dict["default_slice_start"], con_dict["default_slice_stop"]
     print(slice(start, stop, None))
@@ -556,6 +559,24 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False,
     data_reflect = reflect_correct(data, white, dark)
 
     return data_reflect, bands, snr
+
+
+def get_fenix_reflectance(path):
+
+    hyimg = HyliteFenix.correct_folder(str(path))
+    
+    if isinstance(hyimg, tuple):
+        hyimg = hyimg[0]
+    
+    reflectance = hyimg.data          # (H, W, B), float32
+    bands       = hyimg.get_wavelengths()
+    snr         = None # snr workflows not implemented yet
+    band_slice = _slice_from_sensor("FENIX Sensor")
+    reflectance = np.rot90(reflectance, 2)
+    return reflectance[:,:, band_slice]*100, bands[band_slice], snr
+
+
+
 
 #================= Actual processing funcs=====================================
 
