@@ -370,7 +370,7 @@ def run_feature_extraction(obj, key):
 
 #TODO: currently these are held entirely in the scope of lib window and not persistes
 # think about adding as datasets -> need to consider the display window logic
-def quick_corr(obj, x, y):
+def quick_corr(obj, x, y, key):
     """
     Runs a pearson correlation of a user selected spectum against the objects
     continuum removed dataset.
@@ -379,7 +379,9 @@ def quick_corr(obj, x, y):
     if obj.is_raw:
         return None
     res_y = sf.resample_spectrum(x, y, obj.bands)
-    return np.ma.masked_array(sf.numpy_pearson(obj.savgol_cr, sf.cr(res_y)), mask = obj.mask)
+    corr = np.ma.masked_array(sf.numpy_pearson(obj.savgol_cr, sf.cr(res_y)), mask = obj.mask)
+    obj.add_temp_dataset(key, corr, '.npz')
+    return obj
 
 
 #TODO: Old method, maybe delete. Indexing is currently handled directly by display
@@ -697,7 +699,6 @@ def clean_legends(obj, onto_path):
             leg_key = key
             base_key = key[:-6]
             ind_key = key[:-6] + "INDEX"
-            print(ind_key)
             index_array = obj[ind_key].data
             
             legend = obj[leg_key].data

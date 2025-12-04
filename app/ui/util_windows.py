@@ -79,6 +79,24 @@ class PopoutWindow(QMainWindow):
         self.resize(content_widget.sizeHint() * 1.5)
 
 
+class RightClick_TableWidget(QTableWidget):
+    rightClicked = pyqtSignal(int, int)  # row, column
+    
+    def __init__(self, rows=0, cols=1, parent=None):
+        super().__init__(rows, cols, parent)
+        self._search_column = 0
+        self._type_ahead = ""
+        self._last_key_time = 0
+        
+    def mousePressEvent(self, event):
+        if event.button() == Qt.RightButton:
+            item = self.itemAt(event.pos())
+            if item is not None:
+                self.rightClicked.emit(item.row(), item.column())
+        super().mousePressEvent(event)
+
+
+
 class RightClick_Table(QTableView):
     rightClicked = pyqtSignal(QModelIndex)
     def __init__(self, parent = None):
@@ -512,16 +530,16 @@ class ImageCanvas2D(QWidget):
     
     def show_graph(self, depths, values, key):
         if depths.shape != values.shape:
-            print('returned here')
+            
             return
         
         
         if depths[0] > depths[-1]:
             depths = depths[::-1]
             values = values[::-1, :]
-        print(depths, values, key)
+        
         self.ax.plot(values, depths, 'o-', markersize=3)
-        print('plotted')
+        
         self.ax.invert_yaxis()
         self.ax.set_ylabel("Depth (m)")
         self.ax.set_xlabel(key)

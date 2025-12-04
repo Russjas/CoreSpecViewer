@@ -441,7 +441,7 @@ class LibraryManager:
     # Spectrum / band utilities
     # ------------------------------------------------------------------
     def get_spectrum(self, sample_id: int) -> Tuple[np.ndarray, np.ndarray]:
-        print(sample_id)
+        
         """
         Fetch a single spectrum from the Spectra table.
 
@@ -455,8 +455,6 @@ class LibraryManager:
         if not self.is_open():
             raise RuntimeError("No library DB is open.")
         db = self.db
-        if db:
-            print('db')
         assert db is not None
 
         q = QSqlQuery(db)

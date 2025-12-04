@@ -369,17 +369,18 @@ class MainRibbonController(QMainWindow):
                     self.update_display()
                 return
             except Exception as e:
-                print(path,e)
+                
                 try:
                     hole = HoleObject.build_from_parent_dir(path)
-                    print('hole loaded')
+                    
                     self.cxt.ho = hole
                     self._distribute_context()
                     self.choose_view('hol')
                     self.update_display()
                     return
                 except Exception as e:
-                    print(path,e)
+                    QMessageBox.warning(self, "Open dataset", f"Failed to open hole dataset: {e}")
+                    return
                     return
 
 
@@ -464,7 +465,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('loading...', self):
                 if clicked_button == 2:
                     hole = HoleObject.build_from_parent_dir(path)
-                    print('hole loaded')
+                    
                     self.cxt.ho = hole
                     self._distribute_context()
                     self.choose_view('hol')
@@ -500,11 +501,11 @@ class MainRibbonController(QMainWindow):
                 po.export_images()
                 self.cxt.current.reload_all()
                 self.cxt.current.load_thumbs()
-            print('multi')
+            
         if self.cxt.po is None or self.cxt.current.is_raw:
             return
         self.cxt.current.export_images()
-        print('single')
+        
 
 
     def save_clicked(self):
@@ -773,7 +774,7 @@ class MainRibbonController(QMainWindow):
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
-        print(key)
+        
         with busy_cursor(f'extracting {key}...', self):
             self.cxt.current = t.run_feature_extraction(self.cxt.current, key)
         
@@ -943,7 +944,7 @@ class MainRibbonController(QMainWindow):
                         po.save_all()
                         po.reload_all()
                         po.load_thumbs()
-                        print('done one')
+                        
                     except ValueError:
                         continue
                     
@@ -1005,7 +1006,7 @@ class MainRibbonController(QMainWindow):
             self.choose_view('hol')
             self.update_display()
             return
-        print('this was called')
+        
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
@@ -1122,8 +1123,7 @@ class MainRibbonController(QMainWindow):
             try:
                 spectrum = self.cxt.current.savgol[int(y), int(x), :]
                 wavelengths_nm = self.cxt.current.bands
-                print(type(spectrum), type(wavelengths_nm), 'types in handle point click')
-                
+                        
                 # Ask for metadata
                 dlg = LibMetadataDialog(parent=self)
                 if dlg.exec() != QDialog.Accepted:
@@ -1343,7 +1343,7 @@ class MainRibbonController(QMainWindow):
 
         if self.cxt is not None and self.cxt.ho is not None:
             with busy_cursor('Saving.....', self):
-                print('saving')
+                
                 for po in self.cxt.ho:
                     if po.has_temps:
                         print(po.metadata['box number'])

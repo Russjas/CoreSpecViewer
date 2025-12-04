@@ -207,30 +207,25 @@ def mk_thumb(
         RGB thumbnail image, ready to save as JPEG.
     """
     
-    t0 = time.perf_counter()
-
-    def checkpoint(label: str):
-        print(f"[mk_thumb] {label}: {time.perf_counter() - t0:.4f}s")
-
-    
+   
 
     # ---- to ndarray + sanity checks
     arr = np.asarray(arr)
-    print(arr.shape, 'shape check after asarray')
+    
     
 
     if arr.ndim not in (2, 3):
         raise ValueError(f"Unsupported array shape {arr.shape}; expected 2D or 3D.")
-        print('errored on ndims')
+        
     if 0 in arr.shape:
-        print('errored on 0')
+        
         raise ValueError(f"arr shape {arr.shape} cannot have a zero size dim")
 
     # ---- mask validation
     if mask is not None:
         mask = np.asarray(mask, dtype=bool)
         if mask.shape != arr.shape[:2]:
-            print(f'Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}.')
+            
             raise ValueError(
                 f"Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}."
             )
@@ -635,7 +630,7 @@ def despeckle_mask(mask):
             clean[labels == i] = 255
     clean_bool = ~(clean.astype(bool))
     
-    return clean_bool
+    return clean_bool.astype(np.uint8)
 
 
 #============= The app auto-crop method (until something better!)==============
@@ -801,7 +796,7 @@ def get_stats_from_mask(mask, proportion=16, iters=2):
         Component stats from OpenCV: (x, y, width, height, area).
     """
 
-    inv_mask = 1-mask
+    inv_mask = 1-mask.astype(np.uint8)
     kernel = np.ones((3,3),np.uint8)
     erod_im = cv2.erode(inv_mask, kernel, anchor=(0, 0), iterations=iters)
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(erod_im.astype(np.uint8), connectivity=8)
@@ -2125,7 +2120,7 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     calcitic_or_not = est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min_23, wav_max_23))
     #carb wavelength position
     print('MWL-ing')
-    print(bands[cr_crop_min_index_23:cr_crop_max_index_23].shape)
+    
     calc_or_dolo, _ = get_SQM_peak_finder_vectorized(remove_hull(savgol[:,:,cr_crop_min_index_23:cr_crop_max_index_23]), bands[cr_crop_min_index_23:cr_crop_max_index_23])
 
     # ==========#Facies colours"===================================================================

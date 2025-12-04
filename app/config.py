@@ -7,6 +7,7 @@ flags shared by spectral and interface modules.
 
 con_dict = {
     # band slice bounds (inclusive-exclusive)
+         
     "swir_slice_start": 13,
     "swir_slice_stop": 262,
     "mwir_slice_start": 5,

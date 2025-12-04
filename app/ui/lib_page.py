@@ -82,10 +82,10 @@ class LibraryPage(BasePage):
         self.table_view.setModel(self._proxy)
 
         db_path = self._find_default_database()
-        print(f'db_path {db_path}')
+        
         if db_path is not None and os.path.exists(db_path):
             self.load_db(db_path)
-            print(self.cxt.library.is_open())
+            
         else:
             QMessageBox.information(self, "Open a database",
                                     "No default database found. Click 'Open DB…' to select a file.")
@@ -151,14 +151,14 @@ class LibraryPage(BasePage):
     
     
     def open_database_dialog(self):
-        print(self.cxt.library.is_open())
+        
         path, _ = QFileDialog.getOpenFileName(
             self, "Open SQLite DB", "", "SQLite DB (*.db);;All Files (*)"
         )
         if not path:
             return
         self.load_db(path)
-        print(self.cxt.library.is_open())
+        
     def load_db(self, path: str):
         """
         (Re)open a SQLite DB file and bind the QSqlTableModel/QTableView to it.
@@ -411,8 +411,11 @@ class LibraryPage(BasePage):
             raw_widget=corr_canvas,
             title="Correlation"
         )
+        key = f"{mineral_name}-(ID:-{sample_id})-MINCORR"
         with busy_cursor('correlating...', self):
-            corr_canvas.show_rgb(t.quick_corr(self.current_obj, x_nm, y))
+            t.quick_corr(self.current_obj, x_nm, y, key = key)
+            
+            corr_canvas.show_rgb(self.current_obj.get_data(key))
             corr_canvas.ax.set_title(f"{mineral_name} (ID: {sample_id})", fontsize=11)
 
 

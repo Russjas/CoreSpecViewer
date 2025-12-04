@@ -69,7 +69,6 @@ class HoleObject:
             
             ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
 
-            print(key, ext, base)
             ds = Dataset(base=self.hole_id, key=key, path=fp, suffix=key, ext=ext)
             base = ["depths", "AvSpectra"]
             if key in base:
@@ -131,8 +130,6 @@ class HoleObject:
         and that all boxes have identical legends.
         Does not account for missing boxes in this step
         """
-        print('called')
-        print(key)
         if not self.check_for_all_keys(key):
             raise ValueError(f"{key} dataset is not available for every box in hole")
         if not (key.endswith("INDEX") or key.endswith("LEGEND")):
@@ -221,9 +218,8 @@ class HoleObject:
     def step_product_dataset(self, key):
         if key not in self.product_datasets.keys():
             raise ValueError("bounced no dataset")
-        print(f"{key} passed successfully!")   
         if (key.endswith("FRACTIONS") or key.endswith("DOM-MIN")):
-            print('on fractions line')
+            
             if key.endswith("FRACTIONS"):
                 dom_key = key.replace("FRACTIONS", "DOM-MIN")
                 frac_key = key
@@ -236,7 +232,6 @@ class HoleObject:
                                                                 self.step)
             return depths_stepped, fractions_stepped, dominant_stepped
         else:
-            print('on features line')
             depths_stepped, feature_stepped = res.bin_features_by_step(
                           self.base_datasets["depths"].data,
                           self.product_datasets[key].data,

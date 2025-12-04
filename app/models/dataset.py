@@ -193,3 +193,35 @@ class Dataset:
 
         if self.thumb is not None:
             self.thumb.save(str(self.path)[:-len(self.ext)]+'thumb.jpg')
+            
+            
+            
+    def delete(self) -> None:
+        """
+        Delete the dataset file from disk and clear in-memory data.
+        
+        Also removes associated thumbnail if present.
+        
+        Raises
+        ------
+        FileNotFoundError
+            If the dataset file doesn't exist on disk.
+        PermissionError
+            If the file cannot be deleted (locked, permissions).
+        """
+        
+        self.close_handle()
+        
+        
+        if self.path.exists():
+            self.path.unlink()
+        
+        
+        thumb_path = Path(str(self.path)[:-len(self.ext)] + 'thumb.jpg')
+        if thumb_path.exists():
+            thumb_path.unlink()
+        
+        self.data = None
+        self.thumb = None
+        self._memmap_ref = None
+        gc.collect()

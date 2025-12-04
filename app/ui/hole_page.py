@@ -23,7 +23,8 @@ from PyQt5.QtWidgets import (
     QStyledItemDelegate,
     QStyle,
     QMessageBox,
-    QInputDialog
+    QInputDialog,
+    QLineEdit
 )
 
 from ..models import HoleObject
@@ -98,7 +99,6 @@ class HoleBoxTable(QTableWidget):
         try:
             items = sorted(hole.iter_items(), key=lambda kv: kv[0])
         except AttributeError:
-            print('error-ed out here')
             items = sorted(hole.boxes.items(), key=lambda kv: kv[0])
 
         for row, (box_num, po) in enumerate(items):
@@ -166,7 +166,6 @@ class HoleBoxTable(QTableWidget):
 
         if ds.thumb is None:
             try:
-                print('building')
                 po.build_thumb(key)
             except Exception:
                 return QPixmap()
@@ -381,6 +380,10 @@ class HoleControlPanel(QWidget):
         show_dhole_button.clicked.connect(self.show_downhole)
         combo_layout_full.addWidget(show_dhole_button)
         
+        btn_set_step = QPushButton("Set resampling window", combo_block_full)
+        btn_set_step.clicked.connect(self.set_step)
+        combo_layout_full.addWidget(btn_set_step)
+        
         gen_base_button = QPushButton("Generate base datasets", combo_block_full)
         gen_base_button.clicked.connect(self.gen_base_datasets)
         combo_layout_full.addWidget(gen_base_button)
@@ -524,6 +527,24 @@ class HoleControlPanel(QWidget):
         self._page.add_column(dataset_key=key)
 
 # ---------Full hole level control handlers---------------------------------------------------------
+    def set_step(self):
+        if not self.cxt.ho:
+            return
+        dlg = QInputDialog(self)
+        dlg.setInputMode(QInputDialog.DoubleInput)
+        dlg.setWindowTitle("Enter Value")
+        dlg.setLabelText("Enter a number:")
+        
+        # Access the line edit and set placeholder
+        line_edit = dlg.findChild(QLineEdit)
+        if line_edit:
+            line_edit.setPlaceholderText(str(self.cxt.ho.step))
+        
+        if dlg.exec():
+            value = dlg.doubleValue()
+            self.cxt.ho.step = value
+
+
 
     def show_downhole(self):
         if not self.cxt.ho:
@@ -533,11 +554,11 @@ class HoleControlPanel(QWidget):
         key = text.strip()
         if not key:
             return
-        print(f"{key} from combo box")
         suffixes = ("LEGEND", "FRACTIONS")
         if key.endswith(suffixes):    
             with busy_cursor("Resampling mineral map...", self):
                 try:
+                    
                     depths, values, dominant = self.cxt.ho.step_product_dataset(key)
                 except ValueError as e:
                     QMessageBox.warning(self, "Failed operation", f"Failed to show data: {e}")
@@ -755,13 +776,11 @@ class HolePage(BasePage):
             return
         with busy_cursor('loading...', self):
             hole = HoleObject.build_from_parent_dir(path)
-            print('hole loaded')
             self.set_hole(hole)
 
     def set_hole(self, hole):
         """Set the HoleObject and repopulate the left table."""
         self.cxt.ho = hole
-        print('hole set')
         self._refresh_from_hole()
 
     def _refresh_from_hole(self):
