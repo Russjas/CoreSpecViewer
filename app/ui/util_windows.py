@@ -9,6 +9,9 @@ used outside and embedded in the main pages.
 from contextlib import contextmanager
 
 import matplotlib
+matplotlib.rcParams['savefig.dpi'] = 600
+matplotlib.rcParams['savefig.bbox'] = 'tight'
+matplotlib.rcParams['savefig.facecolor'] = 'white'
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationTool
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch

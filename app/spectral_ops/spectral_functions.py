@@ -1351,8 +1351,7 @@ def kmeans_spectral_wrapper(data, clusters, iters):
 
 # ==== minimim wavelenth mapping =============================================
 
-def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
-                 thresh=0.2):
+def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', use_width=False):
     """
     Estimate minimum wavelength (MWL) position and corresponding absorption depth
     for a specified short-wave infrared absorption feature using multiple
@@ -1410,10 +1409,12 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
             * ``'GAUS'`` – Gaussian fit.
             * ``'QUAD'`` – quadratic fit (default).
  
-    thresh : float, optional
+    thresh : taken from the configuration dictionary, default is 0.7
         Minimum absorption depth threshold used by some alternative masking
-        options. Currently not applied in the returned mask (placeholder for
-        stricter rejection).
+        options. Currently applied in the returned mask.
+    
+    use_width : Boolean
+        Experimental gating of valid features. Off by default until thoroughly tested
  
     Returns
     -------
@@ -1435,6 +1436,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
     - The `'QND'`` method uses a coarse argmin over continuum-removed spectra
       without fitting; depth is computed as ``1 - min(cr)``.
     """
+    thresh = con_dict["feature detection threshold"]
     feats = {'1400W':(	1387,	1445,	1350,	1450),
     '1480W':(	1471,	1491,	1440,	1520),
     '1550W':(	1520,	1563,	1510,	1610),
@@ -1465,6 +1467,62 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
     '4000shortW': (3850,4000,3800,4200),
     '2950BW':(2920, 2990, 2790, 3200),
     }
+    width_props = {"2080W": {
+        "label":         "clay / OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2160W": {
+        "label":         "clay / OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2200W": {
+        "label":         "Al–OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  None,
+    },
+    "2250W": {
+        "label":         "Al–OH / Mg–OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2290W": {
+        "label":         "Mg–Fe–OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2320W": {
+        "label":         "Mg–Fe–OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2350W": {
+        "label":         "carbonate / OH",
+        "depth_factor":  1.1,   # slightly stricter
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2390W": {
+        "label":         "carbonate",
+        "depth_factor":  1.1,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    }}
     cr_crop_min = feats[feature][2]
     cr_crop_max = feats[feature][3]
     cr_crop_min_index = np.argmin(np.abs(np.array(bands)-(feats[feature][2])))
@@ -1474,8 +1532,8 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
     wav_min_index = np.argmin(np.abs(np.array(bands)-(feats[feature][0])))
     wav_max_index = np.argmin(np.abs(np.array(bands)-(feats[feature][1])))
 
-    check_response =  est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min, wav_max))
-    #check_response =  est_peaks_cube_scipy_thresh(savgol_cr, bands, wavrange=(wav_min, wav_max), thresh = thresh)
+    #check_response =  est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min, wav_max))
+    check_response =  est_peaks_cube_scipy_thresh(savgol_cr, bands, wavrange=(wav_min, wav_max), thresh = thresh)
 
     if technique.upper() == 'QND':
         print(technique)
@@ -1519,10 +1577,21 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
         width = Mpoly.__getitem__([0,'width'])
     feature_mask = mask.copy()
     feature_mask[check_response < 0] =1
-    #feature_mask[position>wav_max] = 1
-    #feature_mask[position<wav_min] = 1
-    #if thresh:
-        #feature_mask[depth<thresh] = 1
+    feature_mask[position>wav_max] = 1
+    feature_mask[position<wav_min] = 1
+    if thresh:
+        feature_mask[depth<thresh] = 1
+        
+    # Experimental non-feature masking. Off by default. To use in GUI, hack the default parameter
+    if use_width and technique.upper() in ('POLY', 'GAUS', 'QUAD') and feature in width_props:
+        wmin = width_props[feature]["width_min_nm"]
+        wmax = width_props[feature]["width_max_nm"]
+
+        if wmin is not None:
+            feature_mask[width < wmin] = 1
+        if wmax is not None:
+            feature_mask[width > wmax] = 1
+    
 
     return position, depth, feature_mask
 
@@ -1665,7 +1734,7 @@ def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3
       robust interpretation.
     """
     w, l, b = data.shape
-    arr = np.zeros((w,l))
+    arr = np.full((w,l), -999)
     for i in range(w):
         for j in range(l):
             peak_indices, peak_dict = sc.signal.find_peaks(1-data[i,j], height=(None, None))
@@ -1681,6 +1750,101 @@ def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3
                 else:
                     arr[i,j] = -999
     return arr
+
+def est_peaks_cube_scipy_multi_thresh(
+    data,
+    bands,
+    wavrange=(2300, 2340),
+    depth_thresh=0.3,
+    prom_thresh=None,
+    min_width_nm=10.0,
+    max_width_nm=None,
+):
+    """
+    Robust peak detector for use as a 'real feature?' gate.
+
+    Parameters
+    ----------
+    data : (H, W, B) ndarray
+        Continuum-removed reflectance cube (values ~1 with dips).
+    bands : (B,) ndarray
+        Wavelengths in nm.
+    wavrange : (float, float)
+        Target feature window [min_nm, max_nm].
+    depth_thresh : float
+        Minimum feature depth (1 - R_CR at the minimum).
+    prom_thresh : float or None
+        Minimum prominence. If None, defaults to depth_thresh.
+    min_width_nm : float or None
+        Minimum allowed feature width (FWHM) in nm.
+    max_width_nm : float or None
+        Maximum allowed feature width in nm (optional).
+
+    Returns
+    -------
+    arr : (H, W) ndarray
+        For each pixel, the wavelength (nm) of the best peak in wavrange,
+        or -999.0 if no acceptable feature was found.
+    """
+    H, W, B = data.shape
+    arr = np.full((H, W), -999.0, dtype=float)
+
+    if prom_thresh is None:
+        prom_thresh = depth_thresh
+
+    # Approximate band step (assumed almost regular)
+    band_step = float(np.median(np.diff(bands)))
+
+    for i in range(H):
+        for j in range(W):
+            spec = data[i, j, :]
+            y = 1.0 - spec  # turn absorption into positive peaks
+
+            # Get peaks + measurements.
+            # height filters by depth; prominence/width=0 just request props.
+            peaks, props = sc.signal.find_peaks(
+                y,
+                height=depth_thresh,
+                prominence=0,
+                width=0,
+            )
+
+            if peaks.size == 0:
+                # Leave arr[i,j] = -999.0 (no feature)
+                continue
+
+            heights = props["peak_heights"]
+            prom    = props.get("prominences", np.zeros_like(heights))
+            widths_idx = props.get("widths", np.zeros_like(heights))
+            widths_nm  = widths_idx * band_step
+            lambdas    = bands[peaks]
+
+            # Basic quality masks
+            valid = np.ones_like(heights, dtype=bool)
+            valid &= heights >= depth_thresh
+            valid &= prom    >= prom_thresh
+
+            if min_width_nm is not None:
+                valid &= widths_nm >= min_width_nm
+            if max_width_nm is not None:
+                valid &= widths_nm <= max_width_nm
+
+            # Restrict to the target wavelength window
+            if np.any(valid):
+                valid &= (lambdas >= wavrange[0]) & (lambdas <= wavrange[1])
+
+            if not np.any(valid):
+                # No valid peak in the window → leave -999
+                continue
+
+            # Choose the 'best' peak: highest prominence (or depth if you prefer)
+            v_idx = np.where(valid)[0]
+            best_local = v_idx[np.argmax(prom[v_idx])]
+            arr[i, j] = lambdas[best_local]
+
+    return arr
+
+
 
 
 def get_SQM_peak_finder_vectorized(data, bands, atol=1e-12):

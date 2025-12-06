@@ -22,6 +22,8 @@ con_dict = {
     # Savitzky–Golay
     "savgol_window": 10,
     "savgol_polyorder": 2,
+    #features
+    "feature detection threshold": 0.1 
 }
 
 

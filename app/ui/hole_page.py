@@ -532,8 +532,8 @@ class HoleControlPanel(QWidget):
             return
         dlg = QInputDialog(self)
         dlg.setInputMode(QInputDialog.DoubleInput)
-        dlg.setWindowTitle("Enter Value")
-        dlg.setLabelText("Enter a number:")
+        dlg.setWindowTitle("Resampling window")
+        dlg.setLabelText("Enter resampling window in metres:")
         
         # Access the line edit and set placeholder
         line_edit = dlg.findChild(QLineEdit)
