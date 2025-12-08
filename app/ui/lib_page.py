@@ -48,14 +48,18 @@ class LibraryPage(BasePage):
         btn_open  = QPushButton("Open DB…", self); header.addWidget(btn_open)
         btn_filter = QPushButton("Filter to current band range", self);header.addWidget(btn_filter)
         btn_filter.setToolTip("Show only spectra that fully cover the current object's band range")
+        btn_new = QPushButton("Create blank DB…", self); header.addWidget(btn_new)
 
         btn_add   = QPushButton("Add Selected → Collection", self); header.addWidget(btn_add)
         btn_save  = QPushButton("Save Collection as DB…", self); header.addWidget(btn_save)
         btn_clear = QPushButton("Clear Collection", self); header.addWidget(btn_clear)
         btn_correlate = QPushButton("Correlate", self);header.addWidget(btn_correlate)
-
+        btn_delete = QPushButton("Delete Selected", self)
+        header.addWidget(btn_delete)
+        btn_delete.clicked.connect(self.delete_selected)
         btn_filter.clicked.connect(self.filter_to_current_bands)
         btn_open.clicked.connect(self.open_database_dialog)
+        btn_new.clicked.connect(self.create_blank)
         btn_add.clicked.connect(self.add_selected_to_collection)
         btn_save.clicked.connect(lambda: self.save_collection_as_db(None))
         btn_clear.clicked.connect(self.clear_collection)
@@ -78,10 +82,10 @@ class LibraryPage(BasePage):
         self.table_view.setModel(self._proxy)
 
         db_path = self._find_default_database()
-        print(f'db_path {db_path}')
+        
         if db_path is not None and os.path.exists(db_path):
             self.load_db(db_path)
-            print(self.cxt.library.is_open())
+            
         else:
             QMessageBox.information(self, "Open a database",
                                     "No default database found. Click 'Open DB…' to select a file.")
@@ -124,15 +128,37 @@ class LibraryPage(BasePage):
         sel.setCurrentIndex(idx if idx >= 0 else 0)
         sel.blockSignals(False)
     
+    
+    def create_blank(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Create New SQLite DB", "", "SQLite DB (*.db);;All Files (*)"
+        )
+        if not path:
+            return
+        
+        # Optionally ensure .db extension
+        if not path.endswith('.db'):
+            path += '.db'
+        
+        try:
+            self.cxt.library.new_db(path)
+        except Exception as e:
+            QMessageBox.critical(self, "Database Error",
+                                 f"Failed to create new blank database:\n{e}")
+            return
+        self.load_db(path)
+    
+    
+    
     def open_database_dialog(self):
-        print(self.cxt.library.is_open())
+        
         path, _ = QFileDialog.getOpenFileName(
             self, "Open SQLite DB", "", "SQLite DB (*.db);;All Files (*)"
         )
         if not path:
             return
         self.load_db(path)
-        print(self.cxt.library.is_open())
+        
     def load_db(self, path: str):
         """
         (Re)open a SQLite DB file and bind the QSqlTableModel/QTableView to it.
@@ -155,6 +181,37 @@ class LibraryPage(BasePage):
             self.spec_win_cr.close()
             self.spec_win_cr = None
             
+
+    def delete_selected(self):
+        """Delete selected samples from the database."""
+        ids = self._selected_sample_ids()
+        if not ids:
+            QMessageBox.information(self, "No Selection", "Select one or more rows to delete.")
+            return
+        
+        reply = QMessageBox.question(
+            self, 
+            "Confirm Delete",
+            f"Delete {len(ids)} sample(s)? This cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        failed = []
+        for sample_id in ids:
+            try:
+                self.cxt.library.delete_sample(sample_id)
+            except Exception as e:
+                failed.append((sample_id, str(e)))
+        
+        if failed:
+            msg = "Failed to delete:\n" + "\n".join(f"ID {sid}: {err}" for sid, err in failed)
+            QMessageBox.warning(self, "Delete Errors", msg)
+        else:
+            QMessageBox.information(self, "Deleted", f"Successfully deleted {len(ids)} sample(s).")
+    
 
     def handle_double_click(self, index: QModelIndex):
         """
@@ -354,8 +411,11 @@ class LibraryPage(BasePage):
             raw_widget=corr_canvas,
             title="Correlation"
         )
+        key = f"{mineral_name}-(ID:-{sample_id})-MINCORR"
         with busy_cursor('correlating...', self):
-            corr_canvas.show_rgb(t.quick_corr(self.current_obj, x_nm, y))
+            t.quick_corr(self.current_obj, x_nm, y, key = key)
+            
+            corr_canvas.show_rgb(self.current_obj.get_data(key))
             corr_canvas.ax.set_title(f"{mineral_name} (ID: {sample_id})", fontsize=11)
 
 
@@ -393,7 +453,9 @@ class LibraryPage(BasePage):
                                 f"New database written to:\n{out_path}\n\n"
                                 f"{len(ids_set)} items saved from '{key}'.")
 
-    
+    def update_display(self, key='mask'):
+        self._refresh_collection_selector()
+        
     def teardown(self):
         # any per-teardown cleanup (close SpectrumWindow, etc.)
         if self.spec_win:

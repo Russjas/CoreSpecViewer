@@ -13,6 +13,7 @@ import cv2
 from gfit.util import remove_hull
 import hylite
 from hylite.analyse import minimum_wavelength
+from hylite.sensors import Fenix as HyliteFenix
 import matplotlib
 from numba import jit
 import numpy as np
@@ -39,6 +40,8 @@ def _slice_from_sensor(sensor_type: str):
         start, stop = con_dict["rgb_slice_start"], con_dict["rgb_slice_stop"]
     elif "FX50" in s:
         start, stop = con_dict["mwir_slice_start"], con_dict["mwir_slice_stop"]
+    elif "FENIX" in s:
+        start, stop = con_dict["fenix_slice_start"], con_dict["fenix_slice_stop"]
     else:
         start, stop = con_dict["default_slice_start"], con_dict["default_slice_stop"]
     print(slice(start, stop, None))
@@ -203,42 +206,37 @@ def mk_thumb(
     PIL.Image.Image
         RGB thumbnail image, ready to save as JPEG.
     """
-    print("make thumb called")
-    t0 = time.perf_counter()
-
-    def checkpoint(label: str):
-        print(f"[mk_thumb] {label}: {time.perf_counter() - t0:.4f}s")
-
-    checkpoint("start")
+    
+   
 
     # ---- to ndarray + sanity checks
     arr = np.asarray(arr)
-    print(arr.shape, 'shape check after asarray')
-    checkpoint("after np.asarray(arr)")
+    
+    
 
     if arr.ndim not in (2, 3):
         raise ValueError(f"Unsupported array shape {arr.shape}; expected 2D or 3D.")
-        print('errored on ndims')
+        
     if 0 in arr.shape:
-        print('errored on 0')
+        
         raise ValueError(f"arr shape {arr.shape} cannot have a zero size dim")
 
     # ---- mask validation
     if mask is not None:
         mask = np.asarray(mask, dtype=bool)
         if mask.shape != arr.shape[:2]:
-            print(f'Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}.')
+            
             raise ValueError(
                 f"Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}."
             )
-    checkpoint("after mask validation")
+    
 
     # ---- orientation flip
     if arr.shape[0] > arr.shape[1]:
         arr = np.flip(np.swapaxes(arr, 0, 1), axis=0)
         if mask is not None:
             mask = np.flip(np.swapaxes(mask, 0, 1), axis=0)
-    checkpoint("after optional orientation flip")
+    
 
     # ------------------------------------------------------------------
     # 1) INDEX MODE: use classification colour map (tab20)
@@ -250,7 +248,7 @@ def mk_thumb(
             )
 
         rgb8 = index_to_rgb(arr, mask=mask)
-        checkpoint("after index_to_rgb()")
+        
 
     # ------------------------------------------------------------------
     # 2) NORMAL MODE: original mk_thumb behaviour
@@ -262,20 +260,20 @@ def mk_thumb(
                 a = np.ma.masked_array(arr, mask = mask).astype(float)
             else:
                 a = np.ma.array(arr, dtype=float)
-            checkpoint("after arr.astype(float)")
+            
 
             amin = np.nanmin(a)
             amax = np.nanmax(a)
-            checkpoint("after nanmin/max")
+            
 
             if amax > amin:
                 norm = (a - amin) / (amax - amin)
             else:
                 norm = np.zeros_like(a, dtype=float)
-            checkpoint("after normalisation")
+            
             norm = np.ma.array(norm, mask=a.mask)
             rgb = my_map(norm)[..., :3]
-            checkpoint("after colormap call (my_map(norm))")
+            
 
             rgb8 = np.nan_to_num(
                 rgb * 255.0,
@@ -283,7 +281,7 @@ def mk_thumb(
                 posinf=255.0,
                 neginf=0.0,
             ).astype(np.uint8)
-            checkpoint("after rgb→uint8 conversion")
+            
 
         else:
             # 3D
@@ -292,27 +290,27 @@ def mk_thumb(
             if C > 3:
                 # hyperspectral false-colour conversion
                 fc = get_false_colour(arr)
-                checkpoint("after get_false_colour(arr)")
+                
 
                 fc = np.asarray(fc)
-                checkpoint("after np.asarray(fc)")
+                
 
                 if fc.ndim != 3 or fc.shape[2] != 3:
                     raise ValueError("get_false_colour must return (H, W, 3) array.")
 
                 if np.issubdtype(fc.dtype, np.integer):
                     rgb8 = np.clip(fc, 0, 255).astype(np.uint8)
-                    checkpoint("after clip+astype for integer false-colour")
+                    
                 else:
                     vmin = np.nanmin(fc)
                     vmax = np.nanmax(fc)
-                    checkpoint("after nanmin/max on false-colour")
+                    
 
                     if vmax > vmin:
                         rgb = (fc - vmin) / (vmax - vmin)
                     else:
                         rgb = np.zeros_like(fc, dtype=float)
-                    checkpoint("after false-colour normalisation")
+                    
 
                     rgb8 = np.nan_to_num(
                         rgb * 255.0,
@@ -320,7 +318,7 @@ def mk_thumb(
                         posinf=255.0,
                         neginf=0.0,
                     ).astype(np.uint8)
-                    checkpoint("after false-colour float→uint8")
+                    
 
             else:
                 # C == 1 or C == 3
@@ -328,21 +326,21 @@ def mk_thumb(
 
                 if C == 1:
                     a = np.repeat(a, 3, axis=2)
-                    checkpoint("after repeat single band to RGB")
+                    
 
                 if np.issubdtype(a.dtype, np.integer):
                     rgb8 = np.clip(a, 0, 255).astype(np.uint8)
-                    checkpoint("after integer RGB clip+astype")
+                    
                 else:
                     vmin = np.nanmin(a)
                     vmax = np.nanmax(a)
-                    checkpoint("after nanmin/max for RGB")
+                    
 
                     if vmax > vmin:
                         rgb = (a - vmin) / (vmax - vmin)
                     else:
                         rgb = np.zeros_like(a, dtype=float)
-                    checkpoint("after float RGB normalisation")
+                    
 
                     rgb8 = np.nan_to_num(
                         rgb * 255.0,
@@ -350,12 +348,12 @@ def mk_thumb(
                         posinf=255.0,
                         neginf=0.0,
                     ).astype(np.uint8)
-                    checkpoint("after float RGB→uint8 conversion")
+                    
 
         # ---- apply mask (normal mode only; index_mode already handled it)
         if mask is not None:
             rgb8[mask] = 0
-            checkpoint("after applying mask")
+            
 
     # ---- final resize (PIL, as in original)
     h, w = rgb8.shape[:2]
@@ -364,13 +362,13 @@ def mk_thumb(
     new_h = max(1, int(round(h * scale)))
 
     im = Image.fromarray(rgb8, mode="RGB")
-    checkpoint("after Image.fromarray")
+    
 
     if (new_w, new_h) != (w, h) and resize:
         im = im.resize((new_w, new_h), Image.LANCZOS)
-    checkpoint("after resize (LANCZOS)")
+    
 
-    checkpoint("END")
+    
     return im
 
 
@@ -557,6 +555,24 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False,
 
     return data_reflect, bands, snr
 
+
+def get_fenix_reflectance(path):
+
+    hyimg = HyliteFenix.correct_folder(str(path))
+    
+    if isinstance(hyimg, tuple):
+        hyimg = hyimg[0]
+    
+    reflectance = hyimg.data          # (H, W, B), float32
+    bands       = hyimg.get_wavelengths()
+    snr         = None # snr workflows not implemented yet
+    band_slice = _slice_from_sensor("FENIX Sensor")
+    reflectance = np.rot90(reflectance, 2)
+    return reflectance[:,:, band_slice]*100, bands[band_slice], snr
+
+
+
+
 #================= Actual processing funcs=====================================
 
 def process(cube):
@@ -596,6 +612,25 @@ def improve_mask_from_graph(mask):
         if line[i]>int(mask.shape[0]/3):
             new_mask[:,i] = 1
     return new_mask
+
+
+def despeckle_mask(mask):
+    """
+    Remove small speckles by operating on the inverted mask.
+    mask: boolean array
+    """
+    mask_bool = mask.astype(bool)
+    inv = ~mask_bool
+    bw = inv.astype(np.uint8) * 255
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(bw, connectivity=8)
+    min_area = 50 # remove only small pixel speckles 
+    clean = np.zeros_like(bw)
+    for i in range(1, n):
+        if stats[i, cv2.CC_STAT_AREA] >= min_area:
+            clean[labels == i] = 255
+    clean_bool = ~(clean.astype(bool))
+    
+    return clean_bool.astype(np.uint8)
 
 
 #============= The app auto-crop method (until something better!)==============
@@ -761,7 +796,7 @@ def get_stats_from_mask(mask, proportion=16, iters=2):
         Component stats from OpenCV: (x, y, width, height, area).
     """
 
-    inv_mask = 1-mask
+    inv_mask = 1-mask.astype(np.uint8)
     kernel = np.ones((3,3),np.uint8)
     erod_im = cv2.erode(inv_mask, kernel, anchor=(0, 0), iterations=iters)
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(erod_im.astype(np.uint8), connectivity=8)
@@ -850,79 +885,77 @@ def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
 
     return concatenated
 
-def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
+#====== Functions for working with unwrapped datasets =========================
+def compute_downhole_mineral_fractions(
+    index_map: np.ndarray,
+    mask: np.ndarray,
+    legend: list[dict],
+) -> tuple[np.ndarray, np.ndarray]:
     """
-    Extract bounding boxes from component stats, pad to a common width,
-    and stack them vertically (right-to-left, then top-to-bottom ordering).
+    Compute row-based mineral fractions and dominant mineral per row.
 
-    Parameters
-    ----------
-    image : ndarray
-        Input 2D or 3D image to segment.
-    stats : ndarray, shape (N, 5)
-        (x, y, width, height, area) rows from `cv2.connectedComponentsWithStats`.
-    MIN_AREA : int, optional
-        Minimum area to keep.
-    MIN_WIDTH : int, optional
-        Minimum width to keep.
-
-    Returns
-    -------
-    ndarray
-        Vertically concatenated segments (plain array; padding filled with zeros).
-
-    Notes
-    -----
-    Segments are sorted into columns using an x-based binning tolerance,
-    then into rows by ascending y. 
+    - Uses mask to exclude non-core pixels (mask==1).
+    - Fractions are normalised over *core* pixels only in each row.
+    - Columns 0..K-1 correspond to legend entries (in order).
+    - Column K is 'unclassified': core pixels whose index is not in legend.
+    - dominant[i] is index into legend (0..K-1), or -1 if no classified pixels.
+    
+    - Legend must be an ordered list of dictionaries ["index" : idx,
+                                                      "label" : "label text"]
+    
+    
     """
+    if index_map.ndim != 2:
+        raise ValueError(f"index_map must be 2D, got {index_map.shape}")
+    if mask.shape != index_map.shape:
+        raise ValueError("mask and index_map must have the same shape")
 
+    idx = np.asarray(index_map, dtype=int)
+    msk = np.asarray(mask, dtype=bool)
+    H, W = idx.shape
 
-    segments = []
+    class_ids = np.array([row["index"] for row in legend], dtype=int)
+    K = len(class_ids)
 
-    for i in range(1, stats.shape[0]): # Skip background (label 0)
-        x, y, w, h, area = stats[i]
-        if area < MIN_AREA or w < MIN_WIDTH:
-            continue # Skip small regions
+    fractions = np.zeros((H, K + 1), dtype=float)
+    dominant = np.full(H, -1, dtype=int)
+
+    for i in range(H):
+        row = idx[i]
+        row_mask = msk[i]
+
+        # core pixels only: not masked, and index >= 0
+        valid_mask = (~row_mask) & (row >= 0)
+        if not np.any(valid_mask):
+            continue  # leave zeros; dominant[i] stays -1
+
+        valid_vals = row[valid_mask]
+        total_valid = valid_vals.size
+
+        # Count *all* core values in this row
+        max_val = int(valid_vals.max())
+        counts_all = np.bincount(valid_vals, minlength=max_val + 1)
+
+        # Extract counts for legend classes in legend order
+        counts = np.zeros(K, dtype=float)
+        for j, cid in enumerate(class_ids):
+            if 0 <= cid < counts_all.size:
+                counts[j] = counts_all[cid]
+
+        total_classified = counts.sum()
+        unclassified = total_valid - total_classified
+
+        # Fractions over core width
+        fractions[i, :K] = counts / total_valid
+        fractions[i, K] = unclassified / total_valid
+
+        if total_classified > 0:
+            dominant[i] = int(np.argmax(fractions[i, :K]))
         else:
-            segment = image[y:y+h, x:x+w]
-                        # Store top-left x, y for sorting
-            segments.append(((x, y), segment))
+            dominant[i] = -1
 
-    # Sort segments: right to left (x descending), top to bottom (y ascending)
-    tolerance = 15
-    segments_sorted = sorted(segments, key=lambda s: (round(-s[0][0]/tolerance), s[0][1]))
+    return fractions, dominant
 
-
-
-    # Determine max width
-    max_width = max(s[1].shape[1] for s in segments_sorted)
-    # Pad segments to same width
-    padded_segments = []
-
-    for _, seg in segments_sorted:
-        h, w = seg.shape[:2]
-        pad_total = max_width - w
-
-        if pad_total > 0:
-            pad_left = pad_total // 2
-            pad_right = pad_total - pad_left
-            if seg.ndim == 2:
-                pad_shape = ((0, 0), (pad_left, pad_right))
-            else:
-                pad_shape = ((0, 0), (pad_left, pad_right), (0, 0))
-
-            seg_padded = np.pad(seg, pad_shape, mode='constant', constant_values=0)
-        else:
-            seg_padded = seg
-
-        padded_segments.append(seg_padded)
-
-
-    # Stack vertically
-    concatenated = np.vstack(padded_segments)
-
-    return concatenated
 
 
 #========= Functions for interpreting reflectance data ========================
@@ -1318,8 +1351,7 @@ def kmeans_spectral_wrapper(data, clusters, iters):
 
 # ==== minimim wavelenth mapping =============================================
 
-def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
-                 thresh=0.2):
+def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', use_width=False):
     """
     Estimate minimum wavelength (MWL) position and corresponding absorption depth
     for a specified short-wave infrared absorption feature using multiple
@@ -1377,10 +1409,12 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
             * ``'GAUS'`` – Gaussian fit.
             * ``'QUAD'`` – quadratic fit (default).
  
-    thresh : float, optional
+    thresh : taken from the configuration dictionary, default is 0.7
         Minimum absorption depth threshold used by some alternative masking
-        options. Currently not applied in the returned mask (placeholder for
-        stricter rejection).
+        options. Currently applied in the returned mask.
+    
+    use_width : Boolean
+        Experimental gating of valid features. Off by default until thoroughly tested
  
     Returns
     -------
@@ -1402,6 +1436,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
     - The `'QND'`` method uses a coarse argmin over continuum-removed spectra
       without fitting; depth is computed as ``1 - min(cr)``.
     """
+    thresh = con_dict["feature detection threshold"]
     feats = {'1400W':(	1387,	1445,	1350,	1450),
     '1480W':(	1471,	1491,	1440,	1520),
     '1550W':(	1520,	1563,	1510,	1610),
@@ -1432,6 +1467,62 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
     '4000shortW': (3850,4000,3800,4200),
     '2950BW':(2920, 2990, 2790, 3200),
     }
+    width_props = {"2080W": {
+        "label":         "clay / OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2160W": {
+        "label":         "clay / OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2200W": {
+        "label":         "Al–OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  None,
+    },
+    "2250W": {
+        "label":         "Al–OH / Mg–OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2290W": {
+        "label":         "Mg–Fe–OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2320W": {
+        "label":         "Mg–Fe–OH",
+        "depth_factor":  1.0,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2350W": {
+        "label":         "carbonate / OH",
+        "depth_factor":  1.1,   # slightly stricter
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    },
+    "2390W": {
+        "label":         "carbonate",
+        "depth_factor":  1.1,
+        "use_width":     True,
+        "width_min_nm":  8.0,
+        "width_max_nm":  80.0,
+    }}
     cr_crop_min = feats[feature][2]
     cr_crop_max = feats[feature][3]
     cr_crop_min_index = np.argmin(np.abs(np.array(bands)-(feats[feature][2])))
@@ -1441,8 +1532,8 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
     wav_min_index = np.argmin(np.abs(np.array(bands)-(feats[feature][0])))
     wav_max_index = np.argmin(np.abs(np.array(bands)-(feats[feature][1])))
 
-    check_response =  est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min, wav_max))
-    #check_response =  est_peaks_cube_scipy_thresh(savgol_cr, bands, wavrange=(wav_min, wav_max), thresh = thresh)
+    #check_response =  est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min, wav_max))
+    check_response =  est_peaks_cube_scipy_thresh(savgol_cr, bands, wavrange=(wav_min, wav_max), thresh = thresh)
 
     if technique.upper() == 'QND':
         print(technique)
@@ -1486,10 +1577,21 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD',
         width = Mpoly.__getitem__([0,'width'])
     feature_mask = mask.copy()
     feature_mask[check_response < 0] =1
-    #feature_mask[position>wav_max] = 1
-    #feature_mask[position<wav_min] = 1
-    #if thresh:
-        #feature_mask[depth<thresh] = 1
+    feature_mask[position>wav_max] = 1
+    feature_mask[position<wav_min] = 1
+    if thresh:
+        feature_mask[depth<thresh] = 1
+        
+    # Experimental non-feature masking. Off by default. To use in GUI, hack the default parameter
+    if use_width and technique.upper() in ('POLY', 'GAUS', 'QUAD') and feature in width_props:
+        wmin = width_props[feature]["width_min_nm"]
+        wmax = width_props[feature]["width_max_nm"]
+
+        if wmin is not None:
+            feature_mask[width < wmin] = 1
+        if wmax is not None:
+            feature_mask[width > wmax] = 1
+    
 
     return position, depth, feature_mask
 
@@ -1632,7 +1734,7 @@ def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3
       robust interpretation.
     """
     w, l, b = data.shape
-    arr = np.zeros((w,l))
+    arr = np.full((w,l), -999)
     for i in range(w):
         for j in range(l):
             peak_indices, peak_dict = sc.signal.find_peaks(1-data[i,j], height=(None, None))
@@ -1648,6 +1750,101 @@ def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3
                 else:
                     arr[i,j] = -999
     return arr
+
+def est_peaks_cube_scipy_multi_thresh(
+    data,
+    bands,
+    wavrange=(2300, 2340),
+    depth_thresh=0.3,
+    prom_thresh=None,
+    min_width_nm=10.0,
+    max_width_nm=None,
+):
+    """
+    Robust peak detector for use as a 'real feature?' gate.
+
+    Parameters
+    ----------
+    data : (H, W, B) ndarray
+        Continuum-removed reflectance cube (values ~1 with dips).
+    bands : (B,) ndarray
+        Wavelengths in nm.
+    wavrange : (float, float)
+        Target feature window [min_nm, max_nm].
+    depth_thresh : float
+        Minimum feature depth (1 - R_CR at the minimum).
+    prom_thresh : float or None
+        Minimum prominence. If None, defaults to depth_thresh.
+    min_width_nm : float or None
+        Minimum allowed feature width (FWHM) in nm.
+    max_width_nm : float or None
+        Maximum allowed feature width in nm (optional).
+
+    Returns
+    -------
+    arr : (H, W) ndarray
+        For each pixel, the wavelength (nm) of the best peak in wavrange,
+        or -999.0 if no acceptable feature was found.
+    """
+    H, W, B = data.shape
+    arr = np.full((H, W), -999.0, dtype=float)
+
+    if prom_thresh is None:
+        prom_thresh = depth_thresh
+
+    # Approximate band step (assumed almost regular)
+    band_step = float(np.median(np.diff(bands)))
+
+    for i in range(H):
+        for j in range(W):
+            spec = data[i, j, :]
+            y = 1.0 - spec  # turn absorption into positive peaks
+
+            # Get peaks + measurements.
+            # height filters by depth; prominence/width=0 just request props.
+            peaks, props = sc.signal.find_peaks(
+                y,
+                height=depth_thresh,
+                prominence=0,
+                width=0,
+            )
+
+            if peaks.size == 0:
+                # Leave arr[i,j] = -999.0 (no feature)
+                continue
+
+            heights = props["peak_heights"]
+            prom    = props.get("prominences", np.zeros_like(heights))
+            widths_idx = props.get("widths", np.zeros_like(heights))
+            widths_nm  = widths_idx * band_step
+            lambdas    = bands[peaks]
+
+            # Basic quality masks
+            valid = np.ones_like(heights, dtype=bool)
+            valid &= heights >= depth_thresh
+            valid &= prom    >= prom_thresh
+
+            if min_width_nm is not None:
+                valid &= widths_nm >= min_width_nm
+            if max_width_nm is not None:
+                valid &= widths_nm <= max_width_nm
+
+            # Restrict to the target wavelength window
+            if np.any(valid):
+                valid &= (lambdas >= wavrange[0]) & (lambdas <= wavrange[1])
+
+            if not np.any(valid):
+                # No valid peak in the window → leave -999
+                continue
+
+            # Choose the 'best' peak: highest prominence (or depth if you prefer)
+            v_idx = np.where(valid)[0]
+            best_local = v_idx[np.argmax(prom[v_idx])]
+            arr[i, j] = lambdas[best_local]
+
+    return arr
+
+
 
 
 def get_SQM_peak_finder_vectorized(data, bands, atol=1e-12):
@@ -2087,7 +2284,7 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     calcitic_or_not = est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min_23, wav_max_23))
     #carb wavelength position
     print('MWL-ing')
-    print(bands[cr_crop_min_index_23:cr_crop_max_index_23].shape)
+    
     calc_or_dolo, _ = get_SQM_peak_finder_vectorized(remove_hull(savgol[:,:,cr_crop_min_index_23:cr_crop_max_index_23]), bands[cr_crop_min_index_23:cr_crop_max_index_23])
 
     # ==========#Facies colours"===================================================================
@@ -2150,7 +2347,80 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     return output_data, output_image
 
 
+# Older version of unwrap_from_stats, not mask aware. Dont think it is used in GUI
+def seg_from_stats(image, stats, MIN_AREA=300, MIN_WIDTH=10):
+    """
+    Extract bounding boxes from component stats, pad to a common width,
+    and stack them vertically (right-to-left, then top-to-bottom ordering).
 
+    Parameters
+    ----------
+    image : ndarray
+        Input 2D or 3D image to segment.
+    stats : ndarray, shape (N, 5)
+        (x, y, width, height, area) rows from `cv2.connectedComponentsWithStats`.
+    MIN_AREA : int, optional
+        Minimum area to keep.
+    MIN_WIDTH : int, optional
+        Minimum width to keep.
+
+    Returns
+    -------
+    ndarray
+        Vertically concatenated segments (plain array; padding filled with zeros).
+
+    Notes
+    -----
+    Segments are sorted into columns using an x-based binning tolerance,
+    then into rows by ascending y. 
+    """
+
+
+    segments = []
+
+    for i in range(1, stats.shape[0]): # Skip background (label 0)
+        x, y, w, h, area = stats[i]
+        if area < MIN_AREA or w < MIN_WIDTH:
+            continue # Skip small regions
+        else:
+            segment = image[y:y+h, x:x+w]
+                        # Store top-left x, y for sorting
+            segments.append(((x, y), segment))
+
+    # Sort segments: right to left (x descending), top to bottom (y ascending)
+    tolerance = 15
+    segments_sorted = sorted(segments, key=lambda s: (round(-s[0][0]/tolerance), s[0][1]))
+
+
+
+    # Determine max width
+    max_width = max(s[1].shape[1] for s in segments_sorted)
+    # Pad segments to same width
+    padded_segments = []
+
+    for _, seg in segments_sorted:
+        h, w = seg.shape[:2]
+        pad_total = max_width - w
+
+        if pad_total > 0:
+            pad_left = pad_total // 2
+            pad_right = pad_total - pad_left
+            if seg.ndim == 2:
+                pad_shape = ((0, 0), (pad_left, pad_right))
+            else:
+                pad_shape = ((0, 0), (pad_left, pad_right), (0, 0))
+
+            seg_padded = np.pad(seg, pad_shape, mode='constant', constant_values=0)
+        else:
+            seg_padded = seg
+
+        padded_segments.append(seg_padded)
+
+
+    # Stack vertically
+    concatenated = np.vstack(padded_segments)
+
+    return concatenated
 
 
 

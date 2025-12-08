@@ -6,10 +6,11 @@ and provides pixel inspection tools.
 """
 
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
+from PyQt5.QtGui import QCursor
+from PyQt5.QtWidgets import QTableWidgetItem, QMenu
 
 from .base_page import BasePage
-from .util_windows import ImageCanvas2D, SpectralImageCanvas, SpectrumWindow
+from .util_windows import ImageCanvas2D, SpectralImageCanvas, SpectrumWindow, RightClick_TableWidget
 
 
 class VisualisePage(BasePage):
@@ -21,7 +22,7 @@ class VisualisePage(BasePage):
         super().__init__(parent)
         self._add_left(SpectralImageCanvas(self))
         self._add_right(ImageCanvas2D(self))
-        tbl = QTableWidget(0, 1, self)
+        tbl = RightClick_TableWidget(0, 1, self)
         tbl.setHorizontalHeaderLabels(["Cached Products"])
         tbl.horizontalHeader().setStretchLastSection(True)
         self._add_third(tbl)
@@ -34,6 +35,7 @@ class VisualisePage(BasePage):
 
         self.cache = set()
         self.table.cellDoubleClicked.connect(self._on_row_activated)
+        self.table.rightClicked.connect(self.tbl_right_click_handler)
 
         self._mpl_cids = []  # store mpl connection ids if you add them
         self._sync_lock = False
@@ -224,6 +226,24 @@ class VisualisePage(BasePage):
 
         self.table.resizeRowsToContents()
 
+
+    def tbl_right_click_handler(self, row, column):
+        if self.cxt.ho is not None:
+            return
+        it = self.table.item(row, 0)
+        if not it:
+            return
+        key = it.text().strip()
+        if not key:
+            return
+        menu = QMenu(self)
+        
+        act_delete = menu.addAction("Delete row")
+        action = menu.exec_(QCursor.pos())
+        
+        if action == act_delete:
+            self.current_obj.delete_dataset(key)
+        self.update_display()   
     
     def _bind_mpl(self, canvas, event, handler):
         cid = canvas.mpl_connect(event, handler)

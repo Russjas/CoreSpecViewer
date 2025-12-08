@@ -24,7 +24,7 @@ from PyQt5.QtWidgets import (
 
 from ..interface import tools as t
 from .base_page import BasePage
-from .util_windows import SpectrumWindow
+from .util_windows import SpectrumWindow, busy_cursor
 
 
 
@@ -143,6 +143,9 @@ class ClusterWindow(BasePage):
         self.btn_MSAM = QPushButton("MSAM against library", container)
         self.btn_MSAM.clicked.connect(self._msam_lib)
         btn_row.addWidget(self.btn_MSAM)
+        self.btn_lib = QPushButton("Add Clusters to library", container)
+        self.btn_lib.clicked.connect(self._add_clusters_lib)
+        btn_row.addWidget(self.btn_lib)
         
 
         vbox.addLayout(btn_row)
@@ -340,8 +343,43 @@ class ClusterWindow(BasePage):
         self.spec_win.ax.set_xlabel(x_label)
         
     # ------------------------------------------------------------------ #
-    # Correlation to library                                             #
+    # Interaction to library                                             #
     # ------------------------------------------------------------------ #
+    def _add_clusters_lib(self):
+        if self.centres is None:
+            return
+        if self.cluster_key is None:
+            return
+        if self.cxt.current is None:
+            return
+        for i in range(self.centres.shape[0]):
+            try:
+                spectrum = self.centres[i, :]
+                wavelengths_nm = self.cxt.current.bands
+                         
+                
+                name = f"Class {i}"
+                metadata = {}
+                metadata['SampleNum'] = f"Class {i} from {self.cluster_key}"
+                with busy_cursor('Adding to library...', self):
+                    sample_id = self.cxt.library.add_sample(
+                        name=name,
+                        wavelengths_nm=wavelengths_nm,
+                        reflectance=spectrum,
+                        metadata=metadata
+                    )
+                
+                
+                
+            except Exception as e:
+                QMessageBox.warning(
+                    self, 
+                    "Add to Library", 
+                    f"Failed to add spectrum to library: {e}"
+                )
+        
+    
+    
     def _select_collection_exemplars(self):
         """Return (exemp_ids, exemplars, bands) or None if user cancels / no data."""
         if not self.cxt.library:

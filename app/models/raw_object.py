@@ -54,6 +54,7 @@ class RawObject:
     temp_reflectance: np.ndarray | None = field(default=None, repr=False)
     metadata: dict = field(default_factory=dict)
     file_issues: dict = field(default_factory=dict)
+    sensor: str = "sensor"
     def __post_init__(self):
         """On initialization, populate metadata and compute reflectance."""
         self.get_metadata()
@@ -64,8 +65,10 @@ class RawObject:
         """Load and merge Specim XML + ENVI header metadata if available."""
         if 'metadata' in self.files.keys() and 'data head' in self.files.keys():
             self.metadata = sf.parse_lumo_metadata(self.files['metadata']) | sf.read_envi_header(self.files['data head'])
+            self.sensor = self.metadata['sensor type']
         elif 'metadata' not in self.files.keys() and 'data head' in self.files.keys():
             self.metadata = sf.read_envi_header(self.files['data head'])
+            self.sensor = self.metadata['sensor type']
     @property
     def is_raw(self) -> bool:
         """Return True; distinguishes from ProcessedObject."""
@@ -147,19 +150,46 @@ class RawObject:
     #TODO Might need a refactor when QAQC functions are integrated - not yet.
     def get_reflectance_QAQC(self, QAQC=True):
         """Load reflectance with optional QA/QC metrics (SNR)."""
-        self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=QAQC,
-                                                                         data_data_path = self.files['data raw'],
-                                                                         white_data_path = self.files['white raw'],
-                                                                         dark_data_path = self.files['dark raw'])
-        return self.reflectance, self.snr
+        if getattr(self, "reflectance", None) is not None:
+            return self.reflectance
+
+        if "fenix" not in self.sensor.lower():
+            self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(
+                self.files['data head'],
+                self.files['white head'],
+                self.files['dark head'],
+                QAQC=QAQC,
+                data_data_path=self.files['data raw'],
+                white_data_path=self.files['white raw'],
+                dark_data_path=self.files['dark raw'],
+            )
+        else:
+            self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir))
+    
+        return self.reflectance
 
     def get_reflectance(self):
-        """Return or compute the reflectance cube (without QA/QC)."""
-        if getattr(self, "reflectance", None) is None:
-            self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(self.files['data head'], self.files['white head'], self.files['dark head'], QAQC=False,
-                                                                             data_data_path = self.files['data raw'],
-                                                                             white_data_path = self.files['white raw'],
-                                                                             dark_data_path = self.files['dark raw'])
+        """
+        Return or compute the reflectance cube (without QA/QC).
+        Fenix systems require fish-eye and other corrections, this is all off-loaded to hylite,
+        requiring a different pathway through Raw object.
+        """
+        if getattr(self, "reflectance", None) is not None:
+            return self.reflectance
+
+        if "fenix" not in self.sensor.lower():
+            self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(
+                self.files['data head'],
+                self.files['white head'],
+                self.files['dark head'],
+                QAQC=False,
+                data_data_path=self.files['data raw'],
+                white_data_path=self.files['white raw'],
+                dark_data_path=self.files['dark raw'],
+            )
+        else:
+            self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir))
+    
         return self.reflectance
     def get_false_colour(self, bands=None):
         """Generate a false-colour RGB composite for visualization."""

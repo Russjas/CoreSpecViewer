@@ -7,6 +7,7 @@ flags shared by spectral and interface modules.
 
 con_dict = {
     # band slice bounds (inclusive-exclusive)
+         
     "swir_slice_start": 13,
     "swir_slice_stop": 262,
     "mwir_slice_start": 5,
@@ -15,10 +16,14 @@ con_dict = {
     "rgb_slice_stop": -1,   # keep -1 to mean "to last"
     "default_slice_start": 5,
     "default_slice_stop": -5,
+    "fenix_slice_start": 10,
+    "fenix_slice_stop": -10,
 
     # Savitzky–Golay
     "savgol_window": 10,
     "savgol_polyorder": 2,
+    #features
+    "feature detection threshold": 0.1 
 }
 
 

@@ -10,7 +10,10 @@ from PyQt5.QtWidgets import QSplitter, QVBoxLayout, QWidget
 
 from ..interface import ToolDispatcher
 from ..models import CurrentContext
-from .util_windows import ClosableWidgetWrapper, ImageCanvas2D, SpectralImageCanvas
+from .util_windows import (ClosableWidgetWrapper, 
+                           ImageCanvas2D, 
+                           SpectralImageCanvas,
+                           PopoutWindow)
 
 
 class BasePage(QWidget):
@@ -86,14 +89,15 @@ class BasePage(QWidget):
                 self._dispatcher.clear()
 
         # Nothing to explicitly disconnect on ImageCanvas2D/InfoTable by default
-    def _add_closable_widget(self, raw_widget: QWidget, title: str, closeable=True):
+    def _add_closable_widget(self, raw_widget: QWidget, title: str, closeable=True, popoutable=False):
         """
         Wraps a widget in a ClosableWidgetWrapper and adds it as a *secondary*
         widget to the QSplitter, usually alongside self._right or self._third.
         """
          # Import locally for clean API
 
-        wrapper = ClosableWidgetWrapper(raw_widget, title=title, parent=self, closeable=closeable)
+        wrapper = ClosableWidgetWrapper(raw_widget, title=title, parent=self, closeable=closeable,
+                                        popoutable=popoutable)
 
         # Connect the wrapper's closed signal to the page's removal handler
         wrapper.closed.connect(self.remove_widget)
@@ -130,6 +134,28 @@ class BasePage(QWidget):
             self._right = None
         elif w is self._third:
             self._third = None
+
+    def _handle_popout_request(self, wrapper: ClosableWidgetWrapper):
+        """
+        Handles the signal from a ClosableWidgetWrapper to pop its content out 
+        into a new, independent QMainWindow. This is a generic handler 
+        for all pages.
+        """
+        content_widget = wrapper.wrapped_widget
+        content_title = wrapper.label.text()
+
+        self.remove_widget(wrapper) 
+
+        popout_win = PopoutWindow(
+            content_widget=content_widget,
+            title=f"Popped Out: {content_title}",
+            parent=self 
+        )
+
+        popout_win.show()
+
+
+
 
     def update_display(self, key='mask'):
         pass

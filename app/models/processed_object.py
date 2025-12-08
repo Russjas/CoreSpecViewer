@@ -14,6 +14,7 @@ from PIL import Image
 from ..spectral_ops import spectral_functions as sf
 from .dataset import Dataset
 
+base_datasets = ["cropped", "savgol", "savgol_cr", "mask", "bands", "metadata"]
 
 @dataclass
 class ProcessedObject:
@@ -131,7 +132,7 @@ class ProcessedObject:
 
             ds = Dataset(base=basename, key=key, path=fp, suffix=key, ext=ext)
             datasets[key] = ds
-            print(key)
+            
 
         return cls(basename=basename, root_dir=root, datasets=datasets)
 
@@ -163,7 +164,7 @@ class ProcessedObject:
         path = self.root_dir / f"{self.basename}_{key}{ext}"
         ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
         self.temp_datasets[key] = ds
-        print('calling build thum with {key}')
+        
         self.build_thumb(key)
 
     def update_root_dir(self, path):
@@ -307,7 +308,7 @@ class ProcessedObject:
             else:
                 mask_to_use = getattr(self, 'mask', None)
                 mask_data = mask_to_use
-                print(f"Default key: {key}")
+                
             try:
                 processed = process_and_save(ds, key, mask_data)
                 if not processed:
@@ -319,7 +320,7 @@ class ProcessedObject:
     
     
     def build_thumb(self, key):
-        print(f'build thumb {key}')
+        
         ds = self.temp_datasets.get(key)
         if ds is None:
             ds = self.datasets.get(key)
@@ -337,7 +338,7 @@ class ProcessedObject:
                 ds.thumb = im
 
             elif ds.ext == ".npz":
-                print(key, type(ds.data))
+                
                 im = sf.mk_thumb(ds.data.data, mask=ds.data.mask)
                 #im = sf.mk_thumb(ds.data)
                 ds.thumb = im
@@ -368,8 +369,54 @@ class ProcessedObject:
 
     def load_or_build_thumbs(self):
         for key, ds in self.datasets.items():
-
             if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
                 self.datasets[key].thumb = Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg')
             else:
                 self.build_thumb(key)
+    
+    def delete_dataset(self, key):
+        
+        """
+        Remove a dataset from the object and optionally delete from disk.
+        
+        Parameters
+        ----------
+        key : str
+            Dataset key to delete (e.g., 'mask', 'savgol_cr').
+           
+        Raises
+        ------
+        KeyError
+            If the dataset key doesn't exist.
+        
+        Examples
+        --------
+        >>> po.delete_dataset('old_product')  # Delete file and remove from memory
+        >>> po.delete_dataset('temp_data', from_disk=False)  # Remove from memory only
+        """
+        if key in base_datasets:
+            return #You dont want to delete these datasets.
+        
+        # Check both permanent and temporary datasets
+        if key in self.datasets:
+            ds = self.datasets[key]
+            location = self.datasets
+        elif key in self.temp_datasets:
+            ds = self.temp_datasets[key]
+            location = self.temp_datasets
+        else:
+            raise KeyError(f"Dataset '{key}' not found in object")
+        
+        if key.endswith("INDEX"):
+            try:
+                self.delete_dataset(key.replace("INDEX", "LEGEND"))
+            except (KeyError, FileNotFoundError):
+                pass #not in keys or already deleted
+        try:
+            ds.delete()
+        except FileNotFoundError:
+            # File already gone, that's fine
+            pass
+               
+        del location[key]
+        

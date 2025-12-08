@@ -57,6 +57,7 @@ from .ui import (
     InfoTable,
     LibraryPage,
     MetadataDialog,
+    LibMetadataDialog,
     RawPage,
     VisualisePage,
     busy_cursor,
@@ -203,6 +204,7 @@ class MainRibbonController(QMainWindow):
                 ("Mask outside selected", lambda: self.act_mask_polygon(mode = "mask outside"), "With exising mask, masks all pixels outside of selected region"),
                 ("Mask inside selected", lambda: self.act_mask_polygon(mode = "mask inside"), "With exising mask, masks all pixels outside of selected region")
             ]),
+            ("button", "Despeckle", self.despeck_mask, "Remove speckles from mask"),
             ("button", "Improve", self.act_mask_improve, "Heuristically improves the mask"),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom')
@@ -226,6 +228,10 @@ class MainRibbonController(QMainWindow):
                ]),
             ("menu",   "Features", self.extract_feature_list, "Performs Minimum Wavelength Mapping"),
             ("button", "Generate Images", self.gen_images, "Generates full size images of all products and base datasets in an outputs folder"),
+            ("menu", "Library building", [
+                ("Add spectra", self.act_lib_pix, "Add a single pixel spectra to the current library\n WARNING: This will modify the library on disk, use a back up"),
+                ("Add region average", self.act_lib_region, "Add the average spectra of a region to the current library\n WARNING: This will modify the library on disk, use a back u"),
+                ])
             ])
         
         # --- HOLE TAB ---
@@ -363,17 +369,18 @@ class MainRibbonController(QMainWindow):
                     self.update_display()
                 return
             except Exception as e:
-                print(path,e)
+                
                 try:
                     hole = HoleObject.build_from_parent_dir(path)
-                    print('hole loaded')
+                    
                     self.cxt.ho = hole
                     self._distribute_context()
                     self.choose_view('hol')
                     self.update_display()
                     return
                 except Exception as e:
-                    print(path,e)
+                    QMessageBox.warning(self, "Open dataset", f"Failed to open hole dataset: {e}")
+                    return
                     return
 
 
@@ -392,16 +399,19 @@ class MainRibbonController(QMainWindow):
                 return
             white_head_path, _ = QFileDialog.getOpenFileName(
             self, "Open White header file", "", "header files (*.hdr)")
-            if not data_head_path:
+            if not white_head_path:
                 return
             dark_head_path, _ = QFileDialog.getOpenFileName(
             self, "Open Dark header file", "", "header files (*.hdr)")
-            if not data_head_path:
+            if not dark_head_path:
                 return
             metadata_path, _ = QFileDialog.getOpenFileName(
             self, "Optional lumo metadata", "", "header files (*.xml)")
             try:
-                self.cxt.current = RawObject.manual_create_from_multiple_paths(data_head_path, data_head_path, data_head_path, metadata_path = metadata_path)
+                self.cxt.current = RawObject.manual_create_from_multiple_paths(data_head_path, 
+                                                                               white_head_path, 
+                                                                               dark_head_path, 
+                                                                               metadata_path = metadata_path)
                 self.choose_view('raw')
                 self.update_display()
                 return
@@ -455,7 +465,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('loading...', self):
                 if clicked_button == 2:
                     hole = HoleObject.build_from_parent_dir(path)
-                    print('hole loaded')
+                    
                     self.cxt.ho = hole
                     self._distribute_context()
                     self.choose_view('hol')
@@ -491,11 +501,11 @@ class MainRibbonController(QMainWindow):
                 po.export_images()
                 self.cxt.current.reload_all()
                 self.cxt.current.load_thumbs()
-            print('multi')
+            
         if self.cxt.po is None or self.cxt.current.is_raw:
             return
         self.cxt.current.export_images()
-        print('single')
+        
 
 
     def save_clicked(self):
@@ -632,7 +642,7 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_rect(self):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Masking", "No Current Scan")
             return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
@@ -653,7 +663,7 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_point(self, mode):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Masking", "No Current Scan")
             return
         if self.cxt.current.is_raw:
             QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
@@ -675,16 +685,23 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_improve(self):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Masking", "No Current Scan")
             return
         self.cxt.current = t.improve_mask(self.cxt.current)
         self._distribute_context()
         self.update_display()
 
+    def despeck_mask(self):
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Masking", "No Current Scan")
+            return
+        self.cxt.current = t.despeckle_mask(self.cxt.current)
+        self._distribute_context()
+        self.update_display()
 
     def act_mask_polygon(self, mode = "mask outside"):
         if self.cxt.current is None:
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+            QMessageBox.information(self, "Masking", "No Current Scan")
             return
         p = self._active_page()
         if not p or not p.dispatcher or self.cxt.current is None:
@@ -746,6 +763,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('feature extraction {key}....', self):
                 for po in self.cxt.ho:
                     t.run_feature_extraction(po, key)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -756,7 +774,7 @@ class MainRibbonController(QMainWindow):
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
-        print(key)
+        
         with busy_cursor(f'extracting {key}...', self):
             self.cxt.current = t.run_feature_extraction(self.cxt.current, key)
         
@@ -778,6 +796,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map(po, exemplars, name)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -819,6 +838,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map_SAM(po, exemplars, name)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -862,6 +882,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_multi_range_minmap(po, exemplars, name, mode=mode)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -919,10 +940,11 @@ class MainRibbonController(QMainWindow):
                 for po in self.cxt.ho:
                     try:
                         t.wta_min_map_user_defined(po, exemplars, name, [start_nm, stop_nm], mode=mode)
+                        po.commit_temps()
                         po.save_all()
                         po.reload_all()
                         po.load_thumbs()
-                        print('done one')
+                        
                     except ValueError:
                         continue
                     
@@ -976,6 +998,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map_MSAM(po, exemplars, name)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -983,7 +1006,7 @@ class MainRibbonController(QMainWindow):
             self.choose_view('hol')
             self.update_display()
             return
-        print('this was called')
+        
         if self.cxt.current is None:
             QMessageBox.information(self, "Correlation", "No Current Scan")
             return
@@ -1019,6 +1042,7 @@ class MainRibbonController(QMainWindow):
             with busy_cursor('clustering...', self):
                 for po in self.cxt.ho:
                     t.kmeans_caller(po, clusters, iters)
+                    po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
@@ -1079,7 +1103,155 @@ class MainRibbonController(QMainWindow):
         self._distribute_context()
         self.update_display()
         
+    def act_lib_pix(self):
+        """Add a single pixel spectrum to the current library."""
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Add to Library", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Add to Library", "Open a processed dataset first.")
+            return
+        if not self.cxt.library or not self.cxt.library.is_open():
+            QMessageBox.warning(self, "Add to Library", "No library database is open.")
+            return
+        
+        p = self._active_page()
+        if not p or not p.dispatcher or not p.left_canvas:
+            return
+        
+        def handle_point_click(y, x):
+            try:
+                spectrum = self.cxt.current.savgol[int(y), int(x), :]
+                wavelengths_nm = self.cxt.current.bands
+                        
+                # Ask for metadata
+                dlg = LibMetadataDialog(parent=self)
+                if dlg.exec() != QDialog.Accepted:
+                    return  # user cancelled
+                
+                metadata = dlg.get_metadata()
+                name = metadata.get("Name", "").strip()
+                if not name:
+                    QMessageBox.warning(
+                        self, 
+                        "Add to Library", 
+                        "Name is a mandatory field"
+                    )
+                    return
+                
+                metadata['SampleNum'] = f"Hole: {self.cxt.current.metadata.get('borehole id', 'Unknown')} Box: {self.cxt.current.metadata.get('box number', 'Unknown')} Pixel: ({int(y)}, {int(x)})"
+                with busy_cursor('Adding to library...', self):
+                    sample_id = self.cxt.library.add_sample(
+                        name=name,
+                        wavelengths_nm=wavelengths_nm,
+                        reflectance=spectrum,
+                        metadata=metadata
+                    )
+                
+                self.statusBar().showMessage(
+                    f"Added spectrum '{name}' to library (ID: {sample_id})", 
+                    5000
+                )
+                
+            except Exception as e:
+                QMessageBox.warning(
+                    self, 
+                    "Add to Library", 
+                    f"Failed to add spectrum to library: {e}"
+                )
+            finally:
+                p.dispatcher.clear_all_temp()
+        
+        p.dispatcher.set_single_click(handle_point_click)
+        self.statusBar().showMessage("Click a pixel to add its spectrum to the library...")
 
+        
+    def act_lib_region(self):
+        """Add the average spectrum of a region to the current library."""
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Add to Library", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Add to Library", "Open a processed dataset first.")
+            return
+        if not self.cxt.library or not self.cxt.library.is_open():
+            QMessageBox.warning(self, "Add to Library", "No library database is open.")
+            return
+        
+        p = self._active_page()
+        if not p or not p.dispatcher or not p.left_canvas:
+            return
+        
+        def _on_rect(y0, y1, x0, x1):
+            try:
+                # Extract region and compute average spectrum
+                region = self.cxt.current.savgol[y0:y1, x0:x1, :]
+                
+                # Use mask if available to exclude masked pixels
+                if self.cxt.current.has('mask'):
+                    mask_region = self.cxt.current.mask[y0:y1, x0:x1]
+                    valid_pixels = region[mask_region == 0]
+                    if valid_pixels.size == 0:
+                        QMessageBox.warning(
+                            self, 
+                            "Add to Library", 
+                            "Selected region contains no valid (unmasked) pixels."
+                        )
+                        return
+                    avg_spectrum = valid_pixels.mean(axis=0)
+                    pixel_count = len(valid_pixels)
+                else:
+                    avg_spectrum = region.reshape(-1, region.shape[-1]).mean(axis=0)
+                    pixel_count = (y1 - y0) * (x1 - x0)
+                
+                wavelengths_nm = self.cxt.current.bands
+                
+                dlg = LibMetadataDialog(parent=self)
+                
+                if dlg.exec() != QDialog.Accepted:
+                    return  # user cancelled
+                
+                metadata = dlg.get_metadata()
+                name = metadata.get("Name", "").strip()
+                if not name:
+                    QMessageBox.warning(
+                        self, 
+                        "Add to Library", 
+                        "Name is a mandatory field"
+                    )
+                    return
+                metadata['SampleNum'] = f"Hole: {self.cxt.current.metadata.get('borehole id', 'Unknown')} Box: {self.cxt.current.metadata.get('box number', 'Unknown')} Region: ({y0}-{y1},{x0}-{x1})"
+                
+                
+                with busy_cursor('Adding to library...', self):
+                    sample_id = self.cxt.library.add_sample(
+                        name=name,
+                        wavelengths_nm=wavelengths_nm,
+                        reflectance=avg_spectrum,
+                        metadata=metadata
+                    )
+                    self.choose_view('lib')
+                    self.update_display()
+                
+                self.statusBar().showMessage(
+                    f"Added averaged spectrum '{name}' ({pixel_count} pixels) to library (ID: {sample_id})", 
+                    5000
+                )
+                
+            except Exception as e:
+                QMessageBox.warning(
+                    self, 
+                    "Add to Library", 
+                    f"Failed to add spectrum to library: {e}"
+                )
+            finally:
+                p.dispatcher.clear_all_temp()
+        
+        p.dispatcher.set_rect(_on_rect)
+        p.left_canvas.start_rect_select()
+        self.statusBar().showMessage("Draw a rectangle to average and add to library...")
+        
+        
             # --- HOLE actions ---
     def hole_next_box(self):
         if self.cxt.ho is None or self.cxt.current is None:
@@ -1171,7 +1343,7 @@ class MainRibbonController(QMainWindow):
 
         if self.cxt is not None and self.cxt.ho is not None:
             with busy_cursor('Saving.....', self):
-                print('saving')
+                
                 for po in self.cxt.ho:
                     if po.has_temps:
                         print(po.metadata['box number'])
