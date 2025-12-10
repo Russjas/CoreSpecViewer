@@ -560,7 +560,7 @@ class HoleControlPanel(QWidget):
                 try:
                     
                     depths, values, dominant = self.cxt.ho.step_product_dataset(key)
-                except ValueError as e:
+                except (ValueError, KeyError) as e:
                     QMessageBox.warning(self, "Failed operation", f"Failed to show data: {e}")
                     return
                 legend_key = key.replace("FRACTIONS", "LEGEND")
@@ -580,11 +580,12 @@ class HoleControlPanel(QWidget):
     def gen_base_datasets(self):
         if not self.cxt.ho:
             return
-        try:
-            self.cxt.ho.create_base_datasets()
-        except ValueError as e:
-            QMessageBox.warning(self, "Failed operation", f"Failed to create base data: {e}")
-            return
+        with busy_cursor("Generating downhole base datasets...", self):
+            try:
+                self.cxt.ho.create_base_datasets()
+            except ValueError as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to create base data: {e}")
+                return
         self.update_for_hole()
         return
     
