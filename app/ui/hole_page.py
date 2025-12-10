@@ -628,7 +628,7 @@ class HoleControlPanel(QWidget):
             return
         try:
             self.cxt.ho.create_dhole_minmap(name)
-        except ValueError as e:
+        except (ValueError, AttributeError) as e:
             QMessageBox.warning(self, "Failed operation", f"Failed to create downhole feature: {e}")
             return
         self.update_for_hole()   
