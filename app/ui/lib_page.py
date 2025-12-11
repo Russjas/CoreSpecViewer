@@ -413,7 +413,8 @@ class LibraryPage(BasePage):
         )
         key = f"{mineral_name}-(ID:-{sample_id})-MINCORR"
         with busy_cursor('correlating...', self):
-            t.quick_corr(self.current_obj, x_nm, y, key = key)
+            _, key = t.quick_corr(self.current_obj, x_nm, y, key = key)
+            print(key, self.current_obj.temp_datasets[key].path, self.current_obj.temp_datasets[key].ext)
             
             corr_canvas.show_rgb(self.current_obj.get_data(key))
             corr_canvas.ax.set_title(f"{mineral_name} (ID: {sample_id})", fontsize=11)

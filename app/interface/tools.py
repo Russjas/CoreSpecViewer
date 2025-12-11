@@ -3,6 +3,7 @@ High-level utility functions for cropping, masking, unwrapping, and feature extr
 Used by UI pages to manipulate RawObject and ProcessedObject datasets.
 """
 from pathlib import Path
+import re
 
 from matplotlib.path import Path as mpl_path
 import numpy as np
@@ -368,20 +369,25 @@ def run_feature_extraction(obj, key):
     obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
 
-#TODO: currently these are held entirely in the scope of lib window and not persistes
-# think about adding as datasets -> need to consider the display window logic
+
 def quick_corr(obj, x, y, key):
     """
     Runs a pearson correlation of a user selected spectum against the objects
     continuum removed dataset.
-    Currently returns masked array directly rather than adding to obj.temp_datasets
+    Currently result is stored as a masked array in the temp dataset.
+    Database mineral names are used as the key, but often contain characters that are
+    illegal in file paths. As the key is used in the save path of the resulting dataset
+    it needs to be sanitised.
+    The clean key is returned in addion to the processed object, so the caller has reference
+    the generated dataset.
     """
+    clean_key = re.sub(r'[\\/:*?"<>|_]', '-', key)
     if obj.is_raw:
         return None
     res_y = sf.resample_spectrum(x, y, obj.bands)
     corr = np.ma.masked_array(sf.numpy_pearson(obj.savgol_cr, sf.cr(res_y)), mask = obj.mask)
-    obj.add_temp_dataset(key, corr, '.npz')
-    return obj
+    obj.add_temp_dataset(clean_key, corr, '.npz')
+    return obj, clean_key
 
 
 #TODO: Old method, maybe delete. Indexing is currently handled directly by display
