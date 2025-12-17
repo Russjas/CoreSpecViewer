@@ -554,26 +554,32 @@ class HoleControlPanel(QWidget):
         key = text.strip()
         if not key:
             return
-        suffixes = ("LEGEND", "FRACTIONS")
+        suffixes = ("LEGEND", "FRACTIONS", "DOM-MIN")
         if key.endswith(suffixes):    
             with busy_cursor("Resampling mineral map...", self):
                 try:
                     
                     depths, values, dominant = self.cxt.ho.step_product_dataset(key)
                 except (ValueError, KeyError) as e:
-                    QMessageBox.warning(self, "Failed operation", f"Failed to show data: {e}")
+                    QMessageBox.warning(self, "Failed operation", f"Failed to show data PATH1: {e}")
                     return
-                legend_key = key.replace("FRACTIONS", "LEGEND")
+                if key.endswith("FRACTIONS"):
+                    legend_key = key.replace("FRACTIONS", "LEGEND")
+                elif key.endswith("DOM-MIN"):
+                    legend_key = key.replace("DOM-MIN", "LEGEND")
                 legend = self.cxt.ho.product_datasets[legend_key].data
                 
         else:
             legend = None
             with busy_cursor("Resampling mineral map...", self):
                 try:
-                    depths, values, _ = self.cxt.ho.step_product_dataset(key)
+                    depths, values, dominant = self.cxt.ho.step_product_dataset(key)
                 except ValueError as e:
-                    QMessageBox.warning(self, "Failed operation", f"Failed to show data: {e}")
+                    QMessageBox.warning(self, "Failed operation", f"Failed to show data PATH2: {e}")
                     return
+        if key.endswith("DOM-MIN"):
+            self._page.add_dhole_display(key, depths, dominant, legend = legend)
+            return
         self._page.add_dhole_display(key, depths, values, legend = legend)
         
     
@@ -693,9 +699,12 @@ class HolePage(BasePage):
             popoutable = True
         )
         wrapper.popout_requested.connect(self._handle_popout_request)
-        if legend:
-            canvas.show_fraction_stack(depths, values, legend, 
+        if legend is not None: 
+            if not key.endswith("DOM-MIN"):
+                canvas.show_fraction_stack(depths, values, legend, 
                                       include_unclassified=True)
+            else:
+                canvas.show_dominant_log(depths, values, legend)
         else:
             canvas.show_graph(depths, values, key)
         # Wrap and add

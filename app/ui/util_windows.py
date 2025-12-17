@@ -499,7 +499,8 @@ class ImageCanvas2D(QWidget):
             else:
                 cid = None
                 name = "Unclassified"
-                color = (0.3, 0.3, 0.3, 1.0)  # dark grey
+                color = (0.7, 0.7, 0.7, 1.0)
+                #color = (0.3, 0.3, 0.3, 1.0)  # dark grey
 
             self.ax.fill_betweenx(
                 depths,
@@ -510,9 +511,9 @@ class ImageCanvas2D(QWidget):
                 edgecolor="none",
                 label=name,
             )
-
-        self.ax.set_xlim(0.0, 1.0)
+        self.ax.set_ylim(depths.min(), depths.max())
         self.ax.invert_yaxis()
+        self.ax.set_xlim(0.0, 1.0)
         self.ax.set_xlabel("Fraction of row width")
         self.ax.set_ylabel("Depth")
         self.ax.grid(True, axis="x", alpha=0.2)
@@ -529,6 +530,114 @@ class ImageCanvas2D(QWidget):
             handletextpad=0.6,
         )
 
+        self.canvas.draw_idle()
+    
+    
+    def show_dominant_log(
+        self,
+        depths: np.ndarray,
+        dominant_indices: np.ndarray,
+        legend: list[dict],
+        width: float = 0.1,
+    ):
+
+        """
+        Displays a categorical log track based on dominant mineral indices.
+    
+        The colors are mapped consistently with the stacked log by using the 
+        Mineral Class ID deterministicaly for color selection, but the 
+        Legend Position Index (0..K-1) for array lookup.
+
+        Parameters
+        ----------
+        depths : (H,)
+            Depth per row (same length as fractions.shape[0]).
+        dominant_indices : (H, K+1)
+            Output from compute_fullhole_mineral_fractions.
+            index of the mineral with the greatest abundance in each depth slice
+        legend : list of dict
+            [{'index': int, 'label': str}, ...], length K.
+        
+        
+        
+    
+        """
+        depths = np.asarray(depths)
+        dominant_indices = np.asarray(dominant_indices)
+                
+        self.ax.clear()
+        self.canvas.figure.subplots_adjust(right=0.80)
+        
+        cmap = matplotlib.colormaps.get("tab20") or matplotlib.colormaps["tab10"]
+
+        index_to_color = {}
+        legend_handles = []
+        legend_labels = []
+    
+        for i, entry in enumerate(legend):
+            try:
+                mineral_id = int(entry["index"])
+            except (TypeError, ValueError):
+                continue
+                
+            color = cmap(mineral_id % 20)
+            index_to_color[i] = color 
+            
+            # Collect legend items
+            legend_handles.append(matplotlib.patches.Patch(facecolor=color))
+            legend_labels.append(entry["label"])
+            
+        # Set the color for 'No Dominant Mineral' (-1) 
+        no_data_color = (1.0, 1.0, 1.0, 1.0) # White/Gap
+        index_to_color[-1] = no_data_color
+        legend_handles.append(matplotlib.patches.Patch(facecolor=no_data_color))
+        legend_labels.append("No Dominant / Gap")
+    
+        # 2. Plot the Colored Bars
+        H = dominant_indices.shape[0]
+    
+        for i in range(H):
+            idx = dominant_indices[i] 
+    
+            z_top = depths[i]
+            z_bottom = depths[i+1] if i + 1 < H else depths[-1] + (depths[-1] - depths[-2])
+            
+            color = index_to_color.get(idx, (0.5, 0.5, 0.5, 1.0)) 
+            
+            self.ax.barh(
+                y=z_top, 
+                width=width, 
+                height=z_bottom - z_top, 
+                left=0, 
+                align='edge', 
+                color=color, 
+                edgecolor='none'
+            )
+        
+        # 3. Set up the axis and Legend
+        self.ax.set_ylim(depths.min(), depths.max())
+        self.ax.invert_yaxis()
+        self.ax.set_ylabel("Depth")
+        self.ax.set_xlabel("Dominant Mineral")
+        self.ax.set_xlim(0.0, width)
+        self.ax.set_xticks([]) 
+        self.ax.set_xticklabels([]) 
+    
+        # Display the custom legend
+        
+        self.ax.legend(
+            handles=legend_handles, 
+            labels=legend_labels,
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1.0),
+            borderaxespad=0.0,
+            frameon=True,
+            framealpha=0.9,
+            fontsize=9,
+            handlelength=1.8,
+            handletextpad=0.6,
+        )
+        
         self.canvas.draw_idle()
     
     def show_graph(self, depths, values, key):

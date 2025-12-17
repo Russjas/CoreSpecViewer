@@ -218,14 +218,14 @@ class HoleObject:
     def step_product_dataset(self, key):
         if key not in self.product_datasets.keys():
             raise ValueError("bounced no dataset")
-        if (key.endswith("FRACTIONS") or key.endswith("DOM-MIN")):
-            
+        if (key.endswith("FRACTIONS") or key.endswith("DOM-MIN")):            
             if key.endswith("FRACTIONS"):
                 dom_key = key.replace("FRACTIONS", "DOM-MIN")
                 frac_key = key
             elif key.endswith("DOM-MIN"):
-                frac_key = key
-                dom_key = key.replace("DOM-MIN", "FRACTIONS")
+                dom_key = key
+                frac_key = key.replace("DOM-MIN", "FRACTIONS")
+                
             depths_stepped, fractions_stepped, dominant_stepped = res.resample_fractions_and_dominant_by_step(
                                                                 self.base_datasets["depths"].data,
                                                                 self.product_datasets[frac_key].data,
