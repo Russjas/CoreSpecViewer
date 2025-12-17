@@ -886,6 +886,8 @@ def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
     return concatenated
 
 #====== Functions for working with unwrapped datasets =========================
+
+
 def compute_downhole_mineral_fractions(
     index_map: np.ndarray,
     mask: np.ndarray,
@@ -895,15 +897,10 @@ def compute_downhole_mineral_fractions(
     Compute row-based mineral fractions and dominant mineral per row.
 
     - Uses mask to exclude non-core pixels (mask==1).
-    - Fractions are normalised over *core* pixels only in each row.
+    - Fractions are normalised over *core* pixels only in each row (including -999 unclassified).
     - Columns 0..K-1 correspond to legend entries (in order).
-    - Column K is 'unclassified': core pixels whose index is not in legend.
+    - Column K is 'unclassified': core pixels whose index is not in legend, including -999.
     - dominant[i] is index into legend (0..K-1), or -1 if no classified pixels.
-    
-    - Legend must be an ordered list of dictionaries ["index" : idx,
-                                                      "label" : "label text"]
-    
-    
     """
     if index_map.ndim != 2:
         raise ValueError(f"index_map must be 2D, got {index_map.shape}")
@@ -917,24 +914,32 @@ def compute_downhole_mineral_fractions(
     class_ids = np.array([row["index"] for row in legend], dtype=int)
     K = len(class_ids)
 
-    fractions = np.zeros((H, K + 1), dtype=float)
+    # FIX 1: Initialize with NaN. This prevents 0.0 sums from corrupting the average
+    # in the resampling step when a row is entirely a gap.
+    fractions = np.full((H, K + 1), np.nan, dtype=float)
     dominant = np.full(H, -1, dtype=int)
 
     for i in range(H):
         row = idx[i]
         row_mask = msk[i]
 
-        # core pixels only: not masked, and index >= 0
-        valid_mask = (~row_mask) & (row >= 0)
+        # FIX 2: Include the UNCLASSIFIED index ID (-999) in the valid core count.
+        # Invalid value is -999 in all spectral ops, but it is a default argument
+        # rather than enforced. No gui operation will pass a different argument.
+        # valid_mask = (~row_mask) AND ( (row >= 0) OR (row == -999) )
+        valid_mask = (~row_mask) & ((row >= 0) | (row == -999))
+        
         if not np.any(valid_mask):
-            continue  # leave zeros; dominant[i] stays -1
+            # If no valid pixels, the row remains NaN (due to FIX 1)
+            continue
 
         valid_vals = row[valid_mask]
         total_valid = valid_vals.size
 
-        # Count *all* core values in this row
-        max_val = int(valid_vals.max())
-        counts_all = np.bincount(valid_vals, minlength=max_val + 1)
+        # We use only non-negative values for bincount (as is standard)
+        positive_vals = valid_vals[valid_vals >= 0]
+        max_val = int(positive_vals.max()) if positive_vals.size > 0 else 0
+        counts_all = np.bincount(positive_vals, minlength=max_val + 1)
 
         # Extract counts for legend classes in legend order
         counts = np.zeros(K, dtype=float)
@@ -943,9 +948,12 @@ def compute_downhole_mineral_fractions(
                 counts[j] = counts_all[cid]
 
         total_classified = counts.sum()
+        
+        # Unclassified count is now correctly calculated as the remainder of 
+        # ALL valid core pixels (total_valid) minus those classified by the legend.
         unclassified = total_valid - total_classified
 
-        # Fractions over core width
+        # Fractions over core width (now total_valid includes -999 pixels)
         fractions[i, :K] = counts / total_valid
         fractions[i, K] = unclassified / total_valid
 
@@ -955,8 +963,6 @@ def compute_downhole_mineral_fractions(
             dominant[i] = -1
 
     return fractions, dominant
-
-
 
 #========= Functions for interpreting reflectance data ========================
 ##        Functions currently used in the app =================================

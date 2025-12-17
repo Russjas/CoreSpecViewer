@@ -465,7 +465,7 @@ class HoleControlPanel(QWidget):
         self.full_data_combo.blockSignals(False)
 
    # ------------------------------------------------------------------
-    #TODO add display logic for dhole datasets
+    
     def update_for_hole(self):
         """
         Refresh labels and available dataset keys when a new HoleObject is set.
@@ -624,7 +624,7 @@ class HoleControlPanel(QWidget):
         suffixes = ("INDEX")
         names = [x for x in keys if x.endswith(suffixes)]
         
-        name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
+        name, ok = QInputDialog.getItem(self, "Select Mineral Map", "MinMaps:", names, 0, False)
         if not name:
             return
         try:
