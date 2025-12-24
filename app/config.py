@@ -16,8 +16,8 @@ con_dict = {
     "rgb_slice_stop": -1,   # keep -1 to mean "to last"
     "default_slice_start": 5,
     "default_slice_stop": -5,
-    "fenix_slice_start": 10,
-    "fenix_slice_stop": -10,
+    "fenix_slice_start": 20,
+    "fenix_slice_stop": -20,
 
     # Savitzky–Golay
     "savgol_window": 10,

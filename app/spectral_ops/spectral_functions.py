@@ -22,6 +22,7 @@ import scipy as sc
 import spectral as sp
 import spectral.io.envi as envi
 from ..config import con_dict  # live shared dict
+from .fenix_smile import fenix_smile_correction
 
 my_map = matplotlib.colormaps['viridis']
 my_map.set_bad('black')
@@ -556,18 +557,28 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False,
     return data_reflect, bands, snr
 
 
-def get_fenix_reflectance(path):
-
-    hyimg = HyliteFenix.correct_folder(str(path))
-    
+def get_fenix_reflectance(path, mode='hylite'):
+    print(mode)
+    if mode == 'hylite':
+        hyimg = HyliteFenix.correct_folder(str(path), shift=True, lens = True)
+    else:
+        hyimg = HyliteFenix.correct_folder(str(path), shift=True, lens = False)
+    print(mode, hyimg.data.shape)
     if isinstance(hyimg, tuple):
         hyimg = hyimg[0]
-    
-    reflectance = hyimg.data          # (H, W, B), float32
+    if mode == 'hylite':
+        reflectance = hyimg.data
+    else:
+        reflectance = fenix_smile_correction(np.transpose(hyimg.data, (1, 0, 2)))          # (H, W, B), float32
+    print("after calc", reflectance.shape)
     bands       = hyimg.get_wavelengths()
     snr         = None # snr workflows not implemented yet
     band_slice = _slice_from_sensor("FENIX Sensor")
-    reflectance = np.rot90(reflectance, 2)
+    if mode != 'hylite':
+        reflectance = np.transpose(reflectance, (1, 0, 2))
+        reflectance = np.flip(reflectance, axis = 0)
+    else:
+        reflectance = np.rot90(reflectance, 2)
     return reflectance[:,:, band_slice]*100, bands[band_slice], snr
 
 

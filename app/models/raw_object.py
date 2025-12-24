@@ -164,11 +164,16 @@ class RawObject:
                 dark_data_path=self.files['dark raw'],
             )
         else:
-            self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir))
+            print(len(self.metadata['wavelength']))
+            if len(self.metadata['wavelength']) < 400:
+                self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='hylite')
+            else:
+                self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='empirical')
     
         return self.reflectance
 
     def get_reflectance(self):
+        
         """
         Return or compute the reflectance cube (without QA/QC).
         Fenix systems require fish-eye and other corrections, this is all off-loaded to hylite,
@@ -176,7 +181,7 @@ class RawObject:
         """
         if getattr(self, "reflectance", None) is not None:
             return self.reflectance
-
+        print(self.sensor.lower())
         if "fenix" not in self.sensor.lower():
             self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(
                 self.files['data head'],
@@ -188,7 +193,11 @@ class RawObject:
                 dark_data_path=self.files['dark raw'],
             )
         else:
-            self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir))
+            print(len(self.metadata['wavelength']))
+            if len(self.metadata['wavelength']) < 400:
+                self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='hylite')
+            else:
+                self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='empirical')
     
         return self.reflectance
     def get_false_colour(self, bands=None):
