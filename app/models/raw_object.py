@@ -168,7 +168,7 @@ class RawObject:
             if len(self.metadata['wavelength']) < 400:
                 self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='hylite')
             else:
-                self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='empirical')
+                self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='derived')
     
         return self.reflectance
 
@@ -197,7 +197,7 @@ class RawObject:
             if len(self.metadata['wavelength']) < 400:
                 self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='hylite')
             else:
-                self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='empirical')
+                self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='derived')
     
         return self.reflectance
     def get_false_colour(self, bands=None):
