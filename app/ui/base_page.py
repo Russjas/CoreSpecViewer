@@ -89,7 +89,8 @@ class BasePage(QWidget):
                 self._dispatcher.clear()
 
         # Nothing to explicitly disconnect on ImageCanvas2D/InfoTable by default
-    def _add_closable_widget(self, raw_widget: QWidget, title: str, closeable=True, popoutable=False):
+    def _add_closable_widget(self, raw_widget: QWidget, title: str, closeable=True, popoutable=False,
+                             index = None):
         """
         Wraps a widget in a ClosableWidgetWrapper and adds it as a *secondary*
         widget to the QSplitter, usually alongside self._right or self._third.
@@ -103,8 +104,12 @@ class BasePage(QWidget):
         wrapper.closed.connect(self.remove_widget)
 
         # Add the wrapper to the splitter
-
-        self._splitter.addWidget(wrapper)
+        # Add the wrapper to the splitter at the specified index
+        if index is None:
+            self._splitter.addWidget(wrapper)
+        else:
+            self._splitter.insertWidget(index, wrapper)
+       
 
         return wrapper
 
@@ -114,10 +119,7 @@ class BasePage(QWidget):
         Safely remove a widget (which might be the ClosableWidgetWrapper) 
         from the QSplitter and clean up its memory. (Same as previous version)
         """
-        """
-        Safely remove a widget from the QSplitter and clean up its memory.
-        This is crucial for dynamically added widgets like correlation canvases.
-        """
+        
         # 1. Find the widget in the splitter (it might be a wrapped item)
         idx = self._splitter.indexOf(w)
         if idx == -1:
