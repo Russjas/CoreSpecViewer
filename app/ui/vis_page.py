@@ -27,22 +27,22 @@ class VisualisePage(BasePage):
         super().__init__(parent)
         
         # Main canvases (non-closable)
-        self.left = SpectralImageCanvas(self)
+        self._left = SpectralImageCanvas(self)
         self._add_closable_widget(
-            self.left,
+            self._left,
             title="Smoothed image",
             popoutable=False, closeable=False
         )
         
-        self.right = ImageCanvas2D(self)
+        self._right = ImageCanvas2D(self)
         self._add_closable_widget(
-            self.right,
+            self._right,
             title="Mask",
             popoutable=False, closeable=False
         )
         
         # Track all canvases for synchronization (including closable ones)
-        self._sync_canvases = [self.left, self.right]
+        self._sync_canvases = [self.left_canvas, self.right_canvas]
         
         tbl = RightClick_TableWidget(0, 1, self)
         tbl.setHorizontalHeaderLabels(["Cached Products"])
@@ -61,55 +61,16 @@ class VisualisePage(BasePage):
         self._sync_lock = False
 
     def activate(self):
-        if isinstance(self.left, SpectralImageCanvas):
-            self._dispatcher = ToolDispatcher(self.left)
-        else:
-            self._dispatcher = None
+        super().activate()
+        # No bindings or display if there is no dataset loaded    
         if self.current_obj is None:
             return
         if self.current_obj.is_raw:
             return
+        #Use the centralised logic for binding sync now that we are all closeable
         for canvas in self._sync_canvases:
             self._register_sync_canvas(canvas)
-# =============================================================================
-# =============================================================================
-#         def _sync_now(src_ax, dst_ax):
-#             if self._sync_lock: 
-#                 return
-#             self._sync_lock = True
-#             try:
-#                 dst_ax.set_xlim(src_ax.get_xlim())
-#                 dst_ax.set_ylim(src_ax.get_ylim())
-#                 dst_ax.figure.canvas.draw_idle()
-#             finally:
-#                 self._sync_lock = False
-# 
-#         def _sync_from_event(ev):
-#             # Find which canvas triggered the event
-#             src_canvas = None
-#             for canvas in self._sync_canvases:
-#                 if hasattr(canvas, 'canvas') and ev.canvas is canvas.canvas:
-#                     src_canvas = canvas
-#                     break
-#             
-#             if src_canvas is None:
-#                 return
-#                 
-#             # Sync all other canvases
-#             src_ax = src_canvas.ax
-#             for canvas in self._sync_canvases:
-#                 if canvas is not src_canvas and hasattr(canvas, 'ax'):
-#                     _sync_now(src_ax, canvas.ax)
-# # 
-#         # Bind events to all current canvases
-#         for canvas in self._sync_canvases:
-#             if hasattr(canvas, 'canvas'):
-#                 self._bind_mpl(canvas.canvas, "button_release_event", _sync_from_event)
-#                 self._bind_mpl(canvas.canvas, "scroll_event", _sync_from_event)
-#                 self._bind_mpl(canvas.canvas, "key_release_event", _sync_from_event)
-# =============================================================================
-# 
-# =============================================================================
+        #Set the right click cr spectrum up
         if self.current_obj is not None and not self.current_obj.is_raw and self.dispatcher:
             def _right_click(y, x):
                 spec = self.current_obj.savgol_cr[y, x, :]
@@ -121,10 +82,7 @@ class VisualisePage(BasePage):
             self.refresh_cache_table()
 
     def teardown(self):
-        if isinstance(self.left, SpectralImageCanvas):
-            self.left.cancel_rect_select()
-            if self._dispatcher:
-                self._dispatcher.clear()
+        super().teardown()
         # Disconnect any mpl events
         if self._mpl_cids:
             for cv, cid in self._mpl_cids:
@@ -135,7 +93,7 @@ class VisualisePage(BasePage):
             self._mpl_cids.clear()
         
         # Clear sync canvases but keep the main two
-        self._sync_canvases = [self.left, self.right]
+        self._sync_canvases = [self.left_canvas, self.right_canvas]
         
         self.cache.clear()
         self.table.setRowCount(0)
@@ -216,10 +174,10 @@ class VisualisePage(BasePage):
             return
         if self.current_obj.is_raw:
             return
-        self.left.show_rgb(self.current_obj.savgol, self.current_obj.bands)
+        self.left_canvas.show_rgb(self.current_obj.savgol, self.current_obj.bands)
 
         self.refresh_cache_table()
-        self._display_product_in_canvas(self.right, key)
+        self._display_product_in_canvas(self.right_canvas, 'mask')
 
     def _on_row_activated(self, row: int, col: int):
         """
@@ -339,15 +297,15 @@ class VisualisePage(BasePage):
 
         if base:
             _insert_header("Base processed")
-            for k in base:
+            for k in sorted(base):
                 _insert_item(k)
         if products:
             _insert_header("Products")
-            for k in products:
+            for k in sorted(products):
                 _insert_item(k)
         if unwrapped:
             _insert_header("Unwrapped")
-            for k in unwrapped:
+            for k in sorted(unwrapped):
                 _insert_item(k)
 
         self.table.resizeRowsToContents()
