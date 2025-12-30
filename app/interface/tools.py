@@ -12,6 +12,7 @@ from .. import config
 from ..models import ProcessedObject, RawObject
 from ..spectral_ops import spectral_functions as sf
 from ..spectral_ops import remap_legend as rl
+from ..spectral_ops import band_maths as bm
 
 #======Getting and setting app configs ========================================
 
@@ -390,22 +391,6 @@ def quick_corr(obj, x, y, key):
     return obj, clean_key
 
 
-#TODO: Old method, maybe delete. Indexing is currently handled directly by display
-#and thumbnail logic. 
-def _colorize_indexed(class_idx: np.ndarray, labels: list[str]):
-    """
-    Specific helper for index maps.
-    Return RGB image (uint8) and a color table aligned to labels.
-    """
-    import matplotlib
-    tab = matplotlib.colormaps['tab20']
-    K = max(int(class_idx.max()) + 1, len(labels))
-    colors = np.array([tab(i % 20)[:3] for i in range(K)], dtype=np.float32)
-    colors_rgb = (colors * 255).astype(np.uint8)  # (K,3)
-    rgb = colors_rgb[class_idx]                   # (H,W,3) uint8
-    return rgb, colors_rgb
-
-
 def wta_multi_range_minmap(obj, exemplars, coll_name, mode='pearson'):
     coll_name = coll_name.replace('_', '')
     key_prefix = f"MinMapMulti-{mode}-{coll_name}"
@@ -509,6 +494,7 @@ def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
     obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
 
     return obj
+
 
 def wta_min_map_MSAM_direct(arr, exemplars, bands,  mode='numpy'):
     """
@@ -723,9 +709,6 @@ def clean_legends(obj, onto_path):
     return obj
 
 
-
-
-
 def match_spectra(spectra_x, spectra_y, bands_nm):
     """
     passthrough fuction for matching a spectrum to a band range
@@ -733,7 +716,6 @@ def match_spectra(spectra_x, spectra_y, bands_nm):
     y_res = sf.resample_spectrum(np.asarray(spectra_x, float), np.asarray(spectra_y, float), bands_nm)
     
     return y_res
-
 
 
 def kmeans_caller(obj, clusters = 5, iters = 50):
@@ -780,3 +762,21 @@ def compute_pixel_counts(idx: np.ndarray, m: int) -> np.ndarray:
     return counts[:m]
 
 
+def band_math_interface(obj, name, expr, cr = False):
+    """
+    Takes a processed object, a name and an expression and uses the band_maths
+    submodule to parse and evaluate the expression on reflectance data. Optionally 
+    evaluate the expression on continuum removed data.
+    """
+    if not cr:
+        cube = obj.savgol
+    else:
+        cube = obj.savgol_cr
+    
+    out = bm.evaluate_expression(expr, cube, obj.bands)
+    clean_key = re.sub(r'[\\/:*?"<>|_]', '-', name)
+    obj.add_temp_dataset(clean_key, np.ma.masked_array(out, obj.mask), '.npz')
+    return obj
+    
+    
+    

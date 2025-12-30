@@ -49,6 +49,7 @@ from PyQt5.QtWidgets import (
 from .interface import tools as t
 from .models import CurrentContext, HoleObject, RawObject
 from .ui.cluster_window import ClusterWindow
+from .ui.band_math_dialogue import BandMathsDialog
 from .ui import (
     AutoSettingsDialog,
     CatalogueWindow,
@@ -227,11 +228,12 @@ class MainRibbonController(QMainWindow):
                 
                ]),
             ("menu",   "Features", self.extract_feature_list, "Performs Minimum Wavelength Mapping"),
-            ("button", "Generate Images", self.gen_images, "Generates full size images of all products and base datasets in an outputs folder"),
+            ("button", "Band Maths", self.act_band_maths, "Open the band maths expression window"),
             ("menu", "Library building", [
                 ("Add spectra", self.act_lib_pix, "Add a single pixel spectra to the current library\n WARNING: This will modify the library on disk, use a back up"),
                 ("Add region average", self.act_lib_region, "Add the average spectra of a region to the current library\n WARNING: This will modify the library on disk, use a back u"),
-                ])
+                ]),
+            ("button", "Generate Images", self.gen_images, "Generates full size images of all products and base datasets in an outputs folder"),
             ])
         
         # --- HOLE TAB ---
@@ -1102,7 +1104,42 @@ class MainRibbonController(QMainWindow):
             return
         self._distribute_context()
         self.update_display()
+       
         
+    def act_band_maths(self):
+        #TODO
+        """
+        Triggered from the ribbon/menu:
+        - ask user for a band-maths expression + name
+        - pass them, along with the current object, to the interface layer
+        """
+        if self.cxt.current is None:
+            QMessageBox.information(self, "Band Maths", "No Current Scan")
+            return
+        if self.cxt.current.is_raw:
+            QMessageBox.information(self, "Band Maths", "Open a processed dataset first.")
+            return
+    
+        ok, name, expr, cr = BandMathsDialog.get_expression(
+           parent=self,
+           default_name="Custom band index",
+           default_expr="2300-1400",
+        )
+        if not ok:
+            return
+        with busy_cursor('calculating...', self):
+            try:
+                self.cxt.current = t.band_math_interface(self.cxt.current, name, expr, cr=cr)
+            except Exception as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to evalute expression: {e}")
+                return
+    
+        self.choose_view('vis')
+        self.update_display()
+        
+    
+    
+    
     def act_lib_pix(self):
         """Add a single pixel spectrum to the current library."""
         if self.cxt.current is None:
