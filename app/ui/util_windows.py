@@ -284,20 +284,24 @@ class ImageCanvas2D(QWidget):
         shp = getattr(image, "shape", None)
         if not shp or len(shp) == 1:
             return  # ignore 1D/unknown
-
+        
         if len(shp) == 2:
-            a = image.astype(float)
-            amin = np.nanmin(a)
-            amax = np.nanmax(a)
+                   
+            # choose clipping percentiles (tune as needed)
+            lo = np.nanpercentile(image.data, 2)
+            hi = np.nanpercentile(image.data, 98)
         
-            if amax > amin:
-                norm = (a - amin) / (amax - amin)
+            if hi > lo:
+                clipped = np.clip(image, lo, hi)
             else:
-                norm = np.zeros_like(a, dtype=float)
+                clipped = image  # fallback if image is constant
         
-            
             self.ax.clear()
-            self.ax.imshow(norm, cmap=my_map, origin="upper", vmin=0.0, vmax=1.0)
+            self.ax.imshow(
+                clipped,
+                cmap=my_map,
+                origin="upper"
+            )
 
 
         elif len(shp) == 3 and shp[2] == 3:

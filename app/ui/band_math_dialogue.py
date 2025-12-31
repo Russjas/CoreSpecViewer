@@ -41,15 +41,6 @@ class BandMathsDialog(QDialog):
         info.setReadOnly(True)
         info.setMinimumHeight(150)
         info.setHtml(
-            "<b>Band maths syntax</b><br>"
-            "<ul>"
-            "<li>Expressions use <b>Python arithmetic syntax</b>.</li>"
-            "<li>Use <code>**</code> for exponentiation "
-            "(<code>^</code> is not supported).</li>"
-            "<li>All numeric values are interpreted as wavelengths in nm "
-            "and mapped to the nearest band.</li>"
-            "</ul>"
-        
             "<b>Band Maths Syntax</b><br>"
             "<ul>"
             "<li>Expressions use <b>Python arithmetic syntax</b>: <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>**</code>.</li>"
