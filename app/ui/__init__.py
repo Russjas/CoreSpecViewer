@@ -36,7 +36,7 @@ from .catalogue_window import CatalogueWindow
 from .hole_page import HolePage
 from .lib_page import LibraryPage
 from .raw_page import RawPage
-from .ribbon import Groups, Ribbon
+from .ribbon import Groups, Ribbon, GroupedRibbon
 from .util_windows import (
     AutoSettingsDialog,
     ImageCanvas2D,

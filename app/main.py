@@ -241,21 +241,22 @@ class MainRibbonController(QMainWindow):
         for key in feature_keys:
             self.extract_feature_list_multi.append((key, lambda _, k=key: self.run_feature_extraction(k, multi=True)))
         self.ribbon.add_tab('Hole operations',[
-                            ("button", "Previous", self.hole_prev_box, "View previous box in hole"),
-                            ("button", "Next", self.hole_next_box, "View next box in hole"),
-                            ("button", "Return to Raw", self.hole_return_to_raw, "Open the raw dataset to replace this box"),
-                            ("button", "Quick Cluster", lambda: self.act_kmeans(multi = True)),
-                            ("menu",   "Fullhole Correlations", [
-                                ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation(multi=True)),
-                                ("MineralMap SAM (Winner-takes-all)", lambda: self.act_vis_sam( multi=True)),
-                                ("MineralMap MSAM (Winner-takes-all)", lambda: self.act_vis_msam(multi=True)),
-                                ("Multi-range check (Winner-takes-all)", lambda: self.act_vis_multirange(multi = True), "Performs custom multi-window matching"),
-                                ("select range", lambda: self.act_subrange_corr(multi = True), "Performs correlation on a chosed wavelength range"),
-                               ]),
-                            ("menu",   "Fullhole Features", self.extract_feature_list_multi),
-                            ("button", "Save All", self.save_all_changes),
-                            ("button", "Generate Images", lambda: self.gen_images(multi = True))
-                            ])
+                ("button", "Previous", self.hole_prev_box, "View previous box in hole"),
+                ("button", "Next", self.hole_next_box, "View next box in hole"),
+                ("button", "Return to Raw", self.hole_return_to_raw, "Open the raw dataset to replace this box"),
+                ("menu", "Iterative Operations",[
+                ("Quick Cluster", lambda: self.act_kmeans(multi = True)),
+                ("menu",   "Fullhole Correlations", [
+                    ("MineralMap Pearson (Winner-takes-all)", lambda: self.act_vis_correlation(multi=True)),
+                    ("MineralMap SAM (Winner-takes-all)", lambda: self.act_vis_sam( multi=True)),
+                    ("MineralMap MSAM (Winner-takes-all)", lambda: self.act_vis_msam(multi=True)),
+                    ("Multi-range check (Winner-takes-all)", lambda: self.act_vis_multirange(multi = True), "Performs custom multi-window matching"),
+                    ("select range", lambda: self.act_subrange_corr(multi = True), "Performs correlation on a chosed wavelength range"),
+                   ]),
+                ("menu",   "Fullhole Features", self.extract_feature_list_multi)], "Performs operations iteratively on each box in hole"),
+                ("button", "Save All", self.save_all_changes),
+                ("button", "Generate Images", lambda: self.gen_images(multi = True))
+                ])
 
     #======== UI methods ===============================================
     def _clear_all_canvas_refs(self):
