@@ -280,7 +280,8 @@ class ImageCanvas2D(QWidget):
         layout.addWidget(self.toolbar)
 
     def show_rgb(self, image):
-
+        if image.dtype == bool:
+            image = image.astype(int)
         shp = getattr(image, "shape", None)
         if not shp or len(shp) == 1:
             return  # ignore 1D/unknown
