@@ -67,6 +67,7 @@ from .ui import (
     two_choice_box,
     WavelengthRangeDialog
 )
+from .ui.display_text import gen_display_text
 
 feature_keys = [
     '1400W', '1480W', '1550W', '1760W', '1850W',
@@ -763,7 +764,7 @@ class MainRibbonController(QMainWindow):
         if multi:
             if self.cxt.ho is None: 
                 return
-            with busy_cursor('feature extraction {key}....', self):
+            with busy_cursor(f'feature extraction {key}....', self):
                 for po in self.cxt.ho:
                     t.run_feature_extraction(po, key)
                     po.commit_temps()
@@ -1418,7 +1419,7 @@ class MainRibbonController(QMainWindow):
         )
         win.setWindowFlag(Qt.Window, True)
         win.setAttribute(Qt.WA_DeleteOnClose, True)
-        win.setWindowTitle(cluster_key)
+        win.setWindowTitle(gen_display_text(cluster_key))#TODO
         self.cluster_windows.append(win)
     
         win.destroyed.connect(

@@ -30,6 +30,7 @@ from PyQt5.QtWidgets import (
 from ..models import HoleObject
 from .base_page import BasePage
 from .util_windows import ClosableWidgetWrapper, busy_cursor, ImageCanvas2D
+from .display_text import gen_display_text
 
 class NoSelectionDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
@@ -39,8 +40,14 @@ class NoSelectionDelegate(QStyledItemDelegate):
 
 class HoleBoxTable(QTableWidget):
     """
-    Configurable table showing ProcessedObjects in a HoleObject.
-    Supported column keys: 'box', 'thumb', (future: 'depth', etc.)
+    A specialized table widget for displaying a list of boxes (ProcessedObjects) 
+    associated with the current HoleObject.
+
+    Features:
+    - Renders columns for box numbers and image thumbnails (ProcessObject datasets).
+    - Supports dynamic switching of the displayed thumbnail dataset via a custom header combobox.
+    - Handles thumbnail generation, resizing, and aspect ratio preservation.
+    - Intended to be used as a vertical "strip" log, often synchronized with other tables.
     """
 
     def __init__(self, page: "HolePage", parent=None, columns=None, dataset_key='savgol'):
@@ -211,14 +218,15 @@ class HoleBoxTable(QTableWidget):
         # lazy-create combo
         if self._header_combo is None:
             combo = QComboBox(header)
-            combo.currentTextChanged.connect(self._on_header_dataset_changed)
+            combo.currentIndexChanged.connect(self._on_header_dataset_changed)
             self._header_combo = combo
         else:
             combo = self._header_combo
 
         combo.blockSignals(True)
         combo.clear()
-        def add_header_item(combo, text):
+        
+        def add_header_item(combo: QComboBox, text: str):
             model = combo.model()
             row = model.rowCount()
             model.insertRow(row)
@@ -228,6 +236,10 @@ class HoleBoxTable(QTableWidget):
             font.setBold(True)
             item.setFont(font)
             model.setItem(row, 0, item)
+    
+        def add_key_item(raw_key: str):
+            # Display text in the UI, raw key in UserRole (via userData)
+            combo.addItem(gen_display_text(raw_key), raw_key)
 
         base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
         unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
@@ -249,17 +261,17 @@ class HoleBoxTable(QTableWidget):
 
         add_header_item(combo, "---Base data---")
         for k in base:
-            combo.addItem(k)
+            add_key_item(k)
         add_header_item(combo, "---Products---")
         for k in products:
-            combo.addItem(k)
+            add_key_item(k)
 
 
 
 
         default = self.dataset_key
         if default is not None:
-            idx = combo.findText(default)
+            idx = combo.findData(default, role=Qt.UserRole)
             if idx >= 0:
                 combo.setCurrentIndex(idx)
                 self.dataset_key = default
@@ -279,7 +291,27 @@ class HoleBoxTable(QTableWidget):
             return
         # this will also repopulate from hole
         self.set_dataset_key(key)
-
+    def _on_header_dataset_changed(self, _idx: int):
+        """
+        Slot called when the header dataset combo changes.
+    
+        Reads the raw dataset key from Qt.UserRole, not from display text.
+        """
+        combo = self._header_combo
+        if combo is None:
+            return
+    
+        raw_key = combo.currentData(Qt.UserRole)
+        if not raw_key:
+            return
+    
+        # Avoid redundant updates
+        if raw_key == self.dataset_key:
+            return
+    
+        self.set_dataset_key(raw_key)
+        
+        
     def _reposition_header_combo(self):
         if self._header_combo is None or "thumb" not in self.columns:
             return
@@ -314,15 +346,22 @@ class HoleBoxTable(QTableWidget):
         thumb_idx = self.columns.index("thumb")
         item = self.horizontalHeaderItem(thumb_idx)
         if item is not None:
-            item.setText(self.dataset_key)
+            item.setText(gen_display_text(self.dataset_key))
 
 
 class HoleControlPanel(QWidget):
     """
-    Narrow side panel for hole-level controls.
+    Side panel for displaying hole metadata and executing hole-level operations.
 
-    - Displays basic hole metadata (ID, #boxes, depth range)
-    - Lets the user choose the dataset key used in the secondary strip table.
+    Displays:
+    - Basic metadata: Hole ID, total box count, and depth range.
+
+    Controls:
+    - Box Level: Select and add extra visualization columns (strips) to the main view.
+    - Full Hole: 
+        - Visualize downhole datasets (products, mineral maps) and legends.
+        - Set resampling window steps.
+        - Generate base datasets, downhole features, and mineral maps from box data.
     """
     def __init__(self, page: "HolePage", parent=None):
         super().__init__(parent or page)
@@ -428,6 +467,11 @@ class HoleControlPanel(QWidget):
             font.setBold(True)
             item.setFont(font)
             model.setItem(row, 0, item)
+        
+        def add_key_item(combo, raw_key: str):
+            # Display text in the UI, raw key in UserRole (via userData)
+            combo.addItem(gen_display_text(raw_key), raw_key)
+            
         if keys:
             combo = self.secondary_combo
             base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
@@ -450,17 +494,17 @@ class HoleControlPanel(QWidget):
 
             add_header_item(combo, "---Base data---")
             for k in base:
-                combo.addItem(k)
+                add_key_item(combo, k)
             add_header_item(combo, "---Products---")
             for k in products:
-                combo.addItem(k)
+                add_key_item(combo, k)
         
         add_header_item(self.full_data_combo, "---Base data---")
         for k in self.cxt.ho.base_datasets.keys():
-            self.full_data_combo.addItem(k)
+            add_key_item(self.full_data_combo, k)
         add_header_item(self.full_data_combo, "---Product data---")
         for k in self.cxt.ho.product_datasets.keys():
-            self.full_data_combo.addItem(k)
+            add_key_item(self.full_data_combo, k)
         self.secondary_combo.blockSignals(False)
         self.full_data_combo.blockSignals(False)
 
@@ -510,14 +554,13 @@ class HoleControlPanel(QWidget):
 
 
 # ---------Box level control handlers---------------------------------------------------------
-    def _on_display_btn_clicked(self, key: str):
+    def _on_display_btn_clicked(self):#TODO removed key: str argument, if signal passing causes crash reinstate
         """
         User changed the dataset key for the secondary strip. Rebuild the
         second table using this key.
         """
-        text = self.secondary_combo.currentText()
-
-        key = text.strip()
+        key = self.secondary_combo.currentData(Qt.UserRole)
+       
         if not key:
             return
         self.cxt = self._page.cxt
@@ -549,9 +592,8 @@ class HoleControlPanel(QWidget):
     def show_downhole(self):
         if not self.cxt.ho:
             return
-        text = self.full_data_combo.currentText()
-
-        key = text.strip()
+        key = self.full_data_combo.currentData(Qt.UserRole)
+        
         if not key:
             return
         suffixes = ("LEGEND", "FRACTIONS", "DOM-MIN")
@@ -605,13 +647,23 @@ class HoleControlPanel(QWidget):
             keys = keys | box.datasets.keys() | box.temp_datasets.keys()
         
         suffixes = ("POS", "DEP")
-        names = [x for x in keys if x.endswith(suffixes)]
+        raw_names = [x for x in keys if x.endswith(suffixes)]
+        display_to_key = {gen_display_text(k): k for k in raw_names}
         
-        name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
-        if not name:
+        choice, ok = QInputDialog.getItem(
+            self,
+            "Select Feature",
+            "Features:",
+            sorted(display_to_key.keys()),
+            0,
+            False
+        )
+        if not choice:
             return
         try:
-            self.cxt.ho.create_dhole_features(name)
+            with busy_cursor("Creating donwhole feature dataset...", self):
+                raw_key = display_to_key[choice]
+                self.cxt.ho.create_dhole_features(raw_key)
         except ValueError as e:
             QMessageBox.warning(self, "Failed operation", f"Failed to create downhole feature: {e}")
             return
@@ -627,14 +679,16 @@ class HoleControlPanel(QWidget):
         for box in self.cxt.ho:
             keys = keys | box.datasets.keys() | box.temp_datasets.keys()
         
-        suffixes = ("INDEX")
-        names = [x for x in keys if x.endswith(suffixes)]
+        suffixes = ("INDEX",)
+        raw_names = [x for x in keys if x.endswith(suffixes)]
+        display_to_key = {gen_display_text(k): k for k in raw_names}
         
-        name, ok = QInputDialog.getItem(self, "Select Mineral Map", "MinMaps:", names, 0, False)
-        if not name:
+        choice, ok = QInputDialog.getItem(self, "Select Mineral Map", "MinMaps:", sorted(display_to_key.keys()), 0, False)
+        if not choice:
             return
         try:
-            self.cxt.ho.create_dhole_minmap(name)
+            key = display_to_key[choice]
+            self.cxt.ho.create_dhole_minmap(key)
         except (ValueError, AttributeError) as e:
             QMessageBox.warning(self, "Failed operation", f"Failed to create downhole feature: {e}")
             return
@@ -644,11 +698,20 @@ class HoleControlPanel(QWidget):
     
 class HolePage(BasePage):
     """
-    Hole-level view.
+    The main view for interacting with a multi-box 'HoleObject'.
 
-    Left panel: table listing all ProcessedObjects (boxes) in the current HoleObject,
-                showing the savgol thumbnail and box number.
-    Right/third panels can be added later (downhole plots, metadata, etc.).
+    Layout:
+    - Left: A Control Panel for metadata and dataset operations.
+    - Main Area: A collection of vertical tables ('strips'), starting with a default 
+      Box/Thumbnail table. Users can add additional strips to compare datasets side-by-side.
+
+    Functionality:
+    - Synchronized scrolling across all open strip tables.
+    - Selection handling: Clicking a box updates the global context (CurrentContext) 
+      to that specific ProcessedObject.
+    - Downhole Visualization: Supports generating and displaying downhole plots and 
+      mineral maps in pop-out capable widgets.
+    - Data Management: Loading hole directories and saving changes (committing temporary datasets).
     """
     changeView = pyqtSignal(str)
     def __init__(self, parent=None):
@@ -693,9 +756,10 @@ class HolePage(BasePage):
         
     def add_dhole_display(self, key, depths, values, legend = None):
         canvas = ImageCanvas2D(self)
+        disp = gen_display_text(key)
         wrapper = self._add_closable_widget(
             canvas,
-            title=f"Downhole: {key}",
+            title=f"Downhole: {disp}",
             popoutable = True
         )
         wrapper.popout_requested.connect(self._handle_popout_request)
@@ -706,7 +770,7 @@ class HolePage(BasePage):
             else:
                 canvas.show_dominant_log(depths, values, legend)
         else:
-            canvas.show_graph(depths, values, key)
+            canvas.show_graph(depths, values, disp)
         # Wrap and add
         
 

@@ -225,3 +225,5 @@ class Dataset:
         self.thumb = None
         self._memmap_ref = None
         gc.collect()
+    
+    

@@ -16,6 +16,7 @@ from .util_windows import (ImageCanvas2D,
                            SpectrumWindow, 
                            RightClick_TableWidget,
                            ClosableWidgetWrapper)
+from .display_text import gen_display_text
 
 
 class VisualisePage(BasePage):
@@ -187,19 +188,19 @@ class VisualisePage(BasePage):
         if not it:
             return
 
-        key = it.text().strip()
+        key = it.data(Qt.UserRole)
         if not key:
             return
             
         if key.endswith('CLUSTERS'):
             self.clusterRequested.emit(key)
             return
-        
+        disp = gen_display_text(key)
         # Create a new closable canvas
         canvas = ImageCanvas2D(self)
         wrapper = self._add_closable_widget(
             canvas,
-            title=f"Product: {key}",
+            title=f"Product: {disp}",
             popoutable=True, index=self._splitter.count() -1
         )
         wrapper.popout_requested.connect(self._handle_popout_request)
@@ -285,10 +286,12 @@ class VisualisePage(BasePage):
             it.setFont(f)
             self.table.setItem(r, 0, it)
 
-        def _insert_item(text: str):
+        def _insert_item(key: str):
             r = self.table.rowCount()
             self.table.insertRow(r)
-            it = QTableWidgetItem(text)
+            it = QTableWidgetItem(gen_display_text(key))
+            it.setData(Qt.UserRole, key)
+            
             it.setTextAlignment(Qt.AlignCenter)
             it.setFlags(it.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(r, 0, it)
@@ -316,7 +319,7 @@ class VisualisePage(BasePage):
         it = self.table.item(row, 0)
         if not it:
             return
-        key = it.text().strip()
+        key = it.data(Qt.UserRole)
         if not key:
             return
         menu = QMenu(self)

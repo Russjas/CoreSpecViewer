@@ -218,6 +218,8 @@ class HoleObject:
     def step_product_dataset(self, key):
         if key not in self.product_datasets.keys():
             raise ValueError("bounced no dataset")
+        if "LEGEND" in key:
+            raise ValueError("Cannot step LEGEND datasets")
         if (key.endswith("FRACTIONS") or key.endswith("DOM-MIN")):            
             if key.endswith("FRACTIONS"):
                 dom_key = key.replace("FRACTIONS", "DOM-MIN")
@@ -237,13 +239,7 @@ class HoleObject:
                           self.product_datasets[key].data,
                           self.step)
             return depths_stepped, feature_stepped, None
-# =============================================================================
-#TODO list
 
-# 
-#         Add plotting methods to the gui architecture
-#         Wire up the GUI for downhole plots
-# =============================================================================
     def save_product_datasets(self):
         for key in self.product_datasets.keys():
             self.product_datasets[key].save_dataset()
