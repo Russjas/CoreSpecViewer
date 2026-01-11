@@ -28,6 +28,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ..models import HoleObject
+from ..interface import profile_tools as pt
 from .base_page import BasePage
 from .util_windows import ClosableWidgetWrapper, busy_cursor, ImageCanvas2D
 from .display_text import gen_display_text
@@ -402,13 +403,13 @@ class HoleControlPanel(QWidget):
         combo_layout.addWidget(self.create_button)
         self.layout.addWidget(combo_block)
         
-        # --- full hole datasets control panal
+        # --- Downhole datasets control panal
         combo_block_full = QWidget(self)
         combo_layout_full = QVBoxLayout(combo_block_full)
         combo_layout_full.setContentsMargins(0, 0, 0, 0)
         combo_layout_full.setSpacing(1)
         # Label
-        label = QLabel("Full hole datasets:", combo_block_full)
+        label = QLabel("Down hole datasets:", combo_block_full)
         combo_layout_full.addWidget(label)
         self.full_data_combo = QComboBox(combo_block_full)
         self.full_data_combo.setToolTip(
@@ -427,23 +428,46 @@ class HoleControlPanel(QWidget):
         gen_base_button.clicked.connect(self.gen_base_datasets)
         combo_layout_full.addWidget(gen_base_button)
         
-        gen_min_map_button = QPushButton("Generate Downhole MinMap datasets", combo_block_full)
-        gen_min_map_button.clicked.connect(self.dhole_minmaps_create)
-        combo_layout_full.addWidget(gen_min_map_button)
-        
-        gen_feats_button = QPushButton("Generate Downhole feature datasets", combo_block_full)
-        gen_feats_button.clicked.connect(self.dhole_feats_create)
-        combo_layout_full.addWidget(gen_feats_button)
-        
-        
         self.layout.addWidget(combo_block_full)
+        
+        # ----- box-derived dataset controls
+        box_derived_block = QWidget(self)
+        box_derived_layout = QVBoxLayout(box_derived_block)
+        box_derived_layout.setContentsMargins(0, 0, 0, 0)
+        box_derived_layout.setSpacing(1)
+        
+        label = QLabel("Box derived dataset controls:", box_derived_block)
+        box_derived_layout.addWidget(label)
+        
+        gen_min_map_button = QPushButton("Generate Downhole MinMap datasets", box_derived_block)
+        gen_min_map_button.clicked.connect(self.dhole_minmaps_create)
+        box_derived_layout.addWidget(gen_min_map_button)
+        
+        gen_feats_button = QPushButton("Generate Downhole feature datasets", box_derived_block)
+        gen_feats_button.clicked.connect(self.dhole_feats_create)
+        box_derived_layout.addWidget(gen_feats_button)
+        
+        self.layout.addWidget(box_derived_block)
+        
+        # ----- profile-derived dataset controls
+        profile_derived_block = QWidget(self)
+        profile_derived_layout = QVBoxLayout(profile_derived_block)
+        profile_derived_layout.setContentsMargins(0, 0, 0, 0)
+        profile_derived_layout.setSpacing(1)
+        
+        label = QLabel("Profile derived dataset controls:", profile_derived_block)
+        profile_derived_layout.addWidget(label)
+        
+        gen_kmeans = QPushButton("Calculate profile k-means", profile_derived_block)
+        gen_kmeans.clicked.connect(self.prof_kmeans)
+        profile_derived_layout.addWidget(gen_kmeans)
+                
+        self.layout.addWidget(profile_derived_block)
         self.layout.addStretch(1)
-
-
-
+        
 
 #---------initiation and refresh logic-----------------------------------------
-    #TODO add logic for full hole controller displays
+
     def _set_dataset_keys(self):
         """Populate the combobox without firing change signals."""
         self.secondary_combo.blockSignals(True)
@@ -553,8 +577,8 @@ class HoleControlPanel(QWidget):
         self._set_dataset_keys()
 
 
-# ---------Box level control handlers---------------------------------------------------------
-    def _on_display_btn_clicked(self):#TODO removed key: str argument, if signal passing causes crash reinstate
+# ---------downhole data control handlers---------------------------------------------------------
+    def _on_display_btn_clicked(self):
         """
         User changed the dataset key for the secondary strip. Rebuild the
         second table using this key.
@@ -569,7 +593,7 @@ class HoleControlPanel(QWidget):
 
         self._page.add_column(dataset_key=key)
 
-# ---------Full hole level control handlers---------------------------------------------------------
+
     def set_step(self):
         if not self.cxt.ho:
             return
@@ -588,8 +612,8 @@ class HoleControlPanel(QWidget):
             self.cxt.ho.step = value
 
 
-
-    def show_downhole(self):
+    #Deprecated
+    def show_downhole1(self):
         if not self.cxt.ho:
             return
         key = self.full_data_combo.currentData(Qt.UserRole)
@@ -624,6 +648,64 @@ class HoleControlPanel(QWidget):
             return
         self._page.add_dhole_display(key, depths, values, legend = legend)
         
+    def show_downhole(self):
+        """Display downhole product dataset."""
+        if not self.cxt.ho:
+            return
+        key = self.full_data_combo.currentData(Qt.UserRole)
+        
+        if not key:
+            return
+        # Step the data
+        try:
+            depths, values, dominant = self.cxt.ho.step_product_dataset(key)
+        except ValueError as e:
+            QMessageBox.warning(self, "Failed operation", f"Failed to resample {gen_display_text(key)}: {e}")
+            return
+        
+        # Create canvas
+        canvas = ImageCanvas2D()
+        
+        # Route based on suffix
+        if key.endswith("FRACTIONS"):
+            # Display fractions as stacked area
+            try:
+                legend_key = key.replace("FRACTIONS", "LEGEND")
+                legend = self.cxt.ho.product_datasets[legend_key].data
+                canvas.display_fractions(depths, values, legend, include_unclassified=True)
+            except ValueError as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
+                return
+        
+        elif key.endswith("DOM-MIN"):
+            # Display indices as categorical bars (both DOM-MIN and INDEX)
+            try:
+                legend_key = key.replace("DOM-MIN", "LEGEND")
+                legend = self.cxt.ho.product_datasets[legend_key].data
+                canvas.display_discrete(depths, dominant, legend)
+            except ValueError as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
+                return
+        
+        elif key.endswith("INDEX"):
+            # Display indices as categorical bars (both DOM-MIN and INDEX)
+            try:
+                legend_key = key.replace("INDEX", "LEGEND")
+                legend = self.cxt.ho.product_datasets[legend_key].data
+                canvas.display_discrete(depths, values, legend)
+            except ValueError as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
+                return
+        else:
+            # Display continuous as line plot
+            try:
+                canvas.display_continuous(depths, values, gen_display_text(key))
+            except ValueError as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
+                return
+        # Add to page with wrapper
+        self._page.add_dhole_display(key, canvas)
+    
     
     def gen_base_datasets(self):
         if not self.cxt.ho:
@@ -637,6 +719,8 @@ class HoleControlPanel(QWidget):
         self.update_for_hole()
         return
     
+    
+# ---------Box-derived level control handlers---------------------------------------------------------    
     def dhole_feats_create(self):
         if not self.cxt.ho:
             return
@@ -694,7 +778,16 @@ class HoleControlPanel(QWidget):
             return
         self.update_for_hole()   
         return
-    
+# ---------Box-derived level control handlers---------------------------------------------------------  
+    def prof_kmeans(self):
+        if not self.cxt.ho:
+            return
+        try:
+            pt.profile_kmeans(self.cxt.ho)
+        except ValueError as e:
+            QMessageBox.warning(self, "Failed operation", f"Failed to create downhole clustering: {e}")
+        self.update_for_hole()   
+        
     
 class HolePage(BasePage):
     """
@@ -753,8 +846,20 @@ class HolePage(BasePage):
         self.extra_columns.append(new_col)
         self._register_scroll_table(new_col)
         self._refresh_from_hole()
+    
+    def add_dhole_display(self, key, canvas):
         
-    def add_dhole_display(self, key, depths, values, legend = None):
+        disp = gen_display_text(key)
+        wrapper = self._add_closable_widget(
+            canvas,
+            title=f"Downhole: {disp}",
+            popoutable = True
+        )
+        wrapper.popout_requested.connect(self._handle_popout_request)
+        
+    
+    #Deprecated
+    def add_dhole_display1(self, key, depths, values, legend = None):
         canvas = ImageCanvas2D(self)
         disp = gen_display_text(key)
         wrapper = self._add_closable_widget(

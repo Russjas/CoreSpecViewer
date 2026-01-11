@@ -78,6 +78,44 @@ class HoleObject:
         return
     
     
+    def add_product_dataset(self, key: str, data, ext: str = None):
+        """
+        Generic method to add a product dataset to the HoleObject.
+        
+        Args:
+            key: The dataset key/identifier
+            data: The dataset data to store
+            ext: File extension (e.g., '.npy', '.npz', '.json'). 
+                 If None, will be inferred from data type:
+                 - dict -> '.json'
+                 - masked array -> '.npz'
+                 - regular array -> '.npy'
+        """
+        if ext is None:
+            # Infer extension from data type
+            if isinstance(data, dict):
+                ext = ".json"
+            elif hasattr(data, 'mask'):  # masked array
+                ext = ".npz"
+            else:  # regular numpy array
+                ext = ".npy"
+        
+        # Ensure extension starts with a dot
+        if not ext.startswith("."):
+            ext = f".{ext}"
+        
+        path = self.root_dir / f"{self.hole_id}_{key}{ext}"
+        
+        self.product_datasets[key] = Dataset(
+            base=self.hole_id,
+            key=key,
+            path=path,
+            suffix=key,
+            ext=ext,
+            data=data
+        )
+    
+   # Functions for aggregating 1D from 2D 
     def create_base_datasets(self):
         """
         This function will only work if every po in hole has had unwrapped stats calculated.
@@ -141,13 +179,16 @@ class HoleObject:
         elif key.endswith("LEGEND"):
             leg_key = key
             ind_key = key.replace("LEGEND", "INDEX")
+            
         #check all legends are the same, not working with different versions
         dicts = [po.datasets[leg_key].data for po in self]
         if not all(d == dicts[0] for d in dicts[1:]):
             raise ValueError(f"Boxes with {key} have different Legend entries")
+            
         full_fractions = None    # will become (H_total, K+1)
         full_dominant  = None 
         legend = dicts[0]
+        
         for po in self:
             seg = sf.unwrap_from_stats(po.mask, po.datasets[ind_key].data, po.stats)
             fractions, dominant = sf.compute_downhole_mineral_fractions(seg.data, seg.mask, 
@@ -164,25 +205,11 @@ class HoleObject:
         
         fracs_key = ind_key.replace("INDEX", "FRACTIONS")
         dom_key = ind_key.replace("INDEX", "DOM-MIN")
-        self.product_datasets[fracs_key] = Dataset(base=self.hole_id, 
-                                          key=fracs_key, 
-                                          path=self.root_dir / f"{self.hole_id}_{fracs_key}.npy", 
-                                          suffix=fracs_key, 
-                                          ext=".npy", 
-                                          data=full_fractions)
-        self.product_datasets[dom_key] = Dataset(base=self.hole_id, 
-                                          key=dom_key, 
-                                          path=self.root_dir / f"{self.hole_id}_{dom_key}.npy", 
-                                          suffix=dom_key, 
-                                          ext=".npy", 
-                                          data=full_dominant)
-        self.product_datasets[leg_key] = Dataset(base=self.hole_id, 
-                                          key=leg_key, 
-                                          path=self.root_dir / f"{self.hole_id}_{leg_key}.json", 
-                                          suffix=leg_key, 
-                                          ext=".json", 
-                                          data=legend)
-        print("datasets successfully created!") 
+        self.add_product_dataset(fracs_key, full_fractions, ext=".npy")
+        self.add_product_dataset(dom_key, full_dominant, ext=".npy")
+        self.add_product_dataset(leg_key, legend, ext=".json")
+        
+        print("datasets successfully created!")
         
     def create_dhole_features(self, key):
         """
@@ -207,38 +234,60 @@ class HoleObject:
                 full_feature  = np.ma.concatenate((full_feature, feat_row))
             po.reload_all()
         
-        self.product_datasets[key] = Dataset(base=self.hole_id, 
-                                          key=key, 
-                                          path=self.root_dir / f"{self.hole_id}_{key}", 
-                                          suffix=key, 
-                                          ext=".npz", 
-                                          data=full_feature)
+        self.add_product_dataset(key, full_feature, ext=".npz")
 
-
+#==================================================================
+    
     def step_product_dataset(self, key):
+        """
+        Step product dataset based on suffix.
+        
+        Returns:
+            Tuple format depends on data type:
+            - FRACTIONS: (depths, fractions, dominant)
+            - DOM-MIN: (depths, dominant_indices, None)
+            - INDEX: (depths, indices, None)
+            - Continuous: (depths, values, None)
+        """
+        invalid_keys_suffixes = ("LEGEND", "CLUSTERS")
         if key not in self.product_datasets.keys():
             raise ValueError("bounced no dataset")
-        if "LEGEND" in key:
-            raise ValueError("Cannot step LEGEND datasets")
-        if (key.endswith("FRACTIONS") or key.endswith("DOM-MIN")):            
-            if key.endswith("FRACTIONS"):
-                dom_key = key.replace("FRACTIONS", "DOM-MIN")
-                frac_key = key
-            elif key.endswith("DOM-MIN"):
-                dom_key = key
-                frac_key = key.replace("DOM-MIN", "FRACTIONS")
-                
-            depths_stepped, fractions_stepped, dominant_stepped = res.resample_fractions_and_dominant_by_step(
-                                                                self.base_datasets["depths"].data,
-                                                                self.product_datasets[frac_key].data,
-                                                                self.step)
-            return depths_stepped, fractions_stepped, dominant_stepped
+        for suffix in invalid_keys_suffixes:
+            if key.endswith(suffix):
+                raise ValueError(f"Cannot step {suffix} datasets: '{key}'")
+        depths = self.base_datasets["depths"].data
+        data = self.product_datasets[key].data
+        
+        # 1. FRACTIONS-pair path
+        if key.endswith("FRACTIONS"):
+            depths_s, fractions_s, dominant_s = res.step_fractions_pair(
+                depths, data, self.step
+            )
+            return depths_s, fractions_s, dominant_s
+        
+        # 2. DOM-MIN path on (the pair path)
+        elif key.endswith("DOM-MIN"):
+            data = self.product_datasets[key.replace("DOM-MIN", "FRACTIONS")].data
+            depths_s, fractions_s, dominant_s = res.step_fractions_pair(
+                depths, data, self.step
+            )
+            return depths_s, fractions_s, dominant_s
+        
+        # 3. INDEX path
+        elif key.endswith("INDEX"):
+            depths_s, indices_s = res.step_indices(
+                depths, data, self.step
+            )
+            return depths_s, indices_s, None
+        
+        # 4. Continuous path (default)
         else:
-            depths_stepped, feature_stepped = res.bin_features_by_step(
-                          self.base_datasets["depths"].data,
-                          self.product_datasets[key].data,
-                          self.step)
-            return depths_stepped, feature_stepped, None
+            depths_s, values_s = res.step_continuous(
+                depths, data, self.step, agg='mean'
+            )
+            return depths_s, values_s, None
+
+
 
     def save_product_datasets(self):
         for key in self.product_datasets.keys():

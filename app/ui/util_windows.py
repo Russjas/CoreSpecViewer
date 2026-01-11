@@ -439,8 +439,8 @@ class ImageCanvas2D(QWidget):
 
         self.canvas.draw_idle()
     
-    
-    def show_fraction_stack(
+    #=====Downhole display methods=======================
+    def display_fractions(
         self,
         depths: np.ndarray,
         fractions: np.ndarray,   # (H, K+1)
@@ -463,6 +463,7 @@ class ImageCanvas2D(QWidget):
         include_unclassified : bool
             If False, hides the last 'unclassified' column.
         """
+        # Existing show_fraction_stack logic
         depths = np.asarray(depths)
         frac = np.asarray(fractions)
         H, C = frac.shape
@@ -536,9 +537,9 @@ class ImageCanvas2D(QWidget):
         )
 
         self.canvas.draw_idle()
+       
     
-    
-    def show_dominant_log(
+    def display_discrete(
         self,
         depths: np.ndarray,
         dominant_indices: np.ndarray,
@@ -569,7 +570,9 @@ class ImageCanvas2D(QWidget):
         """
         depths = np.asarray(depths)
         dominant_indices = np.asarray(dominant_indices)
-                
+        if depths[0] > depths[-1]:
+            depths = depths[::-1]
+            dominant_indices = dominant_indices[::-1]
         self.ax.clear()
         self.canvas.figure.subplots_adjust(right=0.80)
         
@@ -645,7 +648,8 @@ class ImageCanvas2D(QWidget):
         
         self.canvas.draw_idle()
     
-    def show_graph(self, depths, values, key):
+    
+    def display_continuous(self, depths, values, key):
         if depths.shape != values.shape:
             
             return
@@ -653,17 +657,16 @@ class ImageCanvas2D(QWidget):
         
         if depths[0] > depths[-1]:
             depths = depths[::-1]
-            values = values[::-1, :]
-        
+            values = values[::-1]
+        self.ax.clear()
         self.ax.plot(values, depths, 'o-', markersize=3)
         
         self.ax.invert_yaxis()
         self.ax.set_ylabel("Depth (m)")
         self.ax.set_xlabel(key)
         self.ax.grid(True, alpha=0.3)
-        self.canvas.draw()
-    
-    
+        self.canvas.figure.tight_layout()  
+        self.canvas.draw_idle() 
     
     def clear_memmap_refs(self):
         """Clear any matplotlib artists that might hold data references."""
