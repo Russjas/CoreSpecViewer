@@ -24,13 +24,17 @@ from PyQt5.QtWidgets import (
     QStyle,
     QMessageBox,
     QInputDialog,
-    QLineEdit
+    QLineEdit,
+    QFrame
 )
 
 from ..models import HoleObject
 from ..interface import profile_tools as pt
+from ..config import feature_keys
 from .base_page import BasePage
 from .util_windows import ClosableWidgetWrapper, busy_cursor, ImageCanvas2D
+from .cluster_window import ClusterWindow
+from .band_math_dialogue import BandMathsDialog
 from .display_text import gen_display_text
 
 class NoSelectionDelegate(QStyledItemDelegate):
@@ -382,6 +386,10 @@ class HoleControlPanel(QWidget):
         info_layout.addRow("# boxes:", self.lbl_box_count)
         info_layout.addRow("Depth range:", self.lbl_depth_range)
         self.layout.addLayout(info_layout)
+        separator1 = QFrame(self)
+        separator1.setFrameShape(QFrame.HLine)
+        separator1.setFrameShadow(QFrame.Sunken)
+        self.layout.addWidget(separator1)
 
         # --- Box level control panel---
         combo_block = QWidget(self)
@@ -402,7 +410,10 @@ class HoleControlPanel(QWidget):
         self.create_button.clicked.connect(self._on_display_btn_clicked)
         combo_layout.addWidget(self.create_button)
         self.layout.addWidget(combo_block)
-        
+        separator2 = QFrame(self)
+        separator2.setFrameShape(QFrame.HLine)
+        separator2.setFrameShadow(QFrame.Sunken)
+        self.layout.addWidget(separator2)
         # --- Downhole datasets control panal
         combo_block_full = QWidget(self)
         combo_layout_full = QVBoxLayout(combo_block_full)
@@ -429,7 +440,10 @@ class HoleControlPanel(QWidget):
         combo_layout_full.addWidget(gen_base_button)
         
         self.layout.addWidget(combo_block_full)
-        
+        separator3 = QFrame(self)
+        separator3.setFrameShape(QFrame.HLine)
+        separator3.setFrameShadow(QFrame.Sunken)
+        self.layout.addWidget(separator3)
         # ----- box-derived dataset controls
         box_derived_block = QWidget(self)
         box_derived_layout = QVBoxLayout(box_derived_block)
@@ -448,7 +462,10 @@ class HoleControlPanel(QWidget):
         box_derived_layout.addWidget(gen_feats_button)
         
         self.layout.addWidget(box_derived_block)
-        
+        separator4 = QFrame(self)
+        separator4.setFrameShape(QFrame.HLine)
+        separator4.setFrameShadow(QFrame.Sunken)
+        self.layout.addWidget(separator4)
         # ----- profile-derived dataset controls
         profile_derived_block = QWidget(self)
         profile_derived_layout = QVBoxLayout(profile_derived_block)
@@ -461,8 +478,34 @@ class HoleControlPanel(QWidget):
         gen_kmeans = QPushButton("Calculate profile k-means", profile_derived_block)
         gen_kmeans.clicked.connect(self.prof_kmeans)
         profile_derived_layout.addWidget(gen_kmeans)
+               
+        # Extract feature section
+        feature_label = QLabel("Extract Features:", profile_derived_block)
+        feature_label.setStyleSheet("QLabel { font-style: italic; margin-left: 10px; }")
+        profile_derived_layout.addWidget(feature_label)
+        
+        # Combo box with feature keys
+        self.feature_combo = QComboBox(profile_derived_block)
+        self.feature_combo.setToolTip("Select a feature to extract")
+        for key in feature_keys:
+            self.feature_combo.addItem(key)
+        profile_derived_layout.addWidget(self.feature_combo)
+        
+        # Button to run extraction
+        extract_button = QPushButton("Extract Feature", profile_derived_block)
+        extract_button.clicked.connect(self.prof_feature_extraction)
+        profile_derived_layout.addWidget(extract_button)
+        
+        bmath_button = QPushButton("Band Maths", profile_derived_block)
+        bmath_button.clicked.connect(self.profile_band_maths)
+        profile_derived_layout.addWidget(bmath_button)
                 
         self.layout.addWidget(profile_derived_block)
+        
+        separator5 = QFrame(self)
+        separator5.setFrameShape(QFrame.HLine)
+        separator5.setFrameShadow(QFrame.Sunken)
+        self.layout.addWidget(separator5)
         self.layout.addStretch(1)
         
 
@@ -612,42 +655,7 @@ class HoleControlPanel(QWidget):
             self.cxt.ho.step = value
 
 
-    #Deprecated
-    def show_downhole1(self):
-        if not self.cxt.ho:
-            return
-        key = self.full_data_combo.currentData(Qt.UserRole)
-        
-        if not key:
-            return
-        suffixes = ("LEGEND", "FRACTIONS", "DOM-MIN")
-        if key.endswith(suffixes):    
-            with busy_cursor("Resampling mineral map...", self):
-                try:
-                    
-                    depths, values, dominant = self.cxt.ho.step_product_dataset(key)
-                except (ValueError, KeyError) as e:
-                    QMessageBox.warning(self, "Failed operation", f"Failed to show data PATH1: {e}")
-                    return
-                if key.endswith("FRACTIONS"):
-                    legend_key = key.replace("FRACTIONS", "LEGEND")
-                elif key.endswith("DOM-MIN"):
-                    legend_key = key.replace("DOM-MIN", "LEGEND")
-                legend = self.cxt.ho.product_datasets[legend_key].data
-                
-        else:
-            legend = None
-            with busy_cursor("Resampling mineral map...", self):
-                try:
-                    depths, values, dominant = self.cxt.ho.step_product_dataset(key)
-                except ValueError as e:
-                    QMessageBox.warning(self, "Failed operation", f"Failed to show data PATH2: {e}")
-                    return
-        if key.endswith("DOM-MIN"):
-            self._page.add_dhole_display(key, depths, dominant, legend = legend)
-            return
-        self._page.add_dhole_display(key, depths, values, legend = legend)
-        
+         
     def show_downhole(self):
         """Display downhole product dataset."""
         if not self.cxt.ho:
@@ -656,7 +664,9 @@ class HoleControlPanel(QWidget):
         
         if not key:
             return
-        # Step the data
+        if key.endswith("CLUSTERS"):
+            self.show_clusters(key)
+            return
         try:
             depths, values, dominant = self.cxt.ho.step_product_dataset(key)
         except ValueError as e:
@@ -782,11 +792,63 @@ class HoleControlPanel(QWidget):
     def prof_kmeans(self):
         if not self.cxt.ho:
             return
-        try:
-            pt.profile_kmeans(self.cxt.ho)
-        except ValueError as e:
-            QMessageBox.warning(self, "Failed operation", f"Failed to create downhole clustering: {e}")
+        clusters, ok1 = QInputDialog.getInt(self, "KMeans Clustering",
+            "Enter number of clusters:",value=5, min=1, max=50)
+        if not ok1:
+            return
+        iters, ok2 = QInputDialog.getInt(self, "KMeans Clustering",
+            "Enter number of iterations:", value=50, min=1, max=1000)
+        if not ok2:
+            return
+    
+        with busy_cursor('clustering...', self):
+            try:
+                pt.profile_kmeans(self.cxt.ho, clusters, iters)
+            except ValueError as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to create downhole clustering: {e}")
         self.update_for_hole()   
+        
+    def prof_feature_extraction(self, key):
+        if not self.cxt.ho:
+            return
+        key = self.feature_combo.currentText().strip()
+        if not key:
+            return
+        try:
+            with busy_cursor(f'extracting {key}...', self):
+                pt.run_feature_extraction(self.cxt.ho, key)
+        except ValueError as e:
+            QMessageBox.warning(self, "Failed operation", f"Failed to create perform feature extraction: {e}")
+            return
+        self.update_for_hole() 
+    
+    def show_clusters(self, key):
+        print("cluster window not implemented for profile k-means yet")
+    
+    def profile_band_maths(self):
+        """
+        - ask user for a band-maths expression + name
+        - pass them, along with the current object, to the interface layer
+        """
+        if self.cxt.ho is None:
+            QMessageBox.information(self, "Band Maths", "No Hole loaded")
+            return
+           
+        ok, name, expr, cr = BandMathsDialog.get_expression(
+           parent=self,
+           default_name="Custom band index",
+           default_expr="2300-1400",
+        )
+        if not ok:
+            return
+        with busy_cursor('calculating...', self):
+            try:
+                pt.band_math_interface(self.cxt.ho, name, expr, cr=cr)
+            except Exception as e:
+                QMessageBox.warning(self, "Failed operation", f"Failed to evalute expression: {e}")
+                return
+    
+        self.update_for_hole()
         
     
 class HolePage(BasePage):
@@ -856,28 +918,7 @@ class HolePage(BasePage):
             popoutable = True
         )
         wrapper.popout_requested.connect(self._handle_popout_request)
-        
-    
-    #Deprecated
-    def add_dhole_display1(self, key, depths, values, legend = None):
-        canvas = ImageCanvas2D(self)
-        disp = gen_display_text(key)
-        wrapper = self._add_closable_widget(
-            canvas,
-            title=f"Downhole: {disp}",
-            popoutable = True
-        )
-        wrapper.popout_requested.connect(self._handle_popout_request)
-        if legend is not None: 
-            if not key.endswith("DOM-MIN"):
-                canvas.show_fraction_stack(depths, values, legend, 
-                                      include_unclassified=True)
-            else:
-                canvas.show_dominant_log(depths, values, legend)
-        else:
-            canvas.show_graph(depths, values, disp)
-        # Wrap and add
-        
+              
 
     def remove_widget(self, w: QWidget):
         """

@@ -1109,7 +1109,6 @@ class MainRibbonController(QMainWindow):
        
         
     def act_band_maths(self):
-        #TODO
         """
         Triggered from the ribbon/menu:
         - ask user for a band-maths expression + name
