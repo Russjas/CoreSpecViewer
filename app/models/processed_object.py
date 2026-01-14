@@ -136,6 +136,61 @@ class ProcessedObject:
 
         return cls(basename=basename, root_dir=root, datasets=datasets)
 
+
+    @classmethod
+    def load_post_processed_envi(cls, head_path, data_path, meta_path = None):
+        """
+        Instantiate a ProcessedObject from a post processed dataset stored in an
+        ENVI file.
+
+        Parameters
+        ----------
+        head_path : str or Path
+            Path to ENVI header file.
+        data_path : str or Path
+            Path to ENVI binary file.
+        name : str
+            name of the dataset (typically a holeID and box_number combination)
+
+        Returns
+        -------
+        ProcessedObject
+            Populated instance with all associated Dataset objects.
+
+        Assumes 
+        -------
+        Full post-processing has been performed:
+            - Data is reflectance
+            - Noisy edge bands have been sliced away
+            - Data has been smoothed
+
+        Raises
+        ------
+        ValueError
+            If the band names cannot be discovered.
+        """
+        path = Path(head_path)
+        root = path.parent
+        name = path.name
+        savgol, metadata = sf.load_envi(head_path, data_path)
+        if meta_path is not None:
+            metadata = metadata | sf.parse_lumo_metadata(meta_path)
+        
+        band_key, bands = sf.find_bands(metadata, savgol)
+        print(metadata)
+        if bands is None:
+            raise ValueError("Cannot identify band names from the header file")
+        po = cls.new(root, name)
+        po.add_dataset('metadata', metadata, ext='.json')
+        po.add_dataset('cropped', np.zeros_like(savgol), ext='.npy')
+        po.add_dataset('bands', bands, ext='.npy')
+        po.add_dataset('savgol', savgol, ext='.npy')
+        po.add_dataset('savgol_cr', sf.cr(savgol), ext='.npy')
+        po.add_dataset('mask', np.zeros(savgol.shape[:2]).astype(int), ext='.npy')
+        po.build_all_thumbs()
+        return po
+        
+
     # ---- disk I/O helpers ----
     def save_all(self, new=False):
         """Save all registered datasets to disk."""

@@ -50,6 +50,7 @@ from .interface import tools as t
 from .models import CurrentContext, HoleObject, RawObject
 from .ui.cluster_window import ClusterWindow
 from .ui.band_math_dialogue import BandMathsDialog
+from .ui.load_dialogue import LoadDialogue
 from .ui import (
     AutoSettingsDialog,
     CatalogueWindow,
@@ -389,105 +390,11 @@ class MainRibbonController(QMainWindow):
 
 
     def load_from_disk(self):
-        '''loads PO or RO only, HO and db are loaded from control panel on
-        thei respective games'''
-        clicked_button = choice_box( "What would you like to open?", ["Processed dataset", "Raw directory", "Hole directory", "Mangled Dataset"])
+        dlg = LoadDialogue(self.cxt, parent=self)
+        if dlg.exec_() == QDialog.Accepted:
+            self.choose_view(dlg.view_flag)
+            self.update_display()
 
-        if clicked_button is None:
-            return
-        
-        if clicked_button == 3:
-            data_head_path, _ = QFileDialog.getOpenFileName(
-            self, "Open Data header file", "", "header files (*.hdr)")
-            if not data_head_path:
-                return
-            white_head_path, _ = QFileDialog.getOpenFileName(
-            self, "Open White header file", "", "header files (*.hdr)")
-            if not white_head_path:
-                return
-            dark_head_path, _ = QFileDialog.getOpenFileName(
-            self, "Open Dark header file", "", "header files (*.hdr)")
-            if not dark_head_path:
-                return
-            metadata_path, _ = QFileDialog.getOpenFileName(
-            self, "Optional lumo metadata", "", "header files (*.xml)")
-            try:
-                self.cxt.current = RawObject.manual_create_from_multiple_paths(data_head_path, 
-                                                                               white_head_path, 
-                                                                               dark_head_path, 
-                                                                               metadata_path = metadata_path)
-                self.choose_view('raw')
-                self.update_display()
-                return
-            except ValueError as e:
-                QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}/n manually add raw paths if file names are inconsistent")
-                data_raw_path, _ = QFileDialog.getOpenFileName(
-                self, "Open Data raw", "", "raw files (*)")
-                if not data_raw_path:
-                    return
-                white_raw_path, _ = QFileDialog.getOpenFileName(
-                self, "Open White raw", "", "raw files (*)")
-                if not white_raw_path:
-                    return
-                dark_raw_path, _ = QFileDialog.getOpenFileName(
-                self, "Open Dark raw", "", "raw files (*)")
-                if not dark_raw_path:
-                    return
-                try:
-                    self.cxt.current = RawObject.manual_create_from_critical_paths(data_head_path,
-                                                                                data_raw_path,
-                                                                                white_head_path,
-                                                                                white_raw_path,
-                                                                                dark_head_path,
-                                                                                dark_raw_path,
-                                                                                metadata_path= metadata_path) 
-                    self.choose_view('raw')
-                    self.update_display()
-                    return
-                except ValueError as e:
-                    QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}")
-                    return
-                    
-        
-        
-        
-        if clicked_button == 1 or clicked_button == 2:
-            path = QFileDialog.getExistingDirectory(
-                       self,
-                       "Select directory",
-                       "",
-                       QFileDialog.ShowDirsOnly
-                       )
-            if not path:
-                return
-        elif clicked_button == 0:
-            path, _ = QFileDialog.getOpenFileName(
-            self, "Open JSON Metadata", "", "JSON files (*.json)")
-            if not path:
-                return
-        try:
-            with busy_cursor('loading...', self):
-                if clicked_button == 2:
-                    hole = HoleObject.build_from_parent_dir(path)
-                    
-                    self.cxt.ho = hole
-                    self._distribute_context()
-                    self.choose_view('hol')
-                    self.update_display()
-                    return
-                else:
-                    loaded_obj = t.load(path)
-                if loaded_obj.is_raw:
-                    self.cxt.current = loaded_obj
-                    self.choose_view('raw')
-                    self.update_display()
-                else:
-                    self.cxt.current = loaded_obj
-                    self.choose_view('vis')
-                    self.update_display()
-        except Exception as e:
-            QMessageBox.warning(self, "Open dataset", f"Failed to open dataset: {e}")
-            return
 
 
     def process_multi_raw(self):
