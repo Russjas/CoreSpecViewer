@@ -83,6 +83,48 @@ def parse_lumo_metadata(xml_file):
 
     return out
 
+def find_bands(metadata: dict, arr: np.ndarray):
+    """
+    searches metadata contents structurally for a band-centres list
+    """
+    
+    nbands = arr.shape[-1]
+    best = None  
+
+    for key, val in (metadata or {}).items():
+        if isinstance(val, (list, tuple, np.ndarray)) and len(val) == nbands:
+            try:
+                arr = np.asarray(val, dtype=float)
+                if arr.ndim != 1:
+                    continue
+
+                d = np.diff(arr)
+                if not (np.all(d >= 0) or np.all(d <= 0)):
+                    continue
+
+                span = float(arr.max() - arr.min())
+                if best is None or span > best[0]:
+                    best = (span, key, arr)
+
+            except Exception:
+                pass
+
+    if best is None:
+        return None, None
+    _, key, arr = best
+    return key, arr
+def load_envi(head_path, data_path):
+    """Passthrough function to the spectral python library for ENVI file loads
+    Assumes full post-processing has been performed:
+        - Data is reflectance
+        - Noisy edge bands have been sliced away
+        - Data has been smoothed
+    """
+    box = envi.open(head_path, image=data_path)
+    metadata = read_envi_header(head_path)
+    data = np.array(box.load())
+    return data, metadata
+
 
 #========= library spectra helper methods =====================================
 
