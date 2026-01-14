@@ -138,7 +138,7 @@ class ProcessedObject:
 
 
     @classmethod
-    def load_post_processed_envi(cls, head_path, data_path, meta_path = None):
+    def load_post_processed_envi(cls, head_path, data_path, meta_path = None, smoothed = True):
         """
         Instantiate a ProcessedObject from a post processed dataset stored in an
         ENVI file.
@@ -172,21 +172,28 @@ class ProcessedObject:
         path = Path(head_path)
         root = path.parent
         name = path.name
-        savgol, metadata = sf.load_envi(head_path, data_path)
+        data, metadata = sf.load_envi(head_path, data_path)
         if meta_path is not None:
             metadata = metadata | sf.parse_lumo_metadata(meta_path)
         
-        band_key, bands = sf.find_bands(metadata, savgol)
-        print(metadata)
+        band_key, bands = sf.find_bands(metadata, data)
         if bands is None:
             raise ValueError("Cannot identify band names from the header file")
+        if smoothed:
+            savgol = data
+            cropped = np.zeros_like(savgol)
+            mask = np.zeros(savgol.shape[:2]).astype(int)
+            savgol_cr = sf.cr(savgol)
+        else:
+            cropped = data
+            savgol, savgol_cr, mask = sf.process(cropped)
         po = cls.new(root, name)
         po.add_dataset('metadata', metadata, ext='.json')
-        po.add_dataset('cropped', np.zeros_like(savgol), ext='.npy')
+        po.add_dataset('cropped', cropped, ext='.npy')
         po.add_dataset('bands', bands, ext='.npy')
         po.add_dataset('savgol', savgol, ext='.npy')
-        po.add_dataset('savgol_cr', sf.cr(savgol), ext='.npy')
-        po.add_dataset('mask', np.zeros(savgol.shape[:2]).astype(int), ext='.npy')
+        po.add_dataset('savgol_cr', savgol_cr, ext='.npy')
+        po.add_dataset('mask', mask, ext='.npy')
         po.build_all_thumbs()
         return po
         

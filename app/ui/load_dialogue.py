@@ -455,8 +455,9 @@ class LoadDialogue(QDialog):
         meta_grid.addWidget(btn_browse, 0, 2)
         
         lay.addLayout(meta_grid)
-        
-
+        self.cb_data_smoothed = QCheckBox("Is your data smoothed?")
+        self.cb_data_smoothed.setStyleSheet("margin-top: 10px;")
+        lay.addWidget(self.cb_data_smoothed)
         btn_load = QPushButton("Load reflectance")
         btn_load.clicked.connect(self._load_reflectance_clicked)
         lay.addWidget(btn_load)
@@ -617,13 +618,14 @@ class LoadDialogue(QDialog):
         dat = (self.le_dat_envi.text() or "").strip()
         meta_xml = (self.le_meta_xml.text() or "").strip()
         meta_path = meta_xml if meta_xml else None
+        is_smoothed = self.cb_data_smoothed.isChecked()
         if not head:
             self._info("Missing input", "Please select a processed dataset JSON file.")
             return
 
         try:
             with busy_cursor("Loading processed dataset...", self):
-                obj = ProcessedObject.load_post_processed_envi(head, dat, meta_path)
+                obj = ProcessedObject.load_post_processed_envi(head, dat, meta_path, smoothed=is_smoothed)
         except Exception as e:
             self._warn("Failed to open processed dataset", str(e))
             return
