@@ -668,7 +668,8 @@ class HoleControlPanel(QWidget):
             self.show_clusters(key)
             return
         try:
-            depths, values, dominant = self.cxt.ho.step_product_dataset(key)
+            with busy_cursor("Resampling donwhole dataset...", self):
+                depths, values, dominant = self.cxt.ho.step_product_dataset(key)
         except ValueError as e:
             QMessageBox.warning(self, "Failed operation", f"Failed to resample {gen_display_text(key)}: {e}")
             return
@@ -781,8 +782,9 @@ class HoleControlPanel(QWidget):
         if not choice:
             return
         try:
-            key = display_to_key[choice]
-            self.cxt.ho.create_dhole_minmap(key)
+            with busy_cursor("Creating donwhole minmap dataset...", self):
+                key = display_to_key[choice]
+                self.cxt.ho.create_dhole_minmap(key)
         except (ValueError, AttributeError) as e:
             QMessageBox.warning(self, "Failed operation", f"Failed to create downhole feature: {e}")
             return
