@@ -5,6 +5,8 @@ UI agnostic and can be run on any hyperspectral cube in npy format.
 
 NB. This will be broken up in a re-factor eventually.
 """
+import os
+import glob
 import time
 import xml.etree.ElementTree as ET
 
@@ -14,6 +16,7 @@ from gfit.util import remove_hull
 import hylite
 from hylite.analyse import minimum_wavelength
 from hylite.sensors import Fenix as HyliteFenix
+from hylite.io.images import loadWithNumpy
 import matplotlib
 from numba import jit
 import numpy as np
@@ -113,16 +116,34 @@ def find_bands(metadata: dict, arr: np.ndarray):
         return None, None
     _, key, arr = best
     return key, arr
+
+
 def load_envi(head_path, data_path):
     """Passthrough function to the spectral python library for ENVI file loads
     Assumes full post-processing has been performed:
         - Data is reflectance
         - Noisy edge bands have been sliced away
         - Data has been smoothed
+    Some ENVI headers do not capture the byte order parameter. SPy is intolerant 
+    of this, so fallback to a hylite loader.
     """
-    box = envi.open(head_path, image=data_path)
+    try:
+        box = envi.open(head_path, image=data_path)
+        data = np.array(box.load())
+    except Exception:
+        # Workaround for hylite matchHeader Windows path separator bug
+        # Bug will be fixed in next hylite release
+        # TODO: Remove when environment upgrades to numpy 2 and latest hylite
+        # See: https://github.com/hifexplo/hylite/issues/17
+        path, ext = os.path.splitext(head_path)
+        match = glob.glob(path + "*")
+        hylite_path =[x for x in match if x.endswith(".hdr")][0]
+        #=====================================
+        box = loadWithNumpy(hylite_path)
+        box = np.array(box.data)  
+        data = np.transpose(box, (1, 0, 2))
     metadata = read_envi_header(head_path)
-    data = np.array(box.load())
+   
     return data, metadata
 
 
