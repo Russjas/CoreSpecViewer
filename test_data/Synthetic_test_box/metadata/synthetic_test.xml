@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml-stylesheet type="text/xsl" href="SYNTHETIC_TEST_001.xsl"?>
+<properties><header><key field="sensor type">SWIR</key>
+        <key field="sensor id">461061</key>
+        <key field="frame rate">95.002850085503</key>
+        <key field="integration time">2.5998001098633</key>
+        <key field="samples">110</key>
+        <key field="active bands">288</key>
+        <key field="spatial binning">1</key>
+        <key field="spectral binning">1</key>
+        <key field="frames recorded">100</key>
+        <key field="frames dropped">0</key>
+        <key field="data format">BIL</key>
+        <key field="date">2026-01-15</key>
+        <key field="date text">Thursday, January 15, 2026</key>
+        <key field="time">17:42:08</key>
+        <key field="calibration pack">C:/Users/Public/Documents/Specim/461061_OLES15_20220203_calpack.scp</key>
+    </header>
+    <userdefined><key field="sample name">SYNTHETIC_TEST_001</key>
+        <key field="operator">TEST</key>
+        <key field="description">Synthetic test dataset</key>
+        <key field="sensor temperature">151</key>
+        <key field="scb channel1 temperature">25.415386199951</key>
+        <key field="scb channel2 temperature">25.591955184937</key>
+        <key field="scb channel3 temperature">27.341497421265</key>
+        <key field="scb channel4 temperature">26.476196289063</key>
+        <key field="sensor prefix">S</key>
+    </userdefined>
+    <core><key field="borehole id">SYNTHETIC_HOLE</key>
+        <key field="box number">1</key>
+        <key field="core depth start">100.0</key>
+        <key field="core depth stop">105.0</key>
+    </core>
+</properties>
