@@ -71,7 +71,7 @@ class BandMathsDialog(QDialog):
         expr_row = QHBoxLayout()
         expr_row.addWidget(QLabel("Expression:", self))
         self.expr_edit = QLineEdit(self)
-        self.expr_edit.setPlaceholderText("e.g. 2300-1400")
+        self.expr_edit.setPlaceholderText("e.g. R2300-R1400")
         if default_expr:
             self.expr_edit.setText(default_expr)
         expr_row.addWidget(self.expr_edit)
