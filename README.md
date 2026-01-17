@@ -375,7 +375,7 @@ Contributions are welcome!
 2. Open an issue to discuss major changes
 
 
-Lobbying for additions to the [TODO](TODO.md) is encouraged.
+Lobbying for additions to the [TODO](TODO.md) is encouraged.  
 Gracefully requesting prioritisation of [TODO](TODO.md) items to suit your needs is also encouraged.
 
 ### Testing
