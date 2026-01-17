@@ -38,58 +38,6 @@ CoreSpecViewer provides:
 
 ---
 
-## Repository Structure
-
-```
-CoreSpecViewer/
-├── CoreSpecViewer.py              # Thin launcher script
-├── TODO.md                        # Development roadmap
-│
-├── resources/                     # Spectral library DB and demo GIFs
-│
-└── app/                           # Main application package
-    ├── main.py                    # Application entry point, MainRibbonController
-    ├── config.py                  # Global configuration dictionary
-    │
-    ├── models/                    # Data layer: core objects + context
-    │   ├── dataset.py             # Generic dataset container with file I/O
-    │   ├── raw_object.py          # RawObject - unprocessed Lumo scans
-    │   ├── processed_object.py    # ProcessedObject - reflectance cubes
-    │   ├── hole_object.py         # HoleObject - multi-box hole aggregation
-    │   ├── context.py             # CurrentContext - shared application state
-    │   └── lib_manager.py         # LibraryManager - spectral library interface
-    │
-    ├── interface/                 # Translation layer between UI and data
-    │   ├── tools.py               # High-level tool functions (crop, mask, unwrap, features)
-    │   ├── profile_tools.py       # High-level tool functions specific to hole profile data
-    │   └── tool_dispatcher.py     # Safe GUI event routing for canvas interactions
-    │
-    ├── ui/                        # Qt pages and widgets
-    │   ├── base_page.py           # BasePage - common page functionality
-    │   ├── raw_page.py            # RawPage - raw data viewing and processing
-    │   ├── vis_page.py            # VisualisePage - product visualization and interpretation
-    │   ├── lib_page.py            # LibraryPage - spectral library browsing, collection management
-    │   ├── hole_page.py           # HolePage - hole-level navigation, and interpretation
-    │   ├── ribbon.py              # Ribbon widget with workflow tabs
-    │   ├── util_windows.py        # Canvas widgets, dialogs, tables
-    │   ├── catalogue_window.py    # File browser for dataset loading
-    │   ├── cluster_window.py      # Clustering visualization and controls
-    │   ├── load_dialogue.py       # Multi-step dataset loading dialog
-    │   ├── band_math_dialogue.py  # Band math expression editor
-    │   ├── multi_box.py           # Batch processing interface
-    │   └── display_text.py        # Raw key to meaningful description
-    │
-    └── spectral_ops/              # Spectral algorithms and processing
-        ├── spectral_functions.py  # Core algorithms (CR, correlation, features, I/O)
-        ├── band_maths.py          # Band math expression evaluation
-        ├── remap_legend.py        # Legend remapping tools
-        ├── downhole_resampling.py # Downhole profile resampling
-        ├── fenix_smile.py         # FENIX sensor smile correction
-        └── profile_tools.py       # Profile extraction and processing
-```
-
----
-
 ## Getting Started
 
 You will need to download and install one of:  
@@ -149,6 +97,58 @@ After launching, you will see:
 - A **Ribbon** with workflow tabs (Raw / Masking / Visualise / Hole)
 - A **Tab widget** containing the four main pages
 - Shared application state through `CurrentContext`
+
+---
+
+## Repository Structure
+
+```
+CoreSpecViewer/
+├── CoreSpecViewer.py              # Thin launcher script
+├── TODO.md                        # Development roadmap
+│
+├── resources/                     # Spectral library DB and demo GIFs
+│
+└── app/                           # Main application package
+    ├── main.py                    # Application entry point, MainRibbonController
+    ├── config.py                  # Global configuration dictionary
+    │
+    ├── models/                    # Data layer: core objects + context
+    │   ├── dataset.py             # Generic dataset container with file I/O
+    │   ├── raw_object.py          # RawObject - unprocessed Lumo scans
+    │   ├── processed_object.py    # ProcessedObject - reflectance cubes
+    │   ├── hole_object.py         # HoleObject - multi-box hole aggregation
+    │   ├── context.py             # CurrentContext - shared application state
+    │   └── lib_manager.py         # LibraryManager - spectral library interface
+    │
+    ├── interface/                 # Translation layer between UI and data
+    │   ├── tools.py               # High-level tool functions (crop, mask, unwrap, features)
+    │   ├── profile_tools.py       # High-level tool functions specific to hole profile data
+    │   └── tool_dispatcher.py     # Safe GUI event routing for canvas interactions
+    │
+    ├── ui/                        # Qt pages and widgets
+    │   ├── base_page.py           # BasePage - common page functionality
+    │   ├── raw_page.py            # RawPage - raw data viewing and processing
+    │   ├── vis_page.py            # VisualisePage - product visualization and interpretation
+    │   ├── lib_page.py            # LibraryPage - spectral library browsing, collection management
+    │   ├── hole_page.py           # HolePage - hole-level navigation, and interpretation
+    │   ├── ribbon.py              # Ribbon widget with workflow tabs
+    │   ├── util_windows.py        # Canvas widgets, dialogs, tables
+    │   ├── catalogue_window.py    # File browser for dataset loading
+    │   ├── cluster_window.py      # Clustering visualization and controls
+    │   ├── load_dialogue.py       # Multi-step dataset loading dialog
+    │   ├── band_math_dialogue.py  # Band math expression editor
+    │   ├── multi_box.py           # Batch processing interface
+    │   └── display_text.py        # Raw key to meaningful description
+    │
+    └── spectral_ops/              # Spectral algorithms and processing
+        ├── spectral_functions.py  # Core algorithms (CR, correlation, features, I/O)
+        ├── band_maths.py          # Band math expression evaluation
+        ├── remap_legend.py        # Legend remapping tools
+        ├── downhole_resampling.py # Downhole profile resampling
+        ├── fenix_smile.py         # FENIX sensor smile correction
+        └── profile_tools.py       # Profile extraction and processing
+```
 
 ---
 
