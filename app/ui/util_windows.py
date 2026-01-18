@@ -18,6 +18,8 @@ from matplotlib.patches import Patch
 from matplotlib.widgets import PolygonSelector, RectangleSelector
 
 import numpy as np
+import logging
+
 
 from PyQt5.QtCore import (
         QSortFilterProxyModel, 
@@ -44,6 +46,8 @@ from PyQt5.QtWidgets import (
     QWidget,
     
 )
+
+logger = logging.getLogger(__name__)
 
 my_map = matplotlib.colormaps['viridis']
 my_map.set_bad('black')
@@ -1144,9 +1148,10 @@ class AutoSettingsDialog(QDialog):
         root.addLayout(row)
 
     def _on_save(self):
+        
         for r in range(self.tbl.rowCount()):
             key = self.tbl.item(r, 0).text()
             val = self.tbl.item(r, 1).text()
             t.modify_config(key, val)
-
+            logger.info(f"Config setting {key} changed to {val}")
         self.accept()

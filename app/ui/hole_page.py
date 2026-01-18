@@ -4,6 +4,7 @@ UI page for viewing multi-box holes and downhole data.
 Allows selection of boxes, linking of datasets, and merged downhole outputs.
 """
 import sys
+import logging
 
 import numpy as np
 from PyQt5.QtCore import QSize, Qt, pyqtSignal
@@ -36,6 +37,8 @@ from .util_windows import ClosableWidgetWrapper, busy_cursor, ImageCanvas2D
 from .cluster_window import ClusterWindow
 from .band_math_dialogue import BandMathsDialog
 from .display_text import gen_display_text
+
+logger = logging.getLogger(__name__)
 
 class NoSelectionDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
@@ -180,6 +183,7 @@ class HoleBoxTable(QTableWidget):
             try:
                 po.build_thumb(key)
             except Exception:
+                
                 return QPixmap()
 
         if ds.thumb is None:
@@ -193,6 +197,7 @@ class HoleBoxTable(QTableWidget):
             pix.loadFromData(buf.getvalue(), "JPEG")
             return pix
         except Exception:
+            logger.error(f"Failed to build thumb for {key}", exc_info=True)
             return QPixmap()
 
     def set_dataset_key(self, key):
@@ -626,14 +631,16 @@ class HoleControlPanel(QWidget):
         User changed the dataset key for the secondary strip. Rebuild the
         second table using this key.
         """
+        
         key = self.secondary_combo.currentData(Qt.UserRole)
-       
+        
         if not key:
             return
         self.cxt = self._page.cxt
         if self.cxt is None or self.cxt.ho is None:
+            logger.info(f"Button clicked: Display change for box columns to {key} failed because no hole data loaded")
             return
-
+        logger.info(f"Button clicked: Display change for box columns to {key}")
         self._page.add_column(dataset_key=key)
 
 
@@ -653,24 +660,29 @@ class HoleControlPanel(QWidget):
         if dlg.exec():
             value = dlg.doubleValue()
             self.cxt.ho.step = value
-
+            logger.info(f"Button clicked: Downhole resample window changed to {value}")
 
          
     def show_downhole(self):
         """Display downhole product dataset."""
+        logger.info(f"Button clicked: Show downhole data")
         if not self.cxt.ho:
+            logger.warning(f"Show data cancelled, no hole loaded")
             return
         key = self.full_data_combo.currentData(Qt.UserRole)
         
         if not key:
+            logger.warning(f"Show data cancelled, no key selected")
             return
         if key.endswith("CLUSTERS"):
+            logger.info(f"Cluster dataset selected")
             self.show_clusters(key)
             return
         try:
             with busy_cursor("Resampling donwhole dataset...", self):
                 depths, values, dominant = self.cxt.ho.step_product_dataset(key)
         except ValueError as e:
+            logger.error(f"Failed to resample {gen_display_text(key)}", exc_info=True)
             QMessageBox.warning(self, "Failed operation", f"Failed to resample {gen_display_text(key)}: {e}")
             return
         
@@ -684,7 +696,9 @@ class HoleControlPanel(QWidget):
                 legend_key = key.replace("FRACTIONS", "LEGEND")
                 legend = self.cxt.ho.product_datasets[legend_key].data
                 canvas.display_fractions(depths, values, legend, include_unclassified=True)
+                
             except ValueError as e:
+                logger.error(f"Failed to plot {gen_display_text(key)}", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
                 return
         
@@ -694,7 +708,9 @@ class HoleControlPanel(QWidget):
                 legend_key = key.replace("DOM-MIN", "LEGEND")
                 legend = self.cxt.ho.product_datasets[legend_key].data
                 canvas.display_discrete(depths, dominant, legend)
+                
             except ValueError as e:
+                logger.error(f"Failed to plot {gen_display_text(key)}", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
                 return
         
@@ -704,27 +720,36 @@ class HoleControlPanel(QWidget):
                 legend_key = key.replace("INDEX", "LEGEND")
                 legend = self.cxt.ho.product_datasets[legend_key].data
                 canvas.display_discrete(depths, values, legend)
+                
             except ValueError as e:
+                logger.error(f"Failed to plot {gen_display_text(key)}", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
                 return
         else:
             # Display continuous as line plot
             try:
                 canvas.display_continuous(depths, values, gen_display_text(key))
+                
             except ValueError as e:
+                logger.error(f"Failed to plot {gen_display_text(key)}", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
                 return
         # Add to page with wrapper
         self._page.add_dhole_display(key, canvas)
+        logger.info(f"{gen_display_text(key)} displayed")
     
     
     def gen_base_datasets(self):
+        logger.info(f"Button clicked: Generate base datasets")
         if not self.cxt.ho:
+            logger.info(f"Generate base datasets cancelled because no hole loaded")
             return
         with busy_cursor("Generating downhole base datasets...", self):
             try:
                 self.cxt.ho.create_base_datasets()
+                logger.info(f"Generated base datasets for {self.cxt.ho.hole_id}")
             except ValueError as e:
+                logger.error(f"Failed to create base data", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to create base data: {e}")
                 return
         self.update_for_hole()
@@ -733,10 +758,13 @@ class HoleControlPanel(QWidget):
     
 # ---------Box-derived level control handlers---------------------------------------------------------    
     def dhole_feats_create(self):
+        logger.info(f"Button clicked: Generate downhole features")
         if not self.cxt.ho:
+            logger.info(f"Generate downhole features cancelled because no hole loaded")
             return
         keys = set()
         if not self.cxt.ho.boxes:
+            logger.info(f"Generate downhole features cancelled because no hole loaded")
             return
         for box in self.cxt.ho:
             keys = keys | box.datasets.keys() | box.temp_datasets.keys()
@@ -754,22 +782,28 @@ class HoleControlPanel(QWidget):
             False
         )
         if not choice:
+            logger.info(f"Generate downhole features cancelled in dialogue")
             return
         try:
             with busy_cursor("Creating donwhole feature dataset...", self):
                 raw_key = display_to_key[choice]
                 self.cxt.ho.create_dhole_features(raw_key)
         except ValueError as e:
+            logger.error(f"Failed to create downhole features", exc_info=True)
             QMessageBox.warning(self, "Failed operation", f"Failed to create downhole feature: {e}")
             return
+        logger.info(f"Generated downhole features for {self.cxt.ho.hole_id} {raw_key}")
         self.update_for_hole()   
         return
     
     def dhole_minmaps_create(self):
+        logger.info(f"Button clicked: Generate downhole mineral maps")
         if not self.cxt.ho:
+            logger.info(f"Generate downhole mineral maps cancelled because no hole loaded")
             return
         keys = set()
         if not self.cxt.ho.boxes:
+            logger.info(f"Generate downhole mineral maps cancelled because no hole loaded")
             return
         for box in self.cxt.ho:
             keys = keys | box.datasets.keys() | box.temp_datasets.keys()
@@ -780,48 +814,64 @@ class HoleControlPanel(QWidget):
         
         choice, ok = QInputDialog.getItem(self, "Select Mineral Map", "MinMaps:", sorted(display_to_key.keys()), 0, False)
         if not choice:
+            logger.info(f"Generate downhole mineral maps cancelled in dialogue")
             return
         try:
             with busy_cursor("Creating donwhole minmap dataset...", self):
                 key = display_to_key[choice]
                 self.cxt.ho.create_dhole_minmap(key)
         except (ValueError, AttributeError) as e:
-            QMessageBox.warning(self, "Failed operation", f"Failed to create downhole feature: {e}")
+            logger.error(f"Failed to create downhole mineral maps", exc_info=True)
+            QMessageBox.warning(self, "Failed operation", f"Failed to create downhole mineral maps: {e}")
             return
+        logger.info(f"Generated downhole features for {self.cxt.ho.hole_id} {key}")
         self.update_for_hole()   
         return
 # ---------Box-derived level control handlers---------------------------------------------------------  
     def prof_kmeans(self):
+        logger.info(f"Button clicked: Full hole k-means")
         if not self.cxt.ho:
+            logger.info(f"Full hole k-means cancelled because no hole loaded")
             return
         clusters, ok1 = QInputDialog.getInt(self, "KMeans Clustering",
             "Enter number of clusters:",value=5, min=1, max=50)
         if not ok1:
+            logger.info(f"Full hole k-means cancelled because no n value selected")
             return
         iters, ok2 = QInputDialog.getInt(self, "KMeans Clustering",
             "Enter number of iterations:", value=50, min=1, max=1000)
         if not ok2:
+            logger.info(f"Full hole k-means cancelled because no iterations selected")
             return
     
         with busy_cursor('clustering...', self):
             try:
                 pt.profile_kmeans(self.cxt.ho, clusters, iters)
             except ValueError as e:
+                logger.error(f"Failed to create downhole clustering", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to create downhole clustering: {e}")
+                return
+        logger.info(f"Full hole k-means ({clusters}, {iters}) for {self.cxt.ho.hole_id} created")
         self.update_for_hole()   
         
     def prof_feature_extraction(self, key):
+        logger.info(f"Button clicked: Full hole feature extraction")
         if not self.cxt.ho:
+            logger.info(f"Full hole feature extraction cancelled because no hole loaded")
             return
         key = self.feature_combo.currentText().strip()
         if not key:
+            logger.info(f"Full hole feature extraction cancelled because failed to find key")
             return
+        logger.info(f"Full hole feature extraction using: {key}")
         try:
             with busy_cursor(f'extracting {key}...', self):
                 pt.run_feature_extraction(self.cxt.ho, key)
         except ValueError as e:
+            logger.error(f"Failed to extract full hole feature extraction", exc_info=True)
             QMessageBox.warning(self, "Failed operation", f"Failed to create perform feature extraction: {e}")
             return
+        logger.info(f"Full hole feature {key} created")
         self.update_for_hole() 
     
     def show_clusters(self, key):
@@ -832,7 +882,9 @@ class HoleControlPanel(QWidget):
         - ask user for a band-maths expression + name
         - pass them, along with the current object, to the interface layer
         """
+        logger.info(f"Button clicked: Full hole Band Maths")
         if self.cxt.ho is None:
+            logger.info(f"Full hole feature Band Maths cancelled because no hole loaded")
             QMessageBox.information(self, "Band Maths", "No Hole loaded")
             return
            
@@ -842,14 +894,16 @@ class HoleControlPanel(QWidget):
            default_expr="2300-1400",
         )
         if not ok:
+            logger.info("Band maths operation cancelled from dialogue")
             return
         with busy_cursor('calculating...', self):
             try:
                 pt.band_math_interface(self.cxt.ho, name, expr, cr=cr)
             except Exception as e:
+                logger.error("fBand maths operation using {expr} for {self.cxt.ho.hole_id} evaluated on CR = {cr} has failed", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to evalute expression: {e}")
                 return
-    
+        logger.info("fBand maths operation using {expr} for {self.cxt.ho.hole_id} is done. Evaluated on CR = {cr}")
         self.update_for_hole()
         
     
@@ -988,6 +1042,7 @@ class HolePage(BasePage):
     # ------------------------------------------------------------------
 
     def open_hole(self):
+        logger.info("Button clicked: Open Hole Dataset")
         path = QFileDialog.getExistingDirectory(
                    self,
                    "Select hole directory of processed data",
@@ -995,10 +1050,12 @@ class HolePage(BasePage):
                    QFileDialog.ShowDirsOnly
                    )
         if not path:
+            logger.info("Opening cancelled in dialogue")
             return
         with busy_cursor('loading...', self):
             hole = HoleObject.build_from_parent_dir(path)
             self.set_hole(hole)
+        logger.info(f"Opened {self.cxt.ho.hole_id}")
 
     def set_hole(self, hole):
         """Set the HoleObject and repopulate the left table."""
@@ -1038,6 +1095,7 @@ class HolePage(BasePage):
         Called when the user selects a different row in the box table.
         Sets CurrentContext.po to the corresponding ProcessedObject, if present.
         """
+        logger.info("Button clicked: dbl click on box in hole page")
         if self.cxt is None or self.cxt.ho is None:
             return
         box_num_item = self._box_table.item(row, 0)
@@ -1055,12 +1113,15 @@ class HolePage(BasePage):
 
         self.cxt.current = po
         self.changeView.emit('vis')
+        logger.info(f"{self.cxt.po.basename} displayed in vis page")
+        
 
     def _on_box_clicked(self, row: int, column: int):
         """
         Called when the user selects a different row in the box table.
         Sets CurrentContext.po to the corresponding ProcessedObject, if present.
         """
+        
         if self.cxt is None or self.cxt.ho is None:
             return
         box_num_item = self._box_table.item(row, 0)
@@ -1077,10 +1138,11 @@ class HolePage(BasePage):
             return
 
         self.cxt.current = po
+        
 
 
     def save_changes(self):
-
+        logger.info("Button clicked: Save changes (hole page)")
         if self.cxt is not None and self.cxt.ho is not None:
             with busy_cursor('Saving.....', self):
                 self.cxt.ho.save_product_datasets()
@@ -1090,6 +1152,7 @@ class HolePage(BasePage):
                         po.save_all()
                         po.reload_all()
                         po.load_thumbs()
+                        logger.info(f"{po.basename} saved")
                 self._refresh_from_hole()
 
 

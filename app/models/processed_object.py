@@ -7,7 +7,7 @@ and UI-friendly dataset access.
 """
 from dataclasses import dataclass, field
 from pathlib import Path
-
+import logging
 import numpy as np
 from PIL import Image
 
@@ -15,6 +15,8 @@ from ..spectral_ops import spectral_functions as sf
 from .dataset import Dataset
 
 base_datasets = ["cropped", "savgol", "savgol_cr", "mask", "bands", "metadata"]
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ProcessedObject:
@@ -55,7 +57,8 @@ class ProcessedObject:
             return self.temp_datasets[name].data
         elif name in self.datasets:
             return self.datasets[name].data
-        raise AttributeError(f"{name!r} not found in datasets or attributes")
+        logger.error(f"{name} not found in datasets or attributes")
+        raise AttributeError(f"{name} not found in datasets or attributes")
 
     # ---- internal: parse a stem into (basename, key) with a special-case for 'savgol_cr' ----
     @staticmethod
@@ -110,6 +113,7 @@ class ProcessedObject:
         stem = p.stem
         basename, seed_key = cls._parse_stem_with_exception(stem)
         if basename is None:
+            logger.error(f"Cannot infer basename from {p.name}; expected '<basename>_<suffix>.<ext>'.")
             raise ValueError(
                 f"Cannot infer basename from {p.name}; expected '<basename>_<suffix>.<ext>'."
             )
@@ -177,8 +181,9 @@ class ProcessedObject:
             metadata = metadata | sf.parse_lumo_metadata(meta_path)
         
         band_key, bands = sf.find_bands(metadata, savgol)
-        print(metadata)
+        
         if bands is None:
+            logger.error("Cannot identify band names from the header file")
             raise ValueError("Cannot identify band names from the header file")
         po = cls.new(root, name)
         po.add_dataset('metadata', metadata, ext='.json')
@@ -358,7 +363,7 @@ class ProcessedObject:
                 if mask_to_use is not None:
                     mask_data = mask_to_use[:, :, 0] 
                 else:
-                    print(f"Warning: 'DholeMask' not found on self for key {key}. Skipping.")
+                    logger.warning(f"Warning: 'DholeMask' not found on self for key {key}. Skipping.")
                     continue
             else:
                 mask_to_use = getattr(self, 'mask', None)
@@ -370,7 +375,8 @@ class ProcessedObject:
                     continue 
                 
             except ValueError as e:
-                print(f"ValueError processing {key}: {e}")
+                logger.error(f"ValueError processing {key}: {e}")
+                
                 continue
     
     
@@ -401,6 +407,7 @@ class ProcessedObject:
                 return
 
         except ValueError:
+            logger.error(f"ValueError building thumb for {key}")
             return
 
     def build_all_thumbs(self):

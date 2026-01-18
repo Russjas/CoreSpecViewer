@@ -4,6 +4,7 @@ UI page for visualising processed data.
 Displays spectral products (RGB, masks, MWL maps, classifications)
 and provides pixel inspection tools.
 """
+import logging
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QCursor
@@ -18,6 +19,7 @@ from .util_windows import (ImageCanvas2D,
                            ClosableWidgetWrapper)
 from .display_text import gen_display_text
 
+logger = logging.getLogger(__name__)
 
 class VisualisePage(BasePage):
     """
@@ -184,6 +186,7 @@ class VisualisePage(BasePage):
         """
         On double-click: create a new closable widget with the selected product.
         """
+        
         it = self.table.item(row, 0)
         if not it:
             return
@@ -191,7 +194,7 @@ class VisualisePage(BasePage):
         key = it.data(Qt.UserRole)
         if not key:
             return
-            
+        logger.info(f"Button clicked: Product table dbl clicked {key}")
         if key.endswith('CLUSTERS'):
             self.clusterRequested.emit(key)
             return
@@ -209,6 +212,7 @@ class VisualisePage(BasePage):
         
         # Display the product
         self._display_product_in_canvas(canvas, key)
+        logger.info(f"{key} displayed in vis page.")
 
     def _display_product_in_canvas(self, canvas, key):
         """

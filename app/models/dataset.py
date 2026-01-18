@@ -9,10 +9,11 @@ from dataclasses import dataclass
 import gc
 import json
 from pathlib import Path
-
+import logging
 import numpy as np
 from PIL import Image
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Dataset:
@@ -89,6 +90,7 @@ class Dataset:
             If the file type is not recognized or unsupported.
         """
         if self.ext not in ['.npy', '.json', '.jpg', '.npz']:
+            logger.error(f"Cannot open {self.path} with {self.ext}, this is an invalid file type")
             raise ValueError(f"Cannot open {self.ext}, this is an invalid file type")
 
         if self.ext == '.npy':
@@ -129,9 +131,11 @@ class Dataset:
             If no data is loaded or the file type is unsupported.
         """
         if self.data is None:
+            logger.error("No data loaded or assigned; nothing to save.")
             raise ValueError("No data loaded or assigned; nothing to save.")
 
         if self.ext not in ['.npy', '.json', '.jpg', '.npz']:
+            logger.error(f"Cannot save {self.path} with {self.ext}, this is an invalid file type")
             raise ValueError(f"Cannot save {self.ext}, this is an invalid file type")
 
         if self.ext == '.npz':
@@ -159,6 +163,7 @@ class Dataset:
             if isinstance(self.data, Image.Image):
                 self.data.save(self.path)
         else:
+            logger.error(f"Cannot save {self.path} with {self.ext}, this is an invalid file type")
             raise ValueError(f"Cannot save unsupported file type: {self.ext}")
 
     def copy(self, data=None):

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Literal
-
+import logging
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
@@ -24,6 +24,8 @@ from ..models.hole_object import HoleObject
 from ..models.processed_object import ProcessedObject
 from ..models.context import CurrentContext
 from .util_windows import busy_cursor, MetadataDialog
+
+logger = logging.getLogger(__name__)
 
 ViewFlag = Literal["raw", "vis", "hol"]
 REQUIRED_META_KEYS = (
@@ -478,20 +480,32 @@ class LoadDialogue(QDialog):
     # ----------------------------------------------------------------- NAV
 
     def _show_menu(self) -> None:
+        
         self.stack.setCurrentIndex(0)
         self.btn_back.setEnabled(False)
 
     def _show_page(self, idx: int) -> None:
+        page_names = {
+        0: "menu",
+        1: "processed", 
+        2: "lumo_raw",
+        3: "hole",
+        4: "raw_manual",
+        5: "reflectance"
+    }
+        logger.info(f"Button clicked: show page {page_names[idx]}")
         self.stack.setCurrentIndex(idx)
         self.btn_back.setEnabled(True)
 
     def _go_back(self) -> None:
+        logger.info("Button clicked: back to menu")
         self._show_menu()
 
     # -------------------------------------------------------------- LOAD SLOTS
 
     def _load_processed_clicked(self) -> None:
         jp = (self.le_processed_json.text() or "").strip()
+        logger.info(f"Button clicked: Load Processed | path={jp}")
         if not jp:
             self._info("Missing input", "Please select a processed dataset JSON file.")
             return
@@ -501,14 +515,17 @@ class LoadDialogue(QDialog):
                 obj = t.load(Path(jp))
         except Exception as e:
             self._warn("Failed to open processed dataset", str(e))
+            logger.error(f"Failed to open processed dataset from {jp}", exc_info=True)
             return
 
         self.cxt.current = obj
         self.view_flag = "vis"
+        logger.info(f"loaded processed data {self.cxt.current.basename}")
         self.accept()
 
     def _load_lumo_clicked(self) -> None:
         dp = (self.le_raw_dir.text() or "").strip()
+        logger.info(f"Button clicked: Load Lumo | path={dp}")
         if not dp:
             self._info("Missing input", "Please select a raw dataset directory.")
             return
@@ -518,14 +535,17 @@ class LoadDialogue(QDialog):
                 obj = t.load(Path(dp))
         except Exception as e:
             self._warn("Failed to open raw dataset", str(e))
+            logger.error(f"Failed to open lumo directory from {dp}", exc_info=True)
             return
 
         self.cxt.current = obj
         self.view_flag = "raw"
+        logger.info(f"loaded raw data {self.cxt.current.basename}")
         self.accept()
 
     def _load_hole_clicked(self) -> None:
         dp = (self.le_hole_dir.text() or "").strip()
+        logger.info(f"Button clicked: Load Hole | path={dp}")
         if not dp:
             self._info("Missing input", "Please select a hole directory.")
             return
@@ -535,17 +555,20 @@ class LoadDialogue(QDialog):
                 hole = HoleObject.build_from_parent_dir(Path(dp))
         except Exception as e:
             self._warn("Failed to open hole directory", str(e))
+            logger.error(f"Failed to open hole directory from {dp}", exc_info=True)
             return
 
         # cxt.po, ro and current are not affected by ho update
         self.cxt.ho = hole
         self.view_flag = "hol"
+        logger.info(f"loaded hole data {self.cxt.ho.hole_id}")
         self.accept()
 
     def _load_raw_clicked(self) -> None:
         data_hdr = (self.le_data_hdr.text() or "").strip()
         white_hdr = (self.le_white_hdr.text() or "").strip()
         dark_hdr = (self.le_dark_hdr.text() or "").strip()
+        logger.info(f"Button clicked: Load Raw manuaal | paths={data_hdr, white_hdr, dark_hdr}")
 
         if not (data_hdr and white_hdr and dark_hdr):
             self._info("Missing input", "Please select DATA, WHITE, and DARK header (.hdr) files.")
@@ -569,14 +592,17 @@ class LoadDialogue(QDialog):
                 )
                 # help the user: auto-switch to explicit mode
                 self.cb_infer_raw.setChecked(False)
+                logger.error(f"Failed to open raw manually using data header {data_hdr} and inferred paths", exc_info=True)
                 return
             except Exception as e:
                 self._warn("Failed to open raw dataset", str(e))
+                logger.error(f"Failed to open raw manually using data header {data_hdr} and inferred paths", exc_info=True)
                 return
             if not self._ensure_required_raw_metadata(raw_obj):
                 return
             self.cxt.current = raw_obj
             self.view_flag = "raw"
+            logger.info(f"loaded raw data {self.cxt.current.basename}")
             self.accept()
             return
 
@@ -584,7 +610,7 @@ class LoadDialogue(QDialog):
         data_raw = (self.le_data_raw.text() or "").strip()
         white_raw = (self.le_white_raw.text() or "").strip()
         dark_raw = (self.le_dark_raw.text() or "").strip()
-
+        logger.info(f"Button clicked: Load Raw manuaal explicit mode | paths={data_hdr, white_hdr, dark_hdr, data_raw, white_raw, dark_raw}")
         if not (data_raw and white_raw and dark_raw):
             self._info(
                 "Missing input",
@@ -602,6 +628,7 @@ class LoadDialogue(QDialog):
                 )
         except Exception as e:
             self._warn("Failed to open raw dataset", str(e))
+            logger.error(f"Failed to open raw manually using data header {data_hdr} and explicit paths", exc_info=True)
             return
         
         if not self._ensure_required_raw_metadata(raw_obj):
@@ -609,6 +636,7 @@ class LoadDialogue(QDialog):
         
         self.cxt.current = raw_obj
         self.view_flag = "raw"
+        logger.info(f"loaded raw data {self.cxt.current.basename}")
         self.accept()
         
         
@@ -617,6 +645,7 @@ class LoadDialogue(QDialog):
         dat = (self.le_dat_envi.text() or "").strip()
         meta_xml = (self.le_meta_xml.text() or "").strip()
         meta_path = meta_xml if meta_xml else None
+        logger.info(f"Button clicked: Load Post-processed reflectance | paths={head, dat, meta_path}")
         if not head:
             self._info("Missing input", "Please select a processed dataset JSON file.")
             return
@@ -626,12 +655,14 @@ class LoadDialogue(QDialog):
                 obj = ProcessedObject.load_post_processed_envi(head, dat, meta_path)
         except Exception as e:
             self._warn("Failed to open processed dataset", str(e))
+            logger.error(f"Failed to open reflectance using data header {head}", exc_info=True)
             return
         
         if not self._ensure_required_raw_metadata(obj):
             return
         self.cxt.current = obj
         self.view_flag = "vis"
+        logger.info(f"loaded processed data {self.cxt.current.basename}")
         self.accept()
 
     # metadata validation ====================================================
@@ -666,6 +697,7 @@ class LoadDialogue(QDialog):
         # prompt, prefilled with what we have
         dlg = MetadataDialog(meta=meta, parent=self)
         if dlg.exec_() != QDialog.Accepted:
+            logging.error("Mandatory metadata not added, loading terminated")
             return False
     
         res = dlg.get_result()
@@ -683,9 +715,11 @@ class LoadDialogue(QDialog):
                 "Missing metadata",
                 "These fields are required:\n- " + "\n- ".join(missing2)
             )
+            logger.info(f"Metadata check | Metadata fields not added")
             return False
     
         obj.metadata = meta
+        logger.info(f"Metadata validation: fields_added={missing}")
         return True
         
 
@@ -734,7 +768,15 @@ class LoadDialogue(QDialog):
         ln.setFrameShadow(QFrame.Sunken)
         return ln
 
-
+    def accept(self):
+        """Called when any load succeeds."""
+        logger.info(f"Load dialog accepted | view_flag={self.view_flag}")
+        super().accept()
+    
+    def reject(self):
+        """Called when user clicks Cancel or closes dialog."""
+        logger.info("Load dialog cancelled")
+        super().reject()
 # ---------------------------------------------------------------------------
 # Standalone demo harness (run this file directly)
 # ---------------------------------------------------------------------------
