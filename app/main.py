@@ -1247,7 +1247,7 @@ class MainRibbonController(QMainWindow):
             try:
                 self.cxt.current = t.band_math_interface(self.cxt.current, name, expr, cr=cr)
             except Exception as e:
-                logger.error("fBand maths operation using {expr} for {self.cxt.current.basename} evaluated on CR = {cr} has failed", exc_info=True)
+                logger.error(f"Band maths operation using {expr} for {self.cxt.current.basename} evaluated on CR = {cr} has failed", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to evalute expression: {e}")
                 return
         logger.info(f"Band maths operation using {expr} for {self.cxt.current.basename} is done. Evaluated on CR = {cr}")

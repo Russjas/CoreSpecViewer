@@ -900,10 +900,10 @@ class HoleControlPanel(QWidget):
             try:
                 pt.band_math_interface(self.cxt.ho, name, expr, cr=cr)
             except Exception as e:
-                logger.error("fBand maths operation using {expr} for {self.cxt.ho.hole_id} evaluated on CR = {cr} has failed", exc_info=True)
+                logger.error(f"Band maths operation using {expr} for {self.cxt.ho.hole_id} evaluated on CR = {cr} has failed", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to evalute expression: {e}")
                 return
-        logger.info("fBand maths operation using {expr} for {self.cxt.ho.hole_id} is done. Evaluated on CR = {cr}")
+        logger.info(f"Band maths operation using {expr} for {self.cxt.ho.hole_id} is done. Evaluated on CR = {cr}")
         self.update_for_hole()
         
     
