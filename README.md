@@ -433,10 +433,6 @@ If this has been useful in your research, please cite:
 Rogers, R. (2025). CoreSpecViewer: An Open-Source Hyperspectral Drill-Core Visualisation and Interpretation Tool (Version 1.1.0) [Computer software]. https://doi.org/10.5281/zenodo.17711871
 
 
-## Author
-
-Developed by **Russell Rogers**
-
 ---
 
 ## Disclaimer
