@@ -11,6 +11,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 from typing import Union
+import logging
 
 import numpy as np
 
@@ -19,7 +20,7 @@ from ..spectral_ops import downhole_resampling as res
 from .processed_object import ProcessedObject
 from .dataset import Dataset
 
-
+logger = logging.getLogger(__name__)
 def combine_timestamp(meta: dict) -> datetime | None:
     """
     Combine 'time' and 'date' fields in metadata into a datetime object.
@@ -123,6 +124,7 @@ class HoleObject:
         Does not account for missing boxes in this step
         """
         if not self.check_for_all_keys('stats'):
+            logger.warning("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
             raise ValueError("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
         full_depths = None
         full_average = None
@@ -141,6 +143,7 @@ class HoleObject:
                 po.save_all()
                 po.reload_all()
         except Exception as e:
+            logger.error(f'many, many things could have gone wrong', exc_info=True)
             print(f'many, many things could have gone wrong - new code.{e}')
             return self
         self.base_datasets['depths'] = Dataset(base=self.hole_id, 
@@ -169,8 +172,10 @@ class HoleObject:
         Does not account for missing boxes in this step
         """
         if not self.check_for_all_keys(key):
+            logger.warning(f"Missing {key} data for one or more boxes in the hole. Calculate stats before calling this method.")
             raise ValueError(f"{key} dataset is not available for every box in hole")
         if not (key.endswith("INDEX") or key.endswith("LEGEND")):
+            logger.warning(f"{key} is an invalid dataset for this operation")
             raise ValueError(f"{key} is an invalid dataset for this operation")
         
         if key.endswith("INDEX"):
@@ -183,6 +188,7 @@ class HoleObject:
         #check all legends are the same, not working with different versions
         dicts = [po.datasets[leg_key].data for po in self]
         if not all(d == dicts[0] for d in dicts[1:]):
+            logger.warning(f"Boxes with {key} have different Legend entries")
             raise ValueError(f"Boxes with {key} have different Legend entries")
             
         full_fractions = None    # will become (H_total, K+1)
@@ -219,11 +225,13 @@ class HoleObject:
         Does not account for missing boxes in this step
         """
         if not self.check_for_all_keys(key):
+            logger.warning(f"Missing {key} data for one or more boxes in the hole. Calculate stats before calling this method.")
             raise ValueError(f"{key} dataset is not available for every box in hole")
         
         full_feature = None    # will become (H_total, K+1)
         for po in self:
             if po.datasets[key].ext != ".npz":
+                logger.warning(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
                 raise ValueError(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
                 
             seg = sf.unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats)
@@ -251,9 +259,11 @@ class HoleObject:
         """
         invalid_keys_suffixes = ("LEGEND", "CLUSTERS")
         if key not in self.product_datasets.keys():
+            logger.warning(f"Datasets of type {key} are not present")
             raise ValueError("bounced no dataset")
         for suffix in invalid_keys_suffixes:
             if key.endswith(suffix):
+                logger.warning(f"Cannot step {suffix} datasets: '{key}'")
                 raise ValueError(f"Cannot step {suffix} datasets: '{key}'")
         depths = self.base_datasets["depths"].data
         data = self.product_datasets[key].data
@@ -304,6 +314,7 @@ class HoleObject:
         try:
             hole_id = obj.metadata["borehole id"]
         except Exception as e:
+            logger.error(f"Cannot extract 'borehole id' from metadata: {e}")
             raise ValueError(f"Cannot extract 'borehole id' from metadata: {e}")
         return cls.build_from_parent_dir(obj.root_dir, hole_id)
 
@@ -326,6 +337,7 @@ class HoleObject:
             if hole_ids:
                 hole_id = Counter(hole_ids).most_common(1)[0][0]
             else:
+                logger.error(f"No JSON in {root} contained a 'borehole id'.")
                 raise ValueError(f"No JSON in {root} contained a 'borehole id'.")
 
         # fresh, empty hole; counters will be filled by add_box
@@ -337,13 +349,15 @@ class HoleObject:
                 po = ProcessedObject.from_path(fp)  # may memmap; acceptable for matching ones
                 hole.add_box(po)                    # will skip/raise if hole_id mismatches
             except ValueError:
+                logger.error(f"mismatched hole_id or bad metadata -> skipped {fp}")
                 # mismatched hole_id or bad metadata -> skip
                 continue
             except Exception:
-                # any other load error -> skip this file
+                logger.error(f"Load error", exc_info=True)
                 continue
 
         if hole.num_box == 0:
+            logger.error(f"No boxes in {root} matched borehole id '{hole_id}'.")
             raise ValueError(f"No boxes in {root} matched borehole id '{hole_id}'.")
         hole.load_hole_datasets()
         return hole
@@ -376,12 +390,14 @@ class HoleObject:
             box_hole_id = meta["borehole id"]
             box_num = int(meta["box number"])
         except Exception as e:
+            logger.error(f"Box metadata missing required fields")
             raise ValueError(f"Box metadata missing required fields: {e}")
 
         # initialise / validate hole_id
         if not self.hole_id:
             self.hole_id = box_hole_id
         elif self.hole_id != box_hole_id:
+            logger.error(f"Box hole_id '{box_hole_id}' does not match HoleObject.hole_id '{self.hole_id}'")
             raise ValueError(
                 f"Box hole_id '{box_hole_id}' does not match HoleObject.hole_id '{self.hole_id}'"
             )

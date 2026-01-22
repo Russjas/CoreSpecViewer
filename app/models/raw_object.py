@@ -8,11 +8,14 @@ Provides reflectance conversion for further processing.
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
+import logging
 
 import numpy as np
 
 from ..spectral_ops import spectral_functions as sf
 from .processed_object import ProcessedObject
+
+logger = logging.getLogger(__name__)
 
 SPECIM_LUMO_REQUIRED = {
     "data head":    "{id}.hdr",
@@ -59,8 +62,7 @@ class RawObject:
         """On initialization, populate metadata and compute reflectance."""
         self.get_metadata()
         self.get_reflectance()
-
-
+        
     def get_metadata(self):
         """Load and merge Specim XML + ENVI header metadata if available."""
         if 'metadata' in self.files.keys() and 'data head' in self.files.keys():
@@ -136,13 +138,13 @@ class RawObject:
 
         # Add a print or logging statement for non-critical issues (optional)
         if missing or duplicates or zero_byte:
-            print(f"⚠️ Warning: Non-critical files issues found for {box_id}:")
+            logger.info(f"⚠️ Warning: Non-critical files issues found for {box_id}:")
             if missing:
-                print(f"  Missing (Skipped): {missing}")
+                logger.warning(f"  Missing (Skipped): {missing}")
             if duplicates:
-                print(f"  Duplicates (Skipped): {duplicates}")
+                logger.warning(f"  Duplicates (Skipped): {duplicates}")
             if zero_byte:
-                print(f"  Zero Byte (Skipped): {zero_byte}")
+                logger.warning(f"  Zero Byte (Skipped): {zero_byte}")
 
         return raw_object
 
@@ -312,6 +314,7 @@ class RawObject:
     
         # CRITICAL CHECK: Still raise an error if any critical files are missing/invalid
         if critical_missing:
+            logger.error(f"Cannot create raw dataset: Critical files are missing or invalid: {critical_missing}")
             raise ValueError(
                 f"Cannot create raw dataset: Critical files are missing or invalid: {critical_missing}"
             )
@@ -328,13 +331,13 @@ class RawObject:
     
         # Optional: print warnings about non-critical issues
         if missing or duplicates or zero_byte:
-            print(f"⚠️ Warning: Non-critical file issues found for {box_id}:")
+            logger.warning(f"⚠️ Warning: Non-critical files issues found for {box_id}:")
             if missing:
-                print(f"  Missing (Skipped): {missing}")
+                logger.warning(f"  Missing (Skipped): {missing}")
             if duplicates:
-                print(f"  Duplicates (Skipped): {duplicates}")
+                logger.warning(f"  Duplicates (Skipped): {duplicates}")
             if zero_byte:
-                print(f"  Zero Byte (Skipped): {zero_byte}")
+                logger.warning(f"  Zero Byte (Skipped): {zero_byte}")
     
         return raw_object
     
@@ -395,6 +398,7 @@ class RawObject:
     
         # Raise for *any* critical failure
         if critical_missing:
+            logger.error(f"Cannot create raw dataset: Critical files are missing or invalid: {critical_missing}")
             raise ValueError(
                 f"Cannot create raw dataset: Critical files are missing or invalid: {critical_missing}"
             )
@@ -441,13 +445,13 @@ class RawObject:
     
         # Optional warning summary
         if missing or duplicates or zero_byte:
-            print(f"⚠️ Warning: Non-critical file issues for {box_id}:")
+            logger.warning(f"⚠️ Warning: Non-critical files issues found for {box_id}:")
             if missing:
-                print(f"  Missing: {missing}")
+                logger.warning(f"  Missing (Skipped): {missing}")
             if duplicates:
-                print(f"  Duplicates: {duplicates}")
+                logger.warning(f"  Duplicates (Skipped): {duplicates}")
             if zero_byte:
-                print(f"  Zero-byte: {zero_byte}")
+                logger.warning(f"  Zero Byte (Skipped): {zero_byte}")
     
         return raw_object
     

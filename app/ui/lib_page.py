@@ -6,6 +6,7 @@ used for correlation and MSAM/WTA classification.
 """
 import os
 import sqlite3
+import logging
 
 import numpy as np
 from PyQt5.QtCore import QModelIndex
@@ -16,6 +17,7 @@ from ..interface import tools as t
 from .base_page import BasePage
 from .util_windows import IdSetFilterProxy, ImageCanvas2D, SpectrumWindow, busy_cursor, RightClick_Table
 
+logger = logging.getLogger(__name__)
 # In the 'samples' table (which is displayed in the QTableView):
 ID_COLUMN_INDEX = 0   # Column containing SampleID (used for the lookup)
 NAME_COLUMN_INDEX = 1 # Column containing Name (used for the plot title)
@@ -130,10 +132,12 @@ class LibraryPage(BasePage):
     
     
     def create_blank(self):
+        logger.info(f"Button clicked: Create blank database")
         path, _ = QFileDialog.getSaveFileName(
             self, "Create New SQLite DB", "", "SQLite DB (*.db);;All Files (*)"
         )
         if not path:
+            logger.info(f"Create blank database cancelled in dialogue")
             return
         
         # Optionally ensure .db extension
@@ -143,21 +147,25 @@ class LibraryPage(BasePage):
         try:
             self.cxt.library.new_db(path)
         except Exception as e:
+            logger.error(f"Failed to create new blank database", exc_info=True)
             QMessageBox.critical(self, "Database Error",
                                  f"Failed to create new blank database:\n{e}")
             return
+        logger.info(f"Blank database created at {path}")
         self.load_db(path)
     
     
     
     def open_database_dialog(self):
-        
+        logger.info(f"Button clicked: Open database")
         path, _ = QFileDialog.getOpenFileName(
             self, "Open SQLite DB", "", "SQLite DB (*.db);;All Files (*)"
         )
         if not path:
+            logger.info(f"Open database cancelled in dialogue")
             return
         self.load_db(path)
+        logger.info(f"Database loaded from {path}")
         
     def load_db(self, path: str):
         """
@@ -184,8 +192,10 @@ class LibraryPage(BasePage):
 
     def delete_selected(self):
         """Delete selected samples from the database."""
+        logger.info(f"Button clicked: delete library entry")
         ids = self._selected_sample_ids()
         if not ids:
+            logger.info(f"Delete library entry cancelled as nothing selected")
             QMessageBox.information(self, "No Selection", "Select one or more rows to delete.")
             return
         
@@ -208,8 +218,10 @@ class LibraryPage(BasePage):
         
         if failed:
             msg = "Failed to delete:\n" + "\n".join(f"ID {sid}: {err}" for sid, err in failed)
+            logger.error(msg, exc_info=True)
             QMessageBox.warning(self, "Delete Errors", msg)
         else:
+            logger.info(f"Successfully deleted {len(ids)} sample(s).")
             QMessageBox.information(self, "Deleted", f"Successfully deleted {len(ids)} sample(s).")
     
 
@@ -233,7 +245,7 @@ class LibraryPage(BasePage):
                 return
 
             self.display_spectra(sample_id, item_name)
-            
+            logger.info(f"Displayed reflectance for lib entry {sample_id}, {item_name}")
             
     def handle_right_click(self, index):
         if index.isValid():
@@ -251,7 +263,7 @@ class LibraryPage(BasePage):
                 return
 
             self.display_spectra(sample_id, item_name, hull_rem=True)
-            
+            logger.info(f"Displayed CR for lib entry {sample_id}, {item_name}")
             
     def display_spectra(self, sample_id, item_name, hull_rem = False):
         """Queries the spectra table, unpacks BLOBs using the correct dtype, and launches the plot window."""
@@ -330,6 +342,7 @@ class LibraryPage(BasePage):
         return name.strip()
 
     def add_selected_to_collection(self):
+        logger.info("Button clicked: Add selected to collection")
         ids = self._selected_sample_ids()
         if not ids:
             QMessageBox.information(self, "No Selection", "Select one or more rows first.")
@@ -339,6 +352,7 @@ class LibraryPage(BasePage):
             return
         added, len_coll = self.cxt.library.add_to_collection(name, ids)
         self._refresh_collection_selector()
+        logger.info(f"Added {added} new items to '{name}'.\nSize now: {len_coll}")
         QMessageBox.information(self, "Added to Collection",
                                 f"Added {added} new items to '{name}'.\nSize now: {len_coll}")
     
@@ -356,7 +370,9 @@ class LibraryPage(BasePage):
         whose spectral XData fully covers the current_obj.bands range.
         Applies the proxy filter to show only those rows.
         """
+        logger.info("Button clicked: Filter to current band range")
         if self.current_obj is None:
+            logger.info("No processed data loaded to get band range")
             QMessageBox.critical(self, "No Data", "No processed data loaded to get band range")
             return
             
@@ -374,14 +390,18 @@ class LibraryPage(BasePage):
 
         count = len(ok_ids)
         rng = f"{np.nanmin(bands_nm):.1f}–{np.nanmax(bands_nm):.1f} nm"
-        QMessageBox.information(self, "Filtered", f"{count} spectra cover {rng}.")        
+        QMessageBox.information(self, "Filtered", f"{count} spectra cover {rng}.")  
+        logger.info( f"{count} spectra cover {rng}.")
             
 
     def correlate(self):
+        logger.info("Button clicked: Correlate (lib page)")
         if self.current_obj is None:
+            logger.warning("No scan dataset loaded")
             QMessageBox.critical(self, "Selection error",
                                  "You do not have a scan dataset loaded")
         if self.current_obj.is_raw:
+            logger.warning("You cannot correlate on a raw dataset, you must process first")
             QMessageBox.critical(self, "Selection error",
                                  "You cannot correlate on a raw dataset, you must process first")
             return
@@ -400,6 +420,7 @@ class LibraryPage(BasePage):
         try:
             x_nm, y = self.cxt.library.get_spectrum(sample_id)
         except Exception as e:
+            logger.error(f"Failed to fetch spectrum for ID {sample_id}:\n{e}", exc_info=True)
             QMessageBox.critical(
                 self,
                 "SQL Query Error",
@@ -414,13 +435,15 @@ class LibraryPage(BasePage):
         key = f"{mineral_name}-(ID:-{sample_id})-MINCORR"
         with busy_cursor('correlating...', self):
             _, key = t.quick_corr(self.current_obj, x_nm, y, key = key)
-            print(key, self.current_obj.temp_datasets[key].path, self.current_obj.temp_datasets[key].ext)
+            logger.info("Correlated id {mineral_name} against {self.current_obj.basename}")
+            
             
             corr_canvas.show_rgb(self.current_obj.get_data(key))
             corr_canvas.ax.set_title(f"{mineral_name} (ID: {sample_id})", fontsize=11)
 
 
     def clear_collection(self):
+        logger.info("Button clicked: Delete collection")
         name = self._choose_existing_collection("Delete collection")
         if not name:
             return
@@ -428,10 +451,12 @@ class LibraryPage(BasePage):
                                 f"Delete collection '{name}'? This cannot be undone.") != QMessageBox.Yes:
             return
         self.cxt.library.collections.pop(name, None)
+        logger.info(f"Collection '{name}' removed.")
         QMessageBox.information(self, "Deleted", f"Collection '{name}' removed.")
         self._refresh_collection_selector()
 
     def save_collection_as_db(self, key: str | None = None):
+        logger.info("Button clicked: Save collection as DB")
         if key is None:
             key = self._choose_existing_collection("Save collection as DB")
         if not key:
@@ -449,7 +474,7 @@ class LibraryPage(BasePage):
         except Exception as e:
             QMessageBox.critical(self, "Export Failed", f"Could not save DB:\n{e}")
             return
-
+        logger.info("New database written to {out_path} {len(ids_set)} items saved from '{key}'.")
         QMessageBox.information(self, "Saved",
                                 f"New database written to:\n{out_path}\n\n"
                                 f"{len(ids_set)} items saved from '{key}'.")

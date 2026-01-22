@@ -10,7 +10,6 @@ import glob
 import time
 import xml.etree.ElementTree as ET
 
-
 import cv2
 from gfit.util import remove_hull
 import hylite
@@ -48,7 +47,7 @@ def _slice_from_sensor(sensor_type: str):
         start, stop = con_dict["fenix_slice_start"], con_dict["fenix_slice_stop"]
     else:
         start, stop = con_dict["default_slice_start"], con_dict["default_slice_stop"]
-    print(slice(start, stop, None))
+    
     return slice(start, stop, None)
 
 def read_envi_header(file):
@@ -117,7 +116,6 @@ def find_bands(metadata: dict, arr: np.ndarray):
     _, key, arr = best
     return key, arr
 
-
 def load_envi(head_path, data_path):
     """Passthrough function to the spectral python library for ENVI file loads
     Assumes full post-processing has been performed:
@@ -145,6 +143,7 @@ def load_envi(head_path, data_path):
     metadata = read_envi_header(head_path)
    
     return data, metadata
+
 
 
 #========= library spectra helper methods =====================================
@@ -621,19 +620,19 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False,
 
 
 def get_fenix_reflectance(path, mode='hylite'):
-    print(mode)
+    
     if mode == 'hylite':
         hyimg = HyliteFenix.correct_folder(str(path), shift=True, lens = True)
     else:
         hyimg = HyliteFenix.correct_folder(str(path), shift=True, lens = False)
-    print(mode, hyimg.data.shape)
+    
     if isinstance(hyimg, tuple):
         hyimg = hyimg[0]
     if mode == 'hylite':
         reflectance = hyimg.data
     else:
         reflectance = fenix_smile_correction(np.transpose(hyimg.data, (1, 0, 2)))          # (H, W, B), float32
-    print("after calc", reflectance.shape)
+    
     bands       = hyimg.get_wavelengths()
     snr         = None # snr workflows not implemented yet
     band_slice = _slice_from_sensor("FENIX Sensor")
