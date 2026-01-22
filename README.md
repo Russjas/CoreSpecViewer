@@ -1,5 +1,9 @@
-# CoreSpecViewer
+<h1 align="center">CoreSpecViewer</h1>
 
+<h3 align="right">developed with support from <img src="resources/GSI.jpg" alt="Geological Survey Ireland" height="50"></h3>
+
+
+---  
 
 
 
