@@ -1,6 +1,8 @@
 <h1 align="center">CoreSpecViewer</h1>
-
-<h3 align="right">developed with support from <img src="resources/GSI.jpg" alt="Geological Survey Ireland" height="50"></h3>
+<div align="center">
+<h3>Developed with support from <a href="https://www.gsi.ie/en-ie/programmes-and-projects/geological-mapping/activities/Pages/Hyperspectral-Image-Analysis.aspx">Geological Survey Ireland</a></h3>
+<img src="resources/GSI.jpg" alt="Geological Survey Ireland" height="90">
+</div>
 
 
 ---  
