@@ -1,4 +1,4 @@
-<table width="100%"><tr><td><h1>CoreSpecViewer</h1></td><td align="right">developed with support from <img src="resources/GSI.jpg" alt="Geological Survey Ireland" height="50"></td></tr></table> 
+# CoreSpecViewer
 
 
 
