@@ -2,10 +2,10 @@
 
 ## Technical Clean Up
 
-- [ ] **Set up logging**
-  - [ ] Replace print statements with proper logging
-  - [ ] Log levels: DEBUG, INFO, WARNING, ERROR
-  - [ ] Write logs to file in user directory
+- [x] **Set up logging**
+  - [x] Replace print statements with proper logging
+  - [x] Log levels: DEBUG, INFO, WARNING, ERROR
+  - [x] Write logs to file in user directory
   
 - [ ] **Sort test harness**
   - [ ] Set up test framework
@@ -112,4 +112,4 @@
   
 ---
 
-_Last Updated: 2026-01-16_
+_Last Updated: 2026-01-22_
