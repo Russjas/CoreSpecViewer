@@ -1,4 +1,8 @@
-# CoreSpecViewer
+<table width="100%"><tr><td><h1>CoreSpecViewer</h1></td><td align="right">developed with support from <img src="resources/GSI.jpg" alt="Geological Survey Ireland" height="50"></td></tr></table> 
+
+
+
+
 ### *A desktop application for hyperspectral drill-core processing, visualisation, and analysis*
 
 CoreSpecViewer is a modular **PyQt5 application** designed for the full hyperspectral core‑scanning workflow — from **Raw data** to **reflectance processing**, **masking**, **feature extraction**, **correlation mapping**, **thumbnail generation**, and **hole‑level review**.
