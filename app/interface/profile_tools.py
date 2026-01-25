@@ -72,8 +72,6 @@ def band_math_interface(obj, name, expr, cr = False):
     obj.add_product_dataset(clean_key, np.squeeze(out), '.npy')
     return obj
 
-# Active refactor
-
 def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     """
     Compute a winner-takes-all Pearson class index and best-corr map.
@@ -186,10 +184,7 @@ def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
 
     return obj
 
-# Existing tools that need to be refactored to accept profile dataset from HO
 
-
-#=============Mineral mapping from libraries===================================
 def wta_min_map_user_defined(obj, exemplars, coll_name, ranges, mode='pearson'):
     """
     Compute a winner-takes-all map on a user selected range.
