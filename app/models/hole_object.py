@@ -430,6 +430,13 @@ class HoleObject:
 
         return box_num
 
+    def get_bands(self):
+        """Returns the band centres of the first box of the hole
+        Boxes are checked for band consistency on load"""
+        if self.first_box is None:
+            raise ValueError("No boxes available in HoleObject")
+        return self[self.first_box].bands
+    
     def check_for_all_keys(self, key):
         for i in self:
             tst = i.datasets.get(key)

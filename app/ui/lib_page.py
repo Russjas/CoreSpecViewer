@@ -318,7 +318,7 @@ class LibraryPage(BasePage):
                 pass
         return ids
 
-#TODO: Think about this. This needs to be duplicated in main?
+
     def _choose_existing_collection(self, title="Select collection"):
         names = sorted(self.cxt.library.collections.keys())
         if not names:
@@ -371,7 +371,8 @@ class LibraryPage(BasePage):
         Applies the proxy filter to show only those rows.
         """
         logger.info("Button clicked: Filter to current band range")
-        if self.current_obj is None:
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
             logger.info("No processed data loaded to get band range")
             QMessageBox.critical(self, "No Data", "No processed data loaded to get band range")
             return
@@ -396,14 +397,10 @@ class LibraryPage(BasePage):
 
     def correlate(self):
         logger.info("Button clicked: Correlate (lib page)")
-        if self.current_obj is None:
-            logger.warning("No scan dataset loaded")
-            QMessageBox.critical(self, "Selection error",
-                                 "You do not have a scan dataset loaded")
-        if self.current_obj.is_raw:
-            logger.warning("You cannot correlate on a raw dataset, you must process first")
-            QMessageBox.critical(self, "Selection error",
-                                 "You cannot correlate on a raw dataset, you must process first")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.info(msg)
+            QMessageBox.critical(self, "No Data", msg)
             return
         ids = self._selected_sample_ids()
         if len(ids) == 0:

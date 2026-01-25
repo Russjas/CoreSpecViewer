@@ -72,7 +72,119 @@ def band_math_interface(obj, name, expr, cr = False):
     obj.add_product_dataset(clean_key, np.squeeze(out), '.npy')
     return obj
 
+# Active refactor
 
+def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
+    """
+    Compute a winner-takes-all Pearson class index and best-corr map.
+
+    Parameters
+    ----------
+    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    coll_name = coll_name.replace('_', '')
+    key_prefix = f"MinMap-pearson-{coll_name}"
+    data = sf.remove_hull(obj.base_datasets["AvSpectra"].data)
+    bands_nm = obj.get_bands()
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_wta_strict(data[np.newaxis,...], exemplar_stack)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+    obj.add_product_dataset(f'PROF-{key_prefix}INDEX', np.squeeze(index), '.npy')    
+    obj.add_product_dataset(f'PROF-{key_prefix}CONF', np.squeeze(confidence), '.npy') 
+    obj.add_product_dataset(f'PROF-{key_prefix}LEGEND', legend, '.json') 
+    
+    return obj
+
+def wta_min_map_SAM(obj, exemplars, coll_name, mode='numpy'):
+    """
+    Compute a winner-takes-all SAM class index and best-corr map.
+
+    Parameters
+    ----------
+    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    coll_name = coll_name.replace('_', '')
+    key_prefix = f"MinMap-SAM-{coll_name}"
+    data = sf.remove_hull(obj.base_datasets["AvSpectra"].data)
+    bands_nm = obj.get_bands()
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_wta_sam_strict(data[np.newaxis,...], exemplar_stack)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+    obj.add_product_dataset(f'PROF-{key_prefix}INDEX', np.squeeze(index), '.npy')    
+    obj.add_product_dataset(f'PROF-{key_prefix}CONF', np.squeeze(confidence), '.npy') 
+    obj.add_product_dataset(f'PROF-{key_prefix}LEGEND', legend, '.json') 
+
+    return obj
+
+
+def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
+    """
+    Compute a winner-takes-all MSAM class index and best-corr map.
+
+    Parameters
+    ----------
+    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
+        Usually from LibraryPage.get_collection_exemplars().
+    
+    Returns
+    -------
+    class_idx : (H,W) int32
+    best_corr : (H,W) float32
+    labels    : list[str]
+    """
+    coll_name = coll_name.replace('_', '')
+    key_prefix = f"MinMap-MSAM-{coll_name}"
+    data = sf.remove_hull(obj.base_datasets["AvSpectra"].data)
+    bands_nm = obj.get_bands()
+    labels, bank = [], []
+    for _, (label, x_nm, y) in exemplars.items():
+        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
+        y_res = sf.cr(y_res[np.newaxis, :])[0]
+        labels.append(str(label))
+        bank.append(y_res.astype(np.float32))
+    if not bank:
+        raise ValueError("No exemplars provided.")
+    exemplar_stack = np.vstack(bank)
+    index, confidence = sf.mineral_map_wta_msam_strict(data[np.newaxis,...], exemplar_stack)
+    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
+    obj.add_product_dataset(f'PROF-{key_prefix}INDEX', np.squeeze(index), '.npy')    
+    obj.add_product_dataset(f'PROF-{key_prefix}CONF', np.squeeze(confidence), '.npy') 
+    obj.add_product_dataset(f'PROF-{key_prefix}LEGEND', legend, '.json') 
+
+    return obj
 
 # Existing tools that need to be refactored to accept profile dataset from HO
 
@@ -95,8 +207,8 @@ def wta_min_map_user_defined(obj, exemplars, coll_name, ranges, mode='pearson'):
     """
     coll_name = coll_name.replace('_', '')
     key_prefix = f"MinMap-{ranges[0]}-{ranges[1]}-{mode}-{coll_name}"
-    data = obj.savgol_cr
-    bands_nm = obj.bands
+    data = sf.remove_hull(obj.base_datasets["AvSpectra"].data)
+    bands_nm = obj.get_bands()
     labels, bank = [], []
     for _, (label, x_nm, y) in exemplars.items():
         y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
@@ -106,168 +218,24 @@ def wta_min_map_user_defined(obj, exemplars, coll_name, ranges, mode='pearson'):
     if not bank:
         raise ValueError("No exemplars provided.")
     exemplar_stack = np.vstack(bank)
-    index, confidence = sf.mineral_map_subrange(data, exemplar_stack, bands_nm, ranges, mode=mode)
+    index, confidence = sf.mineral_map_subrange(data[np.newaxis,...], exemplar_stack, bands_nm, ranges, mode=mode)
     legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
-
-    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
-    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
-    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
-
-    return obj
-
-
-def wta_min_map_user_defined(obj, exemplars, coll_name, ranges, mode='pearson'):
-    """
-    Compute a winner-takes-all map on a user selected range.
-
-    Parameters
-    ----------
-    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
-    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
-        Usually from LibraryPage.get_collection_exemplars().
-    coll_name : str text name of the collection passed
-    ranges : list[float(min), float(max)]
-    mode : str (pearson, sam, msam)
-    
-    
-    """
-    coll_name = coll_name.replace('_', '')
-    key_prefix = f"MinMap-{ranges[0]}-{ranges[1]}-{mode}-{coll_name}"
-    data = obj.savgol_cr
-    bands_nm = obj.bands
-    labels, bank = [], []
-    for _, (label, x_nm, y) in exemplars.items():
-        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
-        y_res = sf.cr(y_res[np.newaxis, :])[0]
-        labels.append(str(label))
-        bank.append(y_res.astype(np.float32))
-    if not bank:
-        raise ValueError("No exemplars provided.")
-    exemplar_stack = np.vstack(bank)
-    index, confidence = sf.mineral_map_subrange(data, exemplar_stack, bands_nm, ranges, mode=mode)
-    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
-
-    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
-    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
-    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
+    obj.add_product_dataset(f'PROF-{key_prefix}INDEX', np.squeeze(index), '.npy')    
+    obj.add_product_dataset(f'PROF-{key_prefix}CONF', np.squeeze(confidence), '.npy') 
+    obj.add_product_dataset(f'PROF-{key_prefix}LEGEND', legend, '.json') 
 
     return obj
 
 
 
-def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
-    """
-    Compute a winner-takes-all MSAM class index and best-corr map.
 
-    Parameters
-    ----------
-    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
-    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
-        Usually from LibraryPage.get_collection_exemplars().
-    
-    Returns
-    -------
-    class_idx : (H,W) int32
-    best_corr : (H,W) float32
-    labels    : list[str]
-    """
-    coll_name = coll_name.replace('_', '')
-    key_prefix = f"MinMap-MSAM-{coll_name}"
-    data = obj.savgol_cr
-    bands_nm = obj.bands
-    labels, bank = [], []
-    for _, (label, x_nm, y) in exemplars.items():
-        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
-        y_res = sf.cr(y_res[np.newaxis, :])[0]
-        labels.append(str(label))
-        bank.append(y_res.astype(np.float32))
-    if not bank:
-        raise ValueError("No exemplars provided.")
-    exemplar_stack = np.vstack(bank)
-    index, confidence = sf.mineral_map_wta_msam_strict(data, exemplar_stack)
-    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
 
-    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
-    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
-    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
 
-    return obj
 
-def wta_min_map_SAM(obj, exemplars, coll_name, mode='numpy'):
-    """
-    Compute a winner-takes-all SAM class index and best-corr map.
 
-    Parameters
-    ----------
-    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
-    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
-        Usually from LibraryPage.get_collection_exemplars().
-    
-    Returns
-    -------
-    class_idx : (H,W) int32
-    best_corr : (H,W) float32
-    labels    : list[str]
-    """
-    coll_name = coll_name.replace('_', '')
-    key_prefix = f"MinMap-SAM-{coll_name}"
-    data = obj.savgol_cr
-    bands_nm = obj.bands
-    labels, bank = [], []
-    for _, (label, x_nm, y) in exemplars.items():
-        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
-        y_res = sf.cr(y_res[np.newaxis, :])[0]
-        labels.append(str(label))
-        bank.append(y_res.astype(np.float32))
-    if not bank:
-        raise ValueError("No exemplars provided.")
-    exemplar_stack = np.vstack(bank)
-    index, confidence = sf.mineral_map_wta_sam_strict(data, exemplar_stack)
-    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
 
-    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
-    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
-    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
 
-    return obj
 
-def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
-    """
-    Compute a winner-takes-all Pearson class index and best-corr map.
-
-    Parameters
-    ----------
-    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
-    exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
-        Usually from LibraryPage.get_collection_exemplars().
-    
-    Returns
-    -------
-    class_idx : (H,W) int32
-    best_corr : (H,W) float32
-    labels    : list[str]
-    """
-    coll_name = coll_name.replace('_', '')
-    key_prefix = f"MinMap-pearson-{coll_name}"
-    data = obj.savgol_cr
-    bands_nm = obj.bands
-    labels, bank = [], []
-    for _, (label, x_nm, y) in exemplars.items():
-        y_res = sf.resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
-        y_res = sf.cr(y_res[np.newaxis, :])[0]
-        labels.append(str(label))
-        bank.append(y_res.astype(np.float32))
-    if not bank:
-        raise ValueError("No exemplars provided.")
-    exemplar_stack = np.vstack(bank)
-    index, confidence = sf.mineral_map_wta_strict(data, exemplar_stack)
-    legend = [{"index": i, "label": labels[i]} for i in range(len(labels))]
-
-    obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
-    obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
-    obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
-
-    return obj
 
 
 

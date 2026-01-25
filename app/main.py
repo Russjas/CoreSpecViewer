@@ -454,18 +454,17 @@ class MainRibbonController(QMainWindow):
 
     def gen_images(self, multi = False):
         logger.info(f"Button clicked: Generate Images, Multi-mode = {multi}")
-        if self.cxt is None:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Generate Images", msg)
             return
         if multi:
-            if self.cxt.ho is None:
-                return
             for po in self.cxt.ho:
-                self.cxt.current.save_all()
+                po.save_all()
                 po.export_images()
-                self.cxt.current.reload_all()
-                self.cxt.current.load_thumbs()
-            
-        if self.cxt.po is None or self.cxt.current.is_raw:
+                po.reload_all()
+                po.load_thumbs()
             return
         self.cxt.current.export_images()
         
@@ -473,9 +472,10 @@ class MainRibbonController(QMainWindow):
 
     def save_clicked(self):
         logger.info("Button clicked: Save")
-        if self.cxt.current.is_raw:
-            logger.warning("Raw data must be processed prior to saving")
-            QMessageBox.information(self, "save", "Raw data must be processed prior to saving")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Save", msg)
             return
         if self.cxt.current.has_temps:
             test = two_choice_box('Commit changes before saving?', 'yes', 'no')
@@ -510,9 +510,10 @@ class MainRibbonController(QMainWindow):
 
     def save_as_clicked(self):
         logger.info("Button clicked: Save As")
-        if self.cxt.po is None:
-            logger.warning("Raw data must be processed prior to saving")
-            QMessageBox.information(self, "save", "Raw data must be processed prior to saving")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Save As", msg)
             return
         if self.cxt.current.has_temps:
             test = two_choice_box('Commit changes before saving?', 'yes', 'no')
@@ -538,9 +539,10 @@ class MainRibbonController(QMainWindow):
 
     def undo_unsaved(self):
         logger.info(f"Button clicked: Undo")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant Undo")
-            QMessageBox.information(self, "Undo", "No Current Scan")
+        valid_state, msg = self.cxt.requires(self.cxt.SCAN)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Undo", msg)
             return
         self.cxt.current = t.reset(self.cxt.current)
         logger.info(f"{self.cxt.current.basename} temp datasets cleared")
@@ -551,9 +553,10 @@ class MainRibbonController(QMainWindow):
 
     def crop_current_image(self):
         logger.info(f"Button clicked: Crop")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant crop")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+        valid_state, msg = self.cxt.requires(self.cxt.SCAN)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Crop", msg)
             return
         p = self._active_page()
         if not p or not p.dispatcher or not p.left_canvas:
@@ -574,9 +577,10 @@ class MainRibbonController(QMainWindow):
 
     def automatic_crop(self):
         logger.info(f"Button clicked: Auto-Crop")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant auto-crop")
-            QMessageBox.information(self, "Cropping", "No Current Scan")
+        valid_state, msg = self.cxt.requires(self.cxt.SCAN)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Crop", msg)
             return
         with busy_cursor('cropping...', self):
             self.cxt.current = t.crop_auto(self.cxt.current)
@@ -587,20 +591,13 @@ class MainRibbonController(QMainWindow):
 
     def process_raw(self):
         logger.info(f"Button clicked: Process")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant process")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
+        valid_state, msg = self.cxt.requires(self.cxt.RAW)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Process", msg)
             return
-        if not self.cxt.current.is_raw:
-            logger.warning("Current scan is already processed")
-            QMessageBox.information(self, "Process", "Load a raw dataset first.")
-            return
-        if (
-        not self.cxt.current.metadata.get('borehole id')
-        or not self.cxt.current.metadata.get('box number')
-        or not self.cxt.current.metadata.get('core depth start')
-        or not self.cxt.current.metadata.get('core depth stop')
-        ):
+        meta_check, _ = self.cxt.requires(self.cxt.MANDATORY_META) 
+        if not meta_check:
             dlg = MetadataDialog(self.cxt.current.metadata, parent=self)
             if dlg.exec() == QDialog.Accepted:
                 result = dlg.get_result()
@@ -609,6 +606,9 @@ class MainRibbonController(QMainWindow):
                 self.cxt.current.metadata['core depth start'] = result['depth_from']
                 self.cxt.current.metadata['core depth stop'] = result['depth_to']
                 logger.info("mandatory metadata added manually")
+            else:
+                logger.info("Processing cancelled - metadata dialog closed")
+                return
         try:
             with busy_cursor('processing...', self):
 
@@ -629,13 +629,10 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_rect(self):
         logger.info(f"Button clicked: Mask Region")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant update mask")
-            QMessageBox.information(self, "Masking", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, cant update mask")
-            QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Masking", msg)
             return
         p = self._active_page()
         if not p or not p.dispatcher or not p.left_canvas:
@@ -654,13 +651,10 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_point(self, mode):
         logger.info(f"Button clicked: Mask point {mode}")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant update mask")
-            QMessageBox.information(self, "Masking", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, cant update mask")
-            QMessageBox.information(self, "Mask region", "Open a processed dataset first.")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Masking", msg)
             return
         p = self._active_page()
         if not p or not p.dispatcher or not p.left_canvas:
@@ -680,13 +674,10 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_improve(self):
         logger.info(f"Button clicked: Improve Mask")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant update mask")
-            QMessageBox.information(self, "Masking", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, cant update mask")
-            QMessageBox.information(self, "Masking", "Open a processed dataset first.")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Masking", msg)
             return
         self.cxt.current = t.improve_mask(self.cxt.current)
         logger.info(f"{self.cxt.current.basename} Mask improved heuristically")
@@ -695,13 +686,11 @@ class MainRibbonController(QMainWindow):
 
     def despeck_mask(self):
         logger.info(f"Button clicked: Despeckle Mask")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant update mask")
-            QMessageBox.information(self, "Masking", "No Current Scan")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Masking", msg)
             return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, cant update mask")
-            QMessageBox.information(self, "Masking", "Open a processed dataset first.")
         self.cxt.current = t.despeckle_mask(self.cxt.current)
         logger.info(f"{self.cxt.current.basename} Mask despeckled")
         self._distribute_context()
@@ -709,13 +698,11 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_polygon(self, mode = "mask outside"):
         logger.info(f"Button clicked: Freehand Mask mode {mode}")
-        if self.cxt.current is None:
-            logger.warning("No current scan, cant update mask")
-            QMessageBox.information(self, "Masking", "No Current Scan")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Masking", msg)
             return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, cant update mask")
-            QMessageBox.information(self, "Masking", "Open a processed dataset first.")
         p = self._active_page()
         if not p or not p.dispatcher or self.cxt.current is None:
             return
@@ -731,13 +718,10 @@ class MainRibbonController(QMainWindow):
 
     def act_mask_calc_stats(self):
         logger.info(f"Button clicked: Calc stats")
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't calculate stats")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't calculate stats")
-            QMessageBox.information(self, "Stats", "Open a processed dataset first.")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Segmentation", msg)
             return
         self.cxt.current = t.calc_unwrap_stats(self.cxt.current)
         logger.info(f"{self.cxt.current.basename} connected components calculated for unwrapping stats")
@@ -747,16 +731,10 @@ class MainRibbonController(QMainWindow):
 
     def unwrap(self):
         logger.info(f"Button clicked: Unwrap")
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't unwrap")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't unwrap")
-            QMessageBox.information(self, "Stats", "Open a processed dataset first.")
-        if not self.cxt.current.has('stats'):
-            logger.warning("No stats calculated, can't unwrap")
-            QMessageBox.warning(self, "Warning", "No stats calculated yet.")
+        valid_state, msg = self.cxt.requires(self.cxt.UNWRAP)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Unwrapping", msg)
             return
         with busy_cursor('unwrapping...', self):
             self.cxt.current = t.unwrapped_output(self.cxt.current)
@@ -767,7 +745,8 @@ class MainRibbonController(QMainWindow):
     # -------- VISUALISE actions --------
     
     def ask_collection_name(self):
-        if not self.cxt.library:
+        valid_state, msg = self.cxt.requires(self.cxt.COLLECTIONS)
+        if not valid_state:
             return None
         names = sorted(self.cxt.library.collections.keys())
         if not names:
@@ -781,9 +760,12 @@ class MainRibbonController(QMainWindow):
     
     def run_feature_extraction(self, key, multi = False):
         logger.info(f"Button clicked: Extract feature {key}, Multi-mode = {multi}")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Feature Extraction", msg)
+            return
         if multi:
-            if self.cxt.ho is None: 
-                return
             with busy_cursor(f'feature extraction {key}....', self):
                 for po in self.cxt.ho:
                     t.run_feature_extraction(po, key)
@@ -796,14 +778,6 @@ class MainRibbonController(QMainWindow):
                 self.choose_view('hol')
                 self.update_display()
             return
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't extract features")
-            QMessageBox.information(self, "Features", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't extract features")
-            QMessageBox.information(self, "Features", "Open a processed dataset first.")
-        
         with busy_cursor(f'extracting {key}...', self):
             self.cxt.current = t.run_feature_extraction(self.cxt.current, key)
         logger.info(f"Extract feature {key} for {self.cxt.current.basename} done")
@@ -813,22 +787,21 @@ class MainRibbonController(QMainWindow):
 
     def act_vis_correlation(self, multi = False):
         logger.info(f"Button clicked: Mineral Map Pearson Correlation, Multi-mode = {multi}")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Mineral Mapping", msg)
+            return
+        name = self.ask_collection_name()
+        if not name:
+            logger.warning("Correlation cancelled, no collection selected")
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
+            return
         if multi:
-            if self.cxt.ho is None: 
-                logger.warning("No hole loaded, No Hole dataset loaded for multibox operations")
-                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
-                return
-            name = self.ask_collection_name()
-            
-            if not name:
-                logger.warning("Correlation cancelled, no collection selected")
-                return
-            logger.info(f"Correlation is using collection {name}")
-            
-            exemplars = self.cxt.library.get_collection_exemplars(name)
-            if not exemplars:
-                logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-                return
+            logger.info(f"Correlation is using collection {name} in multi mode")
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map(po, exemplars, name)
@@ -841,24 +814,8 @@ class MainRibbonController(QMainWindow):
             self.choose_view('hol')
             self.update_display()
             return
-        #======================================================================
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't mineral map")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't mineral map")
-            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
-            return
-        name = self.ask_collection_name()
-        if not name:
-            logger.warning("Correlation cancelled, no collection selected")
-            return
-        logger.info(f"Correlation is using collection {name}")
-        exemplars = self.cxt.library.get_collection_exemplars(name)
-        if not exemplars:
-            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-            return
+        
+        logger.info(f"Correlation is using collection {name} on single box")
         with busy_cursor('correlation...', self):
             self.cxt.current = t.wta_min_map(self.cxt.current, exemplars, name)
         logger.info(f"Pearson with collection {name} for {self.cxt.current.basename} done")
@@ -868,20 +825,21 @@ class MainRibbonController(QMainWindow):
 
     def act_vis_sam(self, multi = False):
         logger.info(f"Button clicked: Mineral Map SAM Correlation, Multi-mode = {multi}")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Mineral Mapping", msg)
+            return
+        name = self.ask_collection_name()
+        if not name:
+            logger.warning("Correlation cancelled, no collection selected")
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
+            return
         if multi:
-            if self.cxt.ho is None: 
-                logger.warning("No hole loaded, No Hole dataset loaded for multibox operations")
-                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
-                return
-            name = self.ask_collection_name()
-            if not name:
-                logger.warning("Correlation cancelled, no collection selected")
-                return
-            logger.info(f"Correlation is using collection {name}")
-            exemplars = self.cxt.library.get_collection_exemplars(name)
-            if not exemplars:
-                logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-                return
+            logger.info(f"Correlation is using collection {name} in multi mode")
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map_SAM(po, exemplars, name)
@@ -893,23 +851,7 @@ class MainRibbonController(QMainWindow):
             self.choose_view('hol')
             self.update_display()
             return
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't mineral map")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't mineral map")
-            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
-            return
-        name = self.ask_collection_name()
-        if not name:
-            logger.warning("Correlation cancelled, no collection selected")
-            return
-        logger.info(f"Correlation is using collection {name}")
-        exemplars = self.cxt.library.get_collection_exemplars(name)
-        if not exemplars:
-            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-            return
+        logger.info(f"Correlation is using collection {name} on single box")
         with busy_cursor('correlation...', self):
             self.cxt.current = t.wta_min_map_SAM(self.cxt.current, exemplars, name)
         logger.info(f"SAM with collection {name} for {self.cxt.current.basename} done")
@@ -919,20 +861,21 @@ class MainRibbonController(QMainWindow):
         
     def act_vis_msam(self, multi = False):
         logger.info(f"Button clicked: Mineral Map MSAM Correlation, Multi-mode = {multi}")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Mineral Mapping", msg)
+            return
+        name = self.ask_collection_name()
+        if not name:
+            logger.warning("Correlation cancelled, no collection selected")
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
+            return
         if multi:
-            if self.cxt.ho is None: 
-                logger.warning("No hole loaded, No Hole dataset loaded for multibox operations")
-                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
-                return
-            name = self.ask_collection_name()
-            if not name:
-                logger.warning("Correlation cancelled, no collection selected")
-                return
-            logger.info(f"Correlation is using collection {name}")
-            exemplars = self.cxt.library.get_collection_exemplars(name)
-            if not exemplars:
-                logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-                return
+            logger.info(f"Correlation is using collection {name} in multi mode")
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_min_map_MSAM(po, exemplars, name)
@@ -945,24 +888,7 @@ class MainRibbonController(QMainWindow):
             self.choose_view('hol')
             self.update_display()
             return
-        
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't mineral map")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't mineral map")
-            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
-            return
-        name = self.ask_collection_name()
-        if not name:
-            logger.warning("Correlation cancelled, no collection selected")
-            return
-        logger.info(f"Correlation is using collection {name}")
-        exemplars = self.cxt.library.get_collection_exemplars(name)
-        if not exemplars:
-            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-            return
+        logger.info(f"Correlation is using collection {name} on single box")
         with busy_cursor('correlation...', self):
             self.cxt.current = t.wta_min_map_MSAM(self.cxt.current, exemplars, name)
         logger.info(f"MSAM with collection {name} for {self.cxt.current.basename} done")
@@ -972,25 +898,26 @@ class MainRibbonController(QMainWindow):
     def act_vis_multirange(self, multi = False):
         modes = ['pearson', 'sam', 'msam']
         logger.info(f"Button clicked: Multi-range mineral mapping, Multi-mode = {multi}")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Mineral Mapping", msg)
+            return
+        name = self.ask_collection_name()
+        if not name:
+            logger.warning("Correlation cancelled, no collection selected")
+            return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
+            return
+        mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
+        if not ok or not mode:
+            logger.warning("Correlation cancelled, no mode selected")
+            return
         if multi:
-            if self.cxt.ho is None: 
-                logger.warning("No hole loaded, No Hole dataset loaded for multibox operations")
-                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
-                return
-            name = self.ask_collection_name()
-            if not name:
-                logger.warning("Correlation cancelled, no collection selected")
-                return
-            logger.info(f"Correlation is using collection {name}")
-            exemplars = self.cxt.library.get_collection_exemplars(name)
-            if not exemplars:
-                logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-                return
-            mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
-            if not ok or not mode:
-                logger.warning("Correlation cancelled, no mode selected")
-                return
-            logger.info(f"Correlation is using {mode} and collection {name}")
+            
+            logger.info(f"Correlation is using {mode} and collection {name} in multibox mode")
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     t.wta_multi_range_minmap(po, exemplars, name, mode=mode)
@@ -1003,29 +930,7 @@ class MainRibbonController(QMainWindow):
             self.update_display()
             return
         
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't mineral map")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't mineral map")
-            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
-            return
-        name = self.ask_collection_name()
-        if not name:
-            logger.warning("Correlation cancelled, no collection selected")
-            return
-        logger.info(f"Correlation is using collection {name}")
-        exemplars = self.cxt.library.get_collection_exemplars(name)
-        if not exemplars:
-            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-            return
-        
-        mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
-        if not ok or not mode:
-            logger.warning("Correlation cancelled, no mode selected")
-            return
-        logger.info(f"Correlation is using {mode} and  collection {name}")
+        logger.info(f"Correlation is using {mode} and  collection {name} for single box")
         with busy_cursor('correlation...', self):
             self.cxt.current = t.wta_multi_range_minmap(self.cxt.current, exemplars, name, mode=mode)
         logger.info(f"Multirange with collection {name} using {mode} for {self.cxt.current.basename} done")
@@ -1036,34 +941,35 @@ class MainRibbonController(QMainWindow):
     def act_subrange_corr(self, multi = False):
         modes = ['pearson', 'sam', 'msam']
         logger.info(f"Button clicked: User-defined range correlation, Multi-mode = {multi}")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Mineral Mapping", msg)
+            return
+        name = self.ask_collection_name()
+        if not name:
+            logger.warning("Correlation cancelled, no collection selected")
+            return
+        logger.info(f"Correlation is using collection {name}")
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
+            return
+        mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
+        if not ok or not mode:
+            logger.warning("Correlation cancelled, no mode selected")
+            return
+        logger.info(f"Correlation is using {mode} and  collection {name}")
+        ok, start_nm, stop_nm = WavelengthRangeDialog.get_range(
+            parent=self,
+            start_default=0,
+            stop_default=20000,
+        )
+        if not ok:
+            logger.warning("Correlation cancelled, no range selected")
+            return
         if multi:
-            if self.cxt.ho is None: 
-                logger.warning("No hole loaded, No Hole dataset loaded for multibox operations")
-                QMessageBox.information(self, "Correlation", "No Hole dataset loaded for multibox operations")
-                return
-            name = self.ask_collection_name()
-            if not name:
-                logger.warning("Correlation cancelled, no collection selected")
-                return
-            logger.info(f"Correlation is using collection {name}")
-            exemplars = self.cxt.library.get_collection_exemplars(name)
-            if not exemplars:
-                logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-                return
-            mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
-            if not ok or not mode:
-                logger.warning("Correlation cancelled, no mode selected")
-                return
-            logger.info(f"Correlation is using {mode} and  collection {name}")
-            ok, start_nm, stop_nm = WavelengthRangeDialog.get_range(
-                parent=self,
-                start_default=0,
-                stop_default=20000,
-            )
-            if not ok:
-                logger.warning("Correlation cancelled, no range selected")
-                return
-            logger.info(f"Correlation is using {mode}, collection {name} and range ({start_nm}:{stop_nm})")
+            logger.info(f"Correlation is using {mode}, collection {name} and range ({start_nm}:{stop_nm}) in multibox mode")
             with busy_cursor('correlation...', self):
                 for po in self.cxt.ho:
                     try:
@@ -1075,42 +981,11 @@ class MainRibbonController(QMainWindow):
                         logger.info(f"Defined range correlation with collection {name} using {mode} and range ({start_nm}:{stop_nm}) for {po.basename} done")
                     except ValueError:
                         logger.warn(f"Defined range correlation with collection {name} using {mode} and range ({start_nm}:{stop_nm}) for {po.basename} done", exc_info=True)
-                        continue
-                    
+                        continue      
             self.choose_view('hol')
             self.update_display()
             return
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't mineral map")
-            QMessageBox.information(self, "Correlation", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't mineral map")
-            QMessageBox.information(self, "Correlation", "Open a processed dataset first.")
-            return
-        name = self.ask_collection_name()
-        if not name:
-            logger.warning("Correlation cancelled, no collection selected")
-            return
-        logger.info(f"Correlation is using collection {name}")
-        exemplars = self.cxt.library.get_collection_exemplars(name)
-        if not exemplars:
-            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
-            return
-        
-        mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
-        if not ok or not mode:
-            logger.warning("Correlation cancelled, no mode selected")
-            return
-        ok, start_nm, stop_nm = WavelengthRangeDialog.get_range(
-            parent=self,
-            start_default=0,
-            stop_default=20000,
-        )
-        if not ok:
-            logger.warning("Correlation cancelled, no range selected")
-            return
-        logger.info(f"Correlation is using {mode}, collection {name} and range ({start_nm}:{stop_nm})")
+        logger.info(f"Correlation is using {mode}, collection {name} and range ({start_nm}:{stop_nm}) for single box")
         with busy_cursor('correlation...', self):
             try:
                 self.cxt.current = t.wta_min_map_user_defined(self.cxt.current, exemplars, name, [start_nm, stop_nm], mode=mode)
@@ -1125,22 +1000,23 @@ class MainRibbonController(QMainWindow):
     
     def act_kmeans(self, multi = False):
         logger.info(f"Button clicked: Quick Cluster, Multi-mode = {multi}")
-        if multi:
-            if self.cxt.ho is None: 
-                logger.warning("No hole loaded, No Hole dataset loaded for multibox operations")
-                QMessageBox.information(self, "Clustering", "No Hole dataset loaded for multibox operations")
-                return
-            clusters, ok1 = QInputDialog.getInt(self, "KMeans Clustering",
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Clustering", msg)
+            return
+        clusters, ok1 = QInputDialog.getInt(self, "KMeans Clustering",
                 "Enter number of clusters:",value=5, min=1, max=50)
-            if not ok1:
-                logger.warning("Clustering cancelled, n value not selected")
-                return
-            iters, ok2 = QInputDialog.getInt(self, "KMeans Clustering",
-                "Enter number of iterations:", value=50, min=1, max=1000)
-            if not ok2:
-                logger.warning("Clustering cancelled, interations number value not selected")
-                return
-            logger.info(f"Clustering started using clusters {clusters} and iters {iters}")
+        if not ok1:
+            logger.warning("Clustering cancelled, n value not selected")
+            return
+        iters, ok2 = QInputDialog.getInt(self, "KMeans Clustering",
+            "Enter number of iterations:", value=50, min=1, max=1000)
+        if not ok2:
+            logger.warning("Clustering cancelled, interations number value not selected")
+            return
+        if multi:
+            logger.info(f"Clustering started using clusters {clusters} and iters {iters} mutlti box")
             with busy_cursor('clustering...', self):
                 for po in self.cxt.ho:
                     t.kmeans_caller(po, clusters, iters)
@@ -1152,24 +1028,7 @@ class MainRibbonController(QMainWindow):
             self.choose_view('hol')
             self.update_display()
             return
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't cluster")
-            QMessageBox.information(self, "Clustering", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't cluster")
-            QMessageBox.information(self, "Clustering", "Open a processed dataset first.")
-            return
-        clusters, ok1 = QInputDialog.getInt(self, "KMeans Clustering",
-            "Enter number of clusters:",value=5, min=1, max=50)
-        if not ok1:
-            logger.warning("Clustering cancelled, n value not selected")
-            return
-        iters, ok2 = QInputDialog.getInt(self, "KMeans Clustering",
-            "Enter number of iterations:", value=50, min=1, max=1000)
-        if not ok2:
-            logger.warning("Clustering cancelled, interations number value not selected")
-            return
+        
         logger.info(f"Clustering started using clusters {clusters} and iters {iters}")
         with busy_cursor('clustering...', self):
             self.cxt.current = t.kmeans_caller(self.cxt.current, clusters, iters)
@@ -1226,15 +1085,11 @@ class MainRibbonController(QMainWindow):
         - pass them, along with the current object, to the interface layer
         """
         logger.info(f"Button clicked: Band Maths")
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't use band maths module")
-            QMessageBox.information(self, "Band Maths", "No Current Scan")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Band maths", msg)
             return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't use band maths module")
-            QMessageBox.information(self, "Band Maths", "Open a processed dataset first.")
-            return
-    
         ok, name, expr, cr = BandMathsDialog.get_expression(
            parent=self,
            default_name="Custom band index",
@@ -1258,19 +1113,12 @@ class MainRibbonController(QMainWindow):
     def act_lib_pix(self):
         """Add a single pixel spectrum to the current library."""
         logger.info(f"Button clicked: Add pixel to library")
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't use library tools")
-            QMessageBox.information(self, "Add to Library", "No Current Scan")
+        valid_state, msg = self.cxt.requires(self.cxt.ADD_TO_LIBRARY)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Add to Library", msg)
             return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't use library tools")
-            QMessageBox.information(self, "Add to Library", "Open a processed dataset first.")
-            return
-        if not self.cxt.library or not self.cxt.library.is_open():
-            logger.warning("No library open. Cannot use library addition tools.")
-            QMessageBox.warning(self, "Add to Library", "No library database is open.")
-            return
-        
+           
         p = self._active_page()
         if not p or not p.dispatcher or not p.left_canvas:
             logger.warning("Library add cancelled, due to absence of either page, dispatcher or canvas")
@@ -1329,17 +1177,10 @@ class MainRibbonController(QMainWindow):
     def act_lib_region(self):
         """Add the average spectrum of a region to the current library."""
         logger.info(f"Button clicked: Add region average to library")
-        if self.cxt.current is None:
-            logger.warning("No current scan, can't use library tools")
-            QMessageBox.information(self, "Add to Library", "No Current Scan")
-            return
-        if self.cxt.current.is_raw:
-            logger.warning("Current scan is raw, can't use library tools")
-            QMessageBox.information(self, "Add to Library", "Open a processed dataset first.")
-            return
-        if not self.cxt.library or not self.cxt.library.is_open():
-            logger.warning("No library open. Cannot use library addition tools.")
-            QMessageBox.warning(self, "Add to Library", "No library database is open.")
+        valid_state, msg = self.cxt.requires(self.cxt.ADD_TO_LIBRARY)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Add to Library", msg)
             return
         
         p = self._active_page()
@@ -1424,9 +1265,10 @@ class MainRibbonController(QMainWindow):
             # --- HOLE actions ---
     def hole_next_box(self):
         logger.info(f"Button clicked: Next Box")
-        if self.cxt.ho is None or self.cxt.current is None:
-            return
-        if self.cxt.current.is_raw:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Hole Navigation", msg)
             return
         try:
             box_num = int(self.cxt.current.metadata.get("box number"))
@@ -1442,9 +1284,10 @@ class MainRibbonController(QMainWindow):
 
     def hole_prev_box(self):
         logger.info(f"Button clicked: Previous Box")
-        if self.cxt.ho is None or self.cxt.current is None:
-            return
-        if self.cxt.current.is_raw:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Hole Navigation", msg)
             return
         try:
             box_num = int(self.cxt.current.metadata.get("box number"))
@@ -1460,9 +1303,10 @@ class MainRibbonController(QMainWindow):
 
     def hole_return_to_raw(self):
         logger.info(f"Button clicked: Return to Raw")
-        if self.cxt.ho is None or self.cxt.current is None:
-            return
-        if self.cxt.current.is_raw:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Hole Navigation", msg)
             return
         path = QFileDialog.getExistingDirectory(
                    self,
@@ -1481,7 +1325,7 @@ class MainRibbonController(QMainWindow):
         try:
             with busy_cursor('loading...', self):
                 loaded_obj = t.load(path)
-                if  not loaded_obj.is_raw:
+                if not loaded_obj.is_raw:
                     QMessageBox.warning(self, "Return to Raw",
                         "Selected path is not a raw Lumo directory.")
                     return
@@ -1511,24 +1355,24 @@ class MainRibbonController(QMainWindow):
 
     def save_all_changes(self):
         logger.info(f"Button clicked: Save All")
-        if self.cxt.ho is None or self.cxt.current is None:
-            logger.warning(f"Save cancelled because no hole or data is loaded")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Save hole", msg)
             return
-
-        if self.cxt is not None and self.cxt.ho is not None:
-            with busy_cursor('Saving.....', self):
-                
-                for po in self.cxt.ho:
-                    if po.has_temps:
-                        print(po.metadata['box number'])
-                        po.commit_temps()
-                        po.save_all()
-                        print('saved all, reloading')
-                        po.reload_all()
-                        po.load_thumbs()
-                        logger.info(f"Data saved for {po.basename}")
-                self.choose_view('hol')
-                self.update_display()
+        with busy_cursor('Saving.....', self):
+            self.cxt.ho.save_product_datasets()
+            for po in self.cxt.ho:
+                if po.has_temps:
+                    print(po.metadata['box number'])
+                    po.commit_temps()
+                    po.save_all()
+                    print('saved all, reloading')
+                    po.reload_all()
+                    po.load_thumbs()
+                    logger.info(f"Data saved for {po.basename}")
+            self.choose_view('hol')
+            self.update_display()
 
 #----------- manage ClusterWindow for interogating cluster centres-------------
     def open_cluster_window(self, cluster_key: str):
@@ -1539,16 +1383,13 @@ class MainRibbonController(QMainWindow):
         Pinned to whatever self.cxt.current is at the moment of opening.
         """
         logger.info(f"Button clicked: View cluster centres")
-        po = self.cxt.current
-        if po is None or getattr(po, "is_raw", False):
-            logger.warning("No processed box selected before inspecting clusters.")
-            QMessageBox.information(
-                self,
-                "No processed box",
-                "You need a processed box selected before inspecting clusters.",
-            )
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Save hole", msg)
             return
-    
+        po = self.cxt.current
+           
         # NEW: Use factory method instead of direct constructor
         win = ClusterWindow.from_processed_object(
             parent=self,

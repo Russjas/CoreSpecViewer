@@ -33,7 +33,7 @@ from ..models import HoleObject
 from ..interface import profile_tools as pt
 from ..config import feature_keys
 from .base_page import BasePage
-from .util_windows import ClosableWidgetWrapper, busy_cursor, ImageCanvas2D
+from .util_windows import ClosableWidgetWrapper, busy_cursor, ImageCanvas2D, WavelengthRangeDialog
 from .cluster_window import ClusterWindow
 from .band_math_dialogue import BandMathsDialog
 from .display_text import gen_display_text
@@ -108,7 +108,10 @@ class HoleBoxTable(QTableWidget):
     def populate_from_hole(self):
         self.setRowCount(0)
         self.cxt = self._page.cxt
-        if self.cxt is None or self.cxt.ho is None:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            #state not valid on startup, no hole loaded
+            logger.debug(msg)
             return
         hole = self.cxt.ho
         try:
@@ -208,8 +211,11 @@ class HoleBoxTable(QTableWidget):
         self.dataset_key = key
         self._update_header_label()
         self.cxt = self._page.cxt
-        if self.cxt is not None and self.cxt.ho is not None:
-            self.populate_from_hole()
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
+            return
+        self.populate_from_hole()
 
     # ------------------------------------------------------------------
     # Header combobox handling
@@ -502,6 +508,14 @@ class HoleControlPanel(QWidget):
         extract_button.clicked.connect(self.prof_feature_extraction)
         profile_derived_layout.addWidget(extract_button)
         
+        prof_min_map_button = QPushButton("MinMap", profile_derived_block)
+        prof_min_map_button.clicked.connect(self.prof_min_map)
+        profile_derived_layout.addWidget(prof_min_map_button)
+        
+        prof_min_map_range_button = QPushButton("MinMap - define range", profile_derived_block)
+        prof_min_map_range_button.clicked.connect(self.prof_min_map_range)
+        profile_derived_layout.addWidget(prof_min_map_range_button)
+        
         bmath_button = QPushButton("Band Maths", profile_derived_block)
         bmath_button.clicked.connect(self.profile_band_maths)
         profile_derived_layout.addWidget(bmath_button)
@@ -591,7 +605,8 @@ class HoleControlPanel(QWidget):
         """
         # ---- labels ----------------------------------------------------
         self.cxt = self._page.cxt
-        if self.cxt is None or self.cxt.ho is None:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             self.lbl_hole_id.setText("—")
             self.lbl_box_count.setText("—")
             self.lbl_depth_range.setText("—")
@@ -638,7 +653,8 @@ class HoleControlPanel(QWidget):
         if not key:
             return
         self.cxt = self._page.cxt
-        if self.cxt is None or self.cxt.ho is None:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.info(f"Button clicked: Display change for box columns to {key} failed because no hole data loaded")
             return
         logger.info(f"Button clicked: Display change for box columns to {key}")
@@ -646,7 +662,9 @@ class HoleControlPanel(QWidget):
 
 
     def set_step(self):
-        if not self.cxt.ho:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
             return
         dlg = QInputDialog(self)
         dlg.setInputMode(QInputDialog.DoubleInput)
@@ -667,7 +685,8 @@ class HoleControlPanel(QWidget):
     def show_downhole(self):
         """Display downhole product dataset."""
         logger.info(f"Button clicked: Show downhole data")
-        if not self.cxt.ho:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.warning(f"Show data cancelled, no hole loaded")
             return
         key = self.full_data_combo.currentData(Qt.UserRole)
@@ -742,7 +761,8 @@ class HoleControlPanel(QWidget):
     
     def gen_base_datasets(self):
         logger.info(f"Button clicked: Generate base datasets")
-        if not self.cxt.ho:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.info(f"Generate base datasets cancelled because no hole loaded")
             return
         with busy_cursor("Generating downhole base datasets...", self):
@@ -760,12 +780,13 @@ class HoleControlPanel(QWidget):
 # ---------Box-derived level control handlers---------------------------------------------------------    
     def dhole_feats_create(self):
         logger.info(f"Button clicked: Generate downhole features")
-        if not self.cxt.ho:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.info(f"Generate downhole features cancelled because no hole loaded")
             return
         keys = set()
         if not self.cxt.ho.boxes:
-            logger.info(f"Generate downhole features cancelled because no hole loaded")
+            logger.info(f"Generate downhole features cancelled - hole has no boxes")
             return
         for box in self.cxt.ho:
             keys = keys | box.datasets.keys() | box.temp_datasets.keys()
@@ -799,12 +820,13 @@ class HoleControlPanel(QWidget):
     
     def dhole_minmaps_create(self):
         logger.info(f"Button clicked: Generate downhole mineral maps")
-        if not self.cxt.ho:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.info(f"Generate downhole mineral maps cancelled because no hole loaded")
             return
         keys = set()
         if not self.cxt.ho.boxes:
-            logger.info(f"Generate downhole mineral maps cancelled because no hole loaded")
+            logger.info(f"Generate downhole features cancelled - hole has no boxes")
             return
         for box in self.cxt.ho:
             keys = keys | box.datasets.keys() | box.temp_datasets.keys()
@@ -831,7 +853,8 @@ class HoleControlPanel(QWidget):
 # ---------Box-derived level control handlers---------------------------------------------------------  
     def prof_kmeans(self):
         logger.info(f"Button clicked: Full hole k-means")
-        if not self.cxt.ho:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.info(f"Full hole k-means cancelled because no hole loaded")
             return
         clusters, ok1 = QInputDialog.getInt(self, "KMeans Clustering",
@@ -857,7 +880,8 @@ class HoleControlPanel(QWidget):
         
     def prof_feature_extraction(self, key):
         logger.info(f"Button clicked: Full hole feature extraction")
-        if not self.cxt.ho:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.info(f"Full hole feature extraction cancelled because no hole loaded")
             return
         key = self.feature_combo.currentText().strip()
@@ -883,8 +907,8 @@ class HoleControlPanel(QWidget):
         Pinned to whatever self.cxt.ho is at the moment of opening.
         """
         logger.info(f"Button clicked: Show Clusters")
-        ho = self.cxt.ho
-        if ho is None:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.warning("No hole selected before inspecting clusters.")
             QMessageBox.information(
                 self,
@@ -892,8 +916,7 @@ class HoleControlPanel(QWidget):
                 "You need a hole selected before inspecting clusters.",
             )
             return
-    
-        # NEW: Use factory method instead of direct constructor
+        ho = self.cxt.ho
         try:
             win = ClusterWindow.from_hole_object(
                 parent=self,
@@ -939,13 +962,122 @@ class HoleControlPanel(QWidget):
         except ValueError:
             pass
 
+
+    def prof_min_map(self):
+        """
+        - ask user min map metric and collection name
+        - pass them, along with the current object, to the interface layer
+        """
+        logger.info(f"Button clicked: Profile Mineral Map")
+        modes = ['pearson', 'sam', 'msam']
+        valid_state, msg = self.cxt.requires(self.cxt.CORRELATION_MULTI)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Mineral Mapping", msg)
+            return
+        
+        names = sorted(self.cxt.library.collections.keys())
+        if not names:
+            logger.info(f"No collections present in library")
+            QMessageBox.information(self, "No collections", "Create a collection first via 'Add Selected → Collection'.")
+            return None
+        if len(names) == 1:
+            name = names[0]
+        else:
+            name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
+            if not ok:
+                logger.info(f"No collections selected, correlation cancelled")
+                return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
+            return
+        mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
+        if not ok or not mode:
+            logger.warning("Correlation cancelled by user, no mode selected")
+            return
+        logger.info(f"Correlation is using {mode} and collection {name}")
+        
+        with busy_cursor('correlation...', self):
+            try:
+                if mode == "pearson":
+                    pt.wta_min_map(self.cxt.ho, exemplars, name)
+                elif mode == 'sam':
+                    pt.wta_min_map_SAM(self.cxt.ho, exemplars, name)
+                elif mode == 'msam':
+                    pt.wta_min_map_MSAM(self.cxt.ho, exemplars, name)
+            except Exception as e:
+                logger.error(f"Correlation with collection {name} using {mode} for {self.cxt.ho.hole_id} failed", exc_info=True)
+                QMessageBox.warning(self, "Failed operation", f"Failed to correlate using {mode}: {e}")
+                return
+        logger.info(f"Full hole minmap created using {mode} and collection {name}")
+        self.update_for_hole() 
+
+    def prof_min_map_range(self):
+        """
+        - ask user min map metric, collection name and wavelength range
+        - pass them, along with the current object, to the interface layer
+        """
+        logger.info(f"Button clicked: Profile Mineral Map")
+        modes = ['pearson', 'sam', 'msam']
+        valid_state, msg = self.cxt.requires(self.cxt.CORRELATION_MULTI)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Mineral Mapping", msg)
+            return
+        names = sorted(self.cxt.library.collections.keys())
+        if not names:
+            logger.info(f"No collections present in library")
+            QMessageBox.information(self, "No collections", "Create a collection first via 'Add Selected → Collection'.")
+            return None
+        if len(names) == 1:
+            name = names[0]
+        else:
+            name, ok = QInputDialog.getItem(self, "Select Collection", "Collections:", names, 0, False)
+            if not ok:
+                logger.info(f"No collections selected, correlation cancelled")
+                return
+        exemplars = self.cxt.library.get_collection_exemplars(name)
+        if not exemplars:
+            logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
+            return
+        mode, ok = QInputDialog.getItem(self, "Select Match Mode", "Options:", modes, 0, False)
+        if not ok or not mode:
+            logger.warning("Correlation cancelled by user, no mode selected")
+            return
+        logger.info(f"Correlation is using {mode} and collection {name}")
+        
+        ok, start_nm, stop_nm = WavelengthRangeDialog.get_range(
+            parent=self,
+            start_default=0,
+            stop_default=20000,
+        )
+        if not ok:
+            logger.warning("Correlation cancelled, no range selected")
+            return
+        logger.info(f"Correlation is using {mode} and collection {name} and range ({start_nm}:{stop_nm})")
+        with busy_cursor('correlation...', self):
+            try:
+                pt.wta_min_map_user_defined(self.cxt.ho, exemplars, name, [start_nm, stop_nm], mode=mode)
+            except Exception as e:
+                logger.error(f"Correlation with collection {name} using {mode} for {self.cxt.ho.hole_id} failed", exc_info=True)
+                QMessageBox.warning(self, "Failed operation", f"Failed to correlate using {mode}: {e}")
+                return
+        logger.info(f"Full hole minmap created using {mode} and collection {name}")
+        self.update_for_hole() 
+
+
+
+
+
     def profile_band_maths(self):
         """
         - ask user for a band-maths expression + name
         - pass them, along with the current object, to the interface layer
         """
         logger.info(f"Button clicked: Full hole Band Maths")
-        if self.cxt.ho is None:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             logger.info(f"Full hole feature Band Maths cancelled because no hole loaded")
             QMessageBox.information(self, "Band Maths", "No Hole loaded")
             return
@@ -1141,8 +1273,8 @@ class HolePage(BasePage):
                 for box in self.cxt.ho:
                     keys = keys | box.datasets.keys() | box.temp_datasets.keys()
 
-        except Exception:
-            pass
+        except Exception as e:
+            pass # pass silently when no hole loaded
         if keys:
             self._box_table.set_header_dataset_keys(keys)
             for col in self.extra_columns:
@@ -1158,7 +1290,8 @@ class HolePage(BasePage):
         Sets CurrentContext.po to the corresponding ProcessedObject, if present.
         """
         logger.info("Button clicked: dbl click on box in hole page")
-        if self.cxt is None or self.cxt.ho is None:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             return
         box_num_item = self._box_table.item(row, 0)
         if not box_num_item:
@@ -1184,7 +1317,8 @@ class HolePage(BasePage):
         Sets CurrentContext.po to the corresponding ProcessedObject, if present.
         """
         
-        if self.cxt is None or self.cxt.ho is None:
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
             return
         box_num_item = self._box_table.item(row, 0)
         if not box_num_item:
@@ -1205,17 +1339,19 @@ class HolePage(BasePage):
 
     def save_changes(self):
         logger.info("Button clicked: Save changes (hole page)")
-        if self.cxt is not None and self.cxt.ho is not None:
-            with busy_cursor('Saving.....', self):
-                self.cxt.ho.save_product_datasets()
-                for po in self.cxt.ho:
-                    if po.has_temps:
-                        po.commit_temps()
-                        po.save_all()
-                        po.reload_all()
-                        po.load_thumbs()
-                        logger.info(f"{po.basename} saved")
-                self._refresh_from_hole()
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            return
+        with busy_cursor('Saving.....', self):
+            self.cxt.ho.save_product_datasets()
+            for po in self.cxt.ho:
+                if po.has_temps:
+                    po.commit_temps()
+                    po.save_all()
+                    po.reload_all()
+                    po.load_thumbs()
+                    logger.info(f"{po.basename} saved")
+            self._refresh_from_hole()
 
 
     def update_display(self, key=''):

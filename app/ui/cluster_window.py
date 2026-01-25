@@ -310,11 +310,8 @@ class ClusterWindow(BasePage):
             )
         self.centres = centres
         
-        # Get bands from first box
-        first_box = ho.boxes.get(ho.first_box)
-        if first_box is None:
-            raise ValueError("No boxes available in HoleObject")
-        self.bands = first_box.bands
+        # Get bands from hole
+        self.bands = ho.get_bands()
         
         # Get pixel counts from index
         try:

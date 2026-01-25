@@ -28,8 +28,8 @@
 - [x] **ClusterWindow profiles**
   - [x] Enable viewing cluster centres derived from profile datasets
   
-- [ ] **Profile minmaps**
-  - [ ] Minimum wavelength mapping for 1D profiles
+- [x] **Profile minmaps**
+  - [X] Minimum wavelength mapping for 1D profiles
   
 - [ ] **Export profiles csv, ascii, las**
   - [ ] CSV with header/metadata
