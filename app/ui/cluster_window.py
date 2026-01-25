@@ -1,11 +1,10 @@
 """
-Cluster page for examing cluster centres returned from unsupervised clustering methods.
+Cluster page for examining cluster centres returned from unsupervised clustering methods.
 
 Supports viewing cluster centre spectrum and classifying using correlation techniques.
+Works with both ProcessedObject (box-level) and HoleObject (profile-level) data sources.
 """
-
-
-
+import logging
 
 import numpy as np
 
@@ -26,75 +25,164 @@ from ..interface import tools as t
 from .base_page import BasePage
 from .util_windows import SpectrumWindow, busy_cursor
 
-
+logger = logging.getLogger(__name__)
 
 class ClusterWindow(BasePage):
     """
-    Standalone window for inspecting k-means cluster centres for a specific
-    ProcessedObject.
-
-    - Pinned to a single ProcessedObject (`self.po`) at creation.
-    - Does *not* follow `cxt.current` as the user changes box.
-    - Uses `cxt.library` (LibraryManager) for correlation.
-
+    Standalone window for inspecting k-means cluster centres.
+    
+    Supports both ProcessedObject (box-level) and HoleObject (profile-level)
+    cluster data sources.
+    
+    Do not instantiate directly - use factory methods:
+    - ClusterWindow.from_processed_object() for box-level clusters
+    - ClusterWindow.from_hole_object() for profile-level clusters
+    
     Table layout:
         Col 0: Class ID
         Col 1: Pixel count
-        Col 2: Best match 1
-        Col 3: Score 1
-        Col 4: Best match 2
-        Col 5: Score 2
-        Col 6: Best match 3
-        Col 7: Score 3
+        Col 2: Pearson Match
+        Col 3: Pearson confidence
+        Col 4: SAM Match
+        Col 5: SAM confidence
+        Col 6: MSAM Match
+        Col 7: MSAM confidence
+        Col 8: User match
     """
 
-    def __init__(self, parent=None, cxt=None, po=None, cluster_key: str = ""):
+    def __init__(self, parent=None, cxt=None):
+        """
+        Private constructor. Use factory methods instead.
+        
+        Parameters
+        ----------
+        parent : QWidget, optional
+        cxt : Context
+            Application context (for library access)
+        """
         super().__init__(parent)
 
-        # Context + pinned PO
+        # Context
         if cxt is not None:
             self.cxt = cxt
-        self.po = po or getattr(self.cxt, "current", None)
-
-        self.cluster_key: str = cluster_key
+        
+        # Data source attributes (set by factory methods)
+        self.data_source = None  # Will be ProcessedObject or HoleObject
+        self.data_source_type: str = ""  # "processed" or "hole"
+        
+        self.cluster_key: str = ""
         self.index_key: str | None = None
         self.legend_key: str | None = None
 
-        self.centres: np.ndarray | None = None     # (m, B)
+        # Cluster data
+        self.centres: np.ndarray | None = None  # (m, B)
         self.pixel_counts: np.ndarray | None = None
-        self.matches_msam: dict[int, tuple[int, str, float]] = {} # class_id : (lib_id, min name, confidence)
+        self.bands: np.ndarray | None = None  # Cached bands
+        
+        # Match results
+        self.matches_msam: dict[int, tuple[int, str, float]] = {}  # class_id : (lib_id, min name, confidence)
         self.matches_sam: dict[int, tuple[int, str, float]] = {}
         self.matches_pearson: dict[int, tuple[int, str, float]] = {}
 
-        self._loaded: bool = False  # have we pulled data from self.po yet?
+        self._loaded: bool = False
 
         self.spec_win: SpectrumWindow | None = None
 
         self._build_ui()
 
-        # If we know the box identity, put it in the title
-        box_label = getattr(self.po, "basename", None) or getattr(self.po, "name", "")
+    # ------------------------------------------------------------------ #
+    # Factory methods                                                    #
+    # ------------------------------------------------------------------ #
+    @classmethod
+    def from_processed_object(cls, parent=None, cxt=None, po=None, cluster_key: str = ""):
+        """
+        Create a ClusterWindow for box-level cluster data.
+        
+        Parameters
+        ----------
+        parent : QWidget, optional
+        cxt : Context
+        po : ProcessedObject
+            Processed box object containing cluster data
+        cluster_key : str
+            Key for cluster centres dataset (e.g., "kmeans-5-50CLUSTERS")
+        
+        Returns
+        -------
+        ClusterWindow
+        """
+        if po is None:
+            logger.warning("No ProcessedObject passed")
+            raise ValueError("ProcessedObject cannot be None")
+        
+        window = cls(parent=parent, cxt=cxt)
+        window.data_source = po
+        window.data_source_type = "processed"
+        window.cluster_key = cluster_key
+        
+        # Set window title
+        box_label = getattr(po, "basename", None) or getattr(po, "name", "")
         base_title = "Cluster centres"
         if box_label:
-            self.setWindowTitle(f"{base_title} – {box_label}")
+            window.setWindowTitle(f"{base_title} — {box_label}")
         else:
-            self.setWindowTitle(base_title)
+            window.setWindowTitle(base_title)
+        
+        return window
+    
+    @classmethod
+    def from_hole_object(cls, parent=None, cxt=None, ho=None, cluster_key: str = ""):
+        """
+        Create a ClusterWindow for profile-level cluster data.
+        
+        Parameters
+        ----------
+        parent : QWidget, optional
+        cxt : Context
+        ho : HoleObject
+            Hole object containing profile cluster data
+        cluster_key : str
+            Key for cluster centres dataset (e.g., "PROF-kmeans-5-50CLUSTERS")
+        
+        Returns
+        -------
+        ClusterWindow
+        """
+        if ho is None:
+            logger.warning("No HoleObject passed")
+            raise ValueError("HoleObject cannot be None")
+        
+        window = cls(parent=parent, cxt=cxt)
+        window.data_source = ho
+        window.data_source_type = "hole"
+        window.cluster_key = cluster_key
+        
+        # Set window title
+        box_label = ho.hole_id
+        base_title = "Cluster centres"
+        if box_label:
+            window.setWindowTitle(f"{base_title} — {box_label}")
+        else:
+            window.setWindowTitle(base_title)
+        
+        return window
 
     # ------------------------------------------------------------------ #
     # BasePage lifecycle                                                 #
     # ------------------------------------------------------------------ #
     def activate(self):
         """
-        Called by controller just after construction. We deliberately *do not*
-        follow self.cxt.current; we stay pinned to self.po.
+        Called by controller just after construction.
+        Loads data from the pinned data source.
         """
         super().activate()
         if not self._loaded:
             try:
-                self._load_from_po()
+                self._load_data()
                 self._populate_table()
                 self._loaded = True
             except Exception as e:
+                logger.error(f"Could not load clusters for key '{self.cluster_key}':\n{e}", exc_info=True)
                 QMessageBox.critical(
                     self,
                     "Cluster load error",
@@ -128,8 +216,6 @@ class ClusterWindow(BasePage):
         header.setStretchLastSection(True)
         header.setSectionResizeMode(QHeaderView.ResizeToContents)
 
-        
-
         # Buttons row
         btn_row = QHBoxLayout()
         btn_row.setContentsMargins(0, 0, 0, 0)
@@ -137,59 +223,111 @@ class ClusterWindow(BasePage):
         self.btn_pearson = QPushButton("Pearson against library", container)
         self.btn_pearson.clicked.connect(self._pearson_lib)
         btn_row.addWidget(self.btn_pearson)
+        
         self.btn_sam = QPushButton("SAM against library", container)
         self.btn_sam.clicked.connect(self._sam_lib)
         btn_row.addWidget(self.btn_sam)
+        
         self.btn_MSAM = QPushButton("MSAM against library", container)
         self.btn_MSAM.clicked.connect(self._msam_lib)
         btn_row.addWidget(self.btn_MSAM)
+        
         self.btn_lib = QPushButton("Add Clusters to library", container)
         self.btn_lib.clicked.connect(self._add_clusters_lib)
         btn_row.addWidget(self.btn_lib)
-        
 
         vbox.addLayout(btn_row)
         vbox.addWidget(self.clus_table, 1)
+        
         # Use BasePage helper to put this on the left side of the splitter
         self._add_left(container)
 
     # ------------------------------------------------------------------ #
-    # Loading from the pinned PO                                         #
+    # Loading data from source                                           #
     # ------------------------------------------------------------------ #
-    def _load_from_po(self):
+    def _load_data(self):
         """
-        Pull cluster centres and index map from the pinned ProcessedObject (`self.po`).
+        Load cluster centres and index map from the data source.
+        Handles both ProcessedObject and HoleObject sources.
         """
-        po = self.po
-        if po is None:
-            raise RuntimeError("ClusterWindow.po is None (no ProcessedObject pinned).")
-
+        if self.data_source is None:
+            raise RuntimeError("ClusterWindow has no data source set.")
+        
         if not self.cluster_key:
             raise RuntimeError("ClusterWindow.cluster_key is not set.")
-
+        
         # Derive related keys for this clustering run
         base = self.cluster_key.replace("CLUSTERS", "")
         self.index_key = base + "INDEX"
-        #TODO: No legend exists for quick cluster by default. May use this window to populate a LEGEND dataset
-        self.legend_key = base + "LEGEND" 
+        self.legend_key = base + "LEGEND"
         
+        # Load data based on source type
+        if self.data_source_type == "processed":
+            self._load_from_processed_object()
+        elif self.data_source_type == "hole":
+            self._load_from_hole_object()
+        else:
+            raise RuntimeError(f"Unknown data source type: {self.data_source_type}")
+    
+    def _load_from_processed_object(self):
+        """Load cluster data from ProcessedObject."""
+        po = self.data_source
+        
+        # Get cluster centres
         centres = po.get_data(self.cluster_key)
-                
+        
         if centres.ndim != 2:
             raise ValueError(
                 f"Cluster centres expected to be 2D (m x bands), got shape {centres.shape}"
             )
         self.centres = centres
+        
+        # Get bands
+        self.bands = getattr(po, "bands", None)
+        
+        # Get pixel counts from index
         try:
             idx = po.get_data(self.index_key)
             self.pixel_counts = t.compute_pixel_counts(idx, centres.shape[0])
-            
         except KeyError:
-            
             m = centres.shape[0]
             self.pixel_counts = np.zeros(m, dtype=int)
-
     
+    def _load_from_hole_object(self):
+        """Load cluster data from HoleObject."""
+        ho = self.data_source
+        
+        # Get cluster centres from product_datasets
+        centres_dataset = ho.product_datasets.get(self.cluster_key)
+        if centres_dataset is None:
+            raise KeyError(f"No dataset found for key: {self.cluster_key}")
+        
+        centres = centres_dataset.data
+        
+        if centres.ndim != 2:
+            raise ValueError(
+                f"Cluster centres expected to be 2D (m x bands), got shape {centres.shape}"
+            )
+        self.centres = centres
+        
+        # Get bands from first box
+        first_box = ho.boxes.get(ho.first_box)
+        if first_box is None:
+            raise ValueError("No boxes available in HoleObject")
+        self.bands = first_box.bands
+        
+        # Get pixel counts from index
+        try:
+            index_dataset = ho.product_datasets.get(self.index_key)
+            if index_dataset is not None:
+                idx = index_dataset.data
+                self.pixel_counts = t.compute_pixel_counts(idx, centres.shape[0])
+            else:
+                m = centres.shape[0]
+                self.pixel_counts = np.zeros(m, dtype=int)
+        except (KeyError, AttributeError):
+            m = centres.shape[0]
+            self.pixel_counts = np.zeros(m, dtype=int)
 
     # ------------------------------------------------------------------ #
     # Table population                                                   #
@@ -231,9 +369,11 @@ class ClusterWindow(BasePage):
                 it_name = QStandardItem("")
                 it_name.setEditable(False)
                 row_items.append(it_name)
+                
                 it_score = QStandardItem("")
                 it_score.setEditable(False)
                 row_items.append(it_score)
+            
             it_user = QStandardItem("")
             it_user.setEditable(True)
             row_items.append(it_user)
@@ -257,6 +397,7 @@ class ClusterWindow(BasePage):
         class_id = self._row_to_class_id(row)
     
         if col in (0, 1):
+            logger.info(f"Button clicked: Double click display cluster centre class {class_id}")
             self._show_cluster_spectrum(class_id)
             return
     
@@ -269,11 +410,12 @@ class ClusterWindow(BasePage):
         metric = metric_by_col.get(col)
         if metric is None:
             return
-    
+        
         self._show_lib_spec(class_id, metric)
 
     def _show_lib_spec(self, class_id: int, metric: str):
-        if self.centres is None or self.po is None or not self.cxt.library:
+        """Show library spectrum that matched this cluster class."""
+        if self.centres is None or self.bands is None or not self.cxt.library:
             return
         if not (0 <= class_id < self.centres.shape[0]):
             return
@@ -295,20 +437,16 @@ class ClusterWindow(BasePage):
         if sample_id < 0:
             return
     
-        bands = getattr(self.po, "bands", None)
-        if bands is None:
-            return
-    
         x_nm, y = self.cxt.library.get_spectrum(sample_id)
-        display_spectra = t.match_spectra(x_nm, y, bands)
+        display_spectra = t.match_spectra(x_nm, y, self.bands)
     
         title = f"CR Spectra for: {sample_name} (ID: {sample_id})"
         if self.spec_win is None:
             self.spec_win = SpectrumWindow(self)
     
-        self.spec_win.plot_spectrum(bands, t.get_cr(display_spectra), title)
+        self.spec_win.plot_spectrum(self.bands, t.get_cr(display_spectra), title)
         self.spec_win.ax.set_ylabel("CR Reflectance (Unitless)")
-
+        logger.info(f"Button clicked: Double click display library match {sample_name}")
 
     def _show_cluster_spectrum(self, class_id: int):
         """
@@ -320,18 +458,13 @@ class ClusterWindow(BasePage):
         if class_id < 0 or class_id >= self.centres.shape[0]:
             return
 
-        po = self.po
-        if po is None:
-            return
-
-        bands = getattr(po, "bands", None)
         y = self.centres[class_id, :]
 
-        if bands is None or np.size(bands) != y.size:
+        if self.bands is None or np.size(self.bands) != y.size:
             x = np.arange(y.size)
             x_label = "Band index"
         else:
-            x = np.asarray(bands, dtype=float)
+            x = np.asarray(self.bands, dtype=float)
             x_label = "Wavelength (nm)"
 
         if self.spec_win is None:
@@ -346,39 +479,73 @@ class ClusterWindow(BasePage):
     # Interaction to library                                             #
     # ------------------------------------------------------------------ #
     def _add_clusters_lib(self):
+        """Add all cluster centres to the spectral library."""
+        logger.info("Button clicked: Add cluster centres to library")
         if self.centres is None:
             return
         if self.cluster_key is None:
             return
-        if self.cxt.current is None:
+        if self.bands is None:
+            QMessageBox.warning(
+                self,
+                "No bands",
+                "Data source has no wavelength bands available."
+            )
             return
-        for i in range(self.centres.shape[0]):
-            try:
-                spectrum = self.centres[i, :]
-                wavelengths_nm = self.cxt.current.bands
-                         
-                
-                name = f"Class {i}"
-                metadata = {}
-                metadata['SampleNum'] = f"Class {i} from {self.cluster_key}"
-                with busy_cursor('Adding to library...', self):
+        
+        # Check if library is open
+        if not self.cxt.library or not self.cxt.library.is_open():
+            logger.warning("No library database is open.")
+            QMessageBox.warning(
+                self,
+                "No Library",
+                "No library database is open."
+            )
+            return
+        
+        num_clusters = self.centres.shape[0]
+        success_count = 0
+        errors = []
+        
+        with busy_cursor(f'Adding {num_clusters} cluster centres to library...', self):
+            for i in range(num_clusters):
+                try:
+                    spectrum = self.centres[i, :]
+                    wavelengths_nm = self.bands
+                            
+                    name = f"Class {i}"
+                    metadata = {}
+                    metadata['SampleNum'] = f"Class {i} from {self.cluster_key}"
+                    
                     sample_id = self.cxt.library.add_sample(
                         name=name,
                         wavelengths_nm=wavelengths_nm,
                         reflectance=spectrum,
                         metadata=metadata
                     )
-                
-                
-                
-            except Exception as e:
-                QMessageBox.warning(
-                    self, 
-                    "Add to Library", 
-                    f"Failed to add spectrum to library: {e}"
-                )
+                    success_count += 1
+                        
+                except Exception as e:
+                    errors.append(f"Class {i}: {str(e)}")
         
-    
+        # Show summary
+        if errors:
+            error_msg = "\n".join(errors[:5])  # Show first 5 errors
+            if len(errors) > 5:
+                error_msg += f"\n... and {len(errors) - 5} more errors"
+            logger.warning(f"Added {success_count}/{num_clusters} cluster centres.\n\nErrors:\n{error_msg}")
+            QMessageBox.warning(
+                self,
+                "Add to Library - Partial Success",
+                f"Added {success_count}/{num_clusters} cluster centres.\n\nErrors:\n{error_msg}"
+            )
+        else:
+            logger.info(f"Successfully added all {num_clusters} cluster centre(s) to library.")
+            QMessageBox.information(
+                self,
+                "Add to Library - Success",
+                f"Successfully added all {num_clusters} cluster centre(s) to library."
+            )
     
     def _select_collection_exemplars(self):
         """Return (exemp_ids, exemplars, bands) or None if user cancels / no data."""
@@ -411,14 +578,15 @@ class ClusterWindow(BasePage):
             return None
     
         exemp_ids = list(exemplars.keys())
-        bands = getattr(self.po, "bands", None)
-        if bands is None:
-            QMessageBox.warning(self, "No bands", "Pinned ProcessedObject has no 'bands' attribute.")
+        
+        if self.bands is None:
+            QMessageBox.warning(self, "No bands", "Data source has no bands available.")
             return None
     
-        return exemp_ids, exemplars, bands
+        return exemp_ids, exemplars, self.bands
     
     def _run_lib_match(self, fn, match_store: dict[int, tuple[int, str, float]]):
+        """Run a library matching function against cluster centres."""
         if self.centres is None:
             return
     
@@ -440,12 +608,18 @@ class ClusterWindow(BasePage):
         self._update_matches_in_table()
     
     def _msam_lib(self):
+        """Run MSAM correlation against library."""
+        logger.info("Button clicked: MSAM match")
         self._run_lib_match(t.wta_min_map_MSAM_direct, self.matches_msam)
     
     def _sam_lib(self):
+        """Run SAM correlation against library."""
+        logger.info("Button clicked: SAM match")
         self._run_lib_match(t.wta_min_map_SAM_direct, self.matches_sam)
     
     def _pearson_lib(self):
+        """Run Pearson correlation against library."""
+        logger.info("Button clicked: Pearson match")
         self._run_lib_match(t.wta_min_map_direct, self.matches_pearson)
 
     def _update_matches_in_table(self):
@@ -474,6 +648,7 @@ class ClusterWindow(BasePage):
     
         for row in range(m):
             class_id = self._row_to_class_id(row)
+            
             def write_pair(col_name: int, col_score: int, tup):
                 """
                 tup is either (idx, name, score) or None.

@@ -379,6 +379,7 @@ class HoleControlPanel(QWidget):
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(6, 6, 6, 6)
         self.layout.setSpacing(8)
+        self.cluster_windows = []
 
         # ---- Hole info -------------------------------------------------
         self.lbl_hole_id = QLabel("—")
@@ -708,7 +709,7 @@ class HoleControlPanel(QWidget):
                 legend_key = key.replace("DOM-MIN", "LEGEND")
                 legend = self.cxt.ho.product_datasets[legend_key].data
                 canvas.display_discrete(depths, dominant, legend)
-                
+               
             except ValueError as e:
                 logger.error(f"Failed to plot {gen_display_text(key)}", exc_info=True)
                 QMessageBox.warning(self, "Failed operation", f"Failed to plot: {e}")
@@ -875,8 +876,69 @@ class HoleControlPanel(QWidget):
         self.update_for_hole() 
     
     def show_clusters(self, key):
-        print("cluster window not implemented for profile k-means yet")
+        """
+        Create a ClusterWindow for the given *CLUSTERS dataset key and
+        show it as a standalone window.
     
+        Pinned to whatever self.cxt.ho is at the moment of opening.
+        """
+        logger.info(f"Button clicked: Show Clusters")
+        ho = self.cxt.ho
+        if ho is None:
+            logger.warning("No hole selected before inspecting clusters.")
+            QMessageBox.information(
+                self,
+                "No hole loaded",
+                "You need a hole selected before inspecting clusters.",
+            )
+            return
+    
+        # NEW: Use factory method instead of direct constructor
+        try:
+            win = ClusterWindow.from_hole_object(
+                parent=self,
+                cxt=self.cxt,
+                ho=ho,
+                cluster_key=key,
+            )
+            
+            win.setWindowFlag(Qt.Window, True)
+            win.setAttribute(Qt.WA_DeleteOnClose, True)
+            win.setWindowTitle(gen_display_text(key))
+            self.cluster_windows.append(win)
+        
+            win.destroyed.connect(
+                lambda _obj=None, w=win: self._on_cluster_window_destroyed(w)
+            )
+        
+            # ---- Half-screen-ish sizing ----
+            main_geo = self.geometry()
+            half_width = max(400, main_geo.width() // 2)
+        
+            # Resize to half width, full height
+            win.resize(half_width, main_geo.height())
+        
+            # Move it to the left side of the main window
+            win.move(main_geo.x(), main_geo.y())
+        
+            win.activate()
+            win.show()
+            win.raise_()
+        except ValueError as e:
+            logger.warning(f"ValueError raised: {e}")
+            QMessageBox.information(
+                self,
+                "Error viewing cluster centres",
+                f"{e}.",
+            )
+    
+    def _on_cluster_window_destroyed(self, win: ClusterWindow):
+        logger.info("Button clicked: close cluster window")
+        try:
+            self.cluster_windows.remove(win)
+        except ValueError:
+            pass
+
     def profile_band_maths(self):
         """
         - ask user for a band-maths expression + name

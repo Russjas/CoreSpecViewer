@@ -1549,15 +1549,17 @@ class MainRibbonController(QMainWindow):
             )
             return
     
-        win = ClusterWindow(
+        # NEW: Use factory method instead of direct constructor
+        win = ClusterWindow.from_processed_object(
             parent=self,
             cxt=self.cxt,
             po=po,
             cluster_key=cluster_key,
         )
+        
         win.setWindowFlag(Qt.Window, True)
         win.setAttribute(Qt.WA_DeleteOnClose, True)
-        win.setWindowTitle(gen_display_text(cluster_key))#TODO
+        win.setWindowTitle(gen_display_text(cluster_key))
         self.cluster_windows.append(win)
     
         win.destroyed.connect(
@@ -1579,12 +1581,13 @@ class MainRibbonController(QMainWindow):
         win.raise_()
     
     def _on_cluster_window_destroyed(self, win: ClusterWindow):
+        logger.info("Button clicked: close cluster window")
         try:
             self.cluster_windows.remove(win)
         except ValueError:
             pass
         
-  
+    
  
 def main():
     logger.info("CoreSpecViewer starting...")
