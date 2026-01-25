@@ -25,8 +25,8 @@
 
 ## Features
 
-- [ ] **ClusterWindow profiles**
-  - [ ] Enable viewing cluster centres derived from profile datasets
+- [x] **ClusterWindow profiles**
+  - [x] Enable viewing cluster centres derived from profile datasets
   
 - [ ] **Profile minmaps**
   - [ ] Minimum wavelength mapping for 1D profiles
@@ -112,4 +112,4 @@
   
 ---
 
-_Last Updated: 2026-01-22_
+_Last Updated: 2026-01-25_
