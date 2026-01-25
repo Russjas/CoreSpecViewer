@@ -981,7 +981,7 @@ class MainRibbonController(QMainWindow):
             if not name:
                 logger.warning("Correlation cancelled, no collection selected")
                 return
-            logger.info("Correlation is using collection {name}")
+            logger.info(f"Correlation is using collection {name}")
             exemplars = self.cxt.library.get_collection_exemplars(name)
             if not exemplars:
                 logger.error(f"Correlation cancelled, failed to collect exemplar for collection {name}", exc_info=True)
