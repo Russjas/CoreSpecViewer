@@ -432,7 +432,7 @@ class LibraryPage(BasePage):
         key = f"{mineral_name}-(ID:-{sample_id})-MINCORR"
         with busy_cursor('correlating...', self):
             _, key = t.quick_corr(self.current_obj, x_nm, y, key = key)
-            logger.info("Correlated id {mineral_name} against {self.current_obj.basename}")
+            logger.info(f"Correlated id {mineral_name} against {self.current_obj.basename}")
             
             
             corr_canvas.show_rgb(self.current_obj.get_data(key))

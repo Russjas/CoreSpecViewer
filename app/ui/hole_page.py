@@ -301,12 +301,6 @@ class HoleBoxTable(QTableWidget):
 
         self._reposition_header_combo()
 
-    def _on_header_dataset_changed(self, key: str):
-        key = key.strip()
-        if not key:
-            return
-        # this will also repopulate from hole
-        self.set_dataset_key(key)
     def _on_header_dataset_changed(self, _idx: int):
         """
         Slot called when the header dataset combo changes.
