@@ -138,7 +138,7 @@ class RawObject:
 
         # Add a print or logging statement for non-critical issues (optional)
         if missing or duplicates or zero_byte:
-            logger.info(f"⚠️ Warning: Non-critical files issues found for {box_id}:")
+            logger.info(f"Warning: Non-critical files issues found for {box_id}:")
             if missing:
                 logger.warning(f"  Missing (Skipped): {missing}")
             if duplicates:
@@ -331,7 +331,7 @@ class RawObject:
     
         # Optional: print warnings about non-critical issues
         if missing or duplicates or zero_byte:
-            logger.warning(f"⚠️ Warning: Non-critical files issues found for {box_id}:")
+            logger.warning(f" Warning: Non-critical files issues found for {box_id}:")
             if missing:
                 logger.warning(f"  Missing (Skipped): {missing}")
             if duplicates:
@@ -445,7 +445,7 @@ class RawObject:
     
         # Optional warning summary
         if missing or duplicates or zero_byte:
-            logger.warning(f"⚠️ Warning: Non-critical files issues found for {box_id}:")
+            logger.warning(f"Warning: Non-critical files issues found for {box_id}:")
             if missing:
                 logger.warning(f"  Missing (Skipped): {missing}")
             if duplicates:

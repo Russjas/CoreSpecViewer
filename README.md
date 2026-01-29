@@ -13,7 +13,12 @@
 
 CoreSpecViewer is a modular **PyQt5 application** designed for the full hyperspectral core‑scanning workflow — from **Raw data** to **reflectance processing**, **masking**, **feature extraction**, **correlation mapping**, **thumbnail generation**, and **hole‑level review**.
 
-The system is designed for geoscientists and hyperspectral imaging specialists, with an emphasis on **clarity, reproducibility, and modularity**.
+The system is designed for geoscientists and hyperspectral imaging specialists, with an emphasis on **clarity, reproducibility, and modularity**.   
+
+A three-part video user guide is available:  
+Part 1: [Introduction and pre-processing](https://www.youtube.com/watch?v=s0LLzybd-bc)  
+Part 2: [Visualisation and interpretation](https://www.youtube.com/watch?v=JhxgPaNjBwo)  
+Part 3: [Full hole datasets](https://www.youtube.com/watch?v=2qlqmRyD4wA)
 
 ---
 

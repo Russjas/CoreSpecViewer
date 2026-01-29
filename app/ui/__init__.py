@@ -48,7 +48,8 @@ from .util_windows import (
     busy_cursor,
     choice_box,
     two_choice_box,
-    WavelengthRangeDialog
+    WavelengthRangeDialog,
+    ProfileExportDialog
 )
 from .vis_page import VisualisePage
 
@@ -71,5 +72,6 @@ __all__ = [
     "choice_box",
     "InfoTable",
     "busy_cursor",
-    "WavelengthRangeDialog"
+    "WavelengthRangeDialog",
+    "ProfileExportDialog"
 ]

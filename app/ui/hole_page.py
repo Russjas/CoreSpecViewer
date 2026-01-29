@@ -33,10 +33,16 @@ from ..models import HoleObject
 from ..interface import profile_tools as pt
 from ..config import feature_keys
 from .base_page import BasePage
-from .util_windows import ClosableWidgetWrapper, busy_cursor, ImageCanvas2D, WavelengthRangeDialog
 from .cluster_window import ClusterWindow
 from .band_math_dialogue import BandMathsDialog
 from .display_text import gen_display_text
+from .util_windows import (ClosableWidgetWrapper, 
+                           busy_cursor, 
+                           ImageCanvas2D, 
+                           WavelengthRangeDialog, 
+                           ProfileExportDialog
+                           )
+
 
 logger = logging.getLogger(__name__)
 
@@ -522,6 +528,23 @@ class HoleControlPanel(QWidget):
         self.layout.addWidget(separator5)
         self.layout.addStretch(1)
         
+        export_block = QWidget(self)
+        export_layout = QVBoxLayout(export_block)
+        export_layout.setContentsMargins(0, 0, 0, 0)
+        export_layout.setSpacing(1)
+        
+        export_csv_button = QPushButton("Export to CSV", export_block)
+        export_csv_button.clicked.connect(self.export_csv_dialog)
+        export_layout.addWidget(export_csv_button)
+        
+        self.layout.addWidget(export_block)
+        # END NEW
+        
+        separator6 = QFrame(self)
+        separator6.setFrameShape(QFrame.HLine)
+        separator6.setFrameShadow(QFrame.Sunken)
+        self.layout.addWidget(separator6)
+        
 
 #---------initiation and refresh logic-----------------------------------------
 
@@ -633,7 +656,43 @@ class HoleControlPanel(QWidget):
         else:
             self.lbl_depth_range.setText("—")
         self._set_dataset_keys()
-
+#-----------Export csv handler-------------------------------------------------------------------
+    def export_csv_dialog(self):
+        logger.info(f"Button clicked: Export CSV button")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
+            return
+        
+        exportable_keys = [k for k in self.cxt.ho.product_datasets.keys() if not k.endswith(("LEGEND", "CLUSTERS"))]
+    
+        if not exportable_keys:
+            logger.warning("Export cancelled: no exportable datasets")
+            QMessageBox.warning(
+                self, "No Data", 
+                "No exportable datasets found. Generate base or product datasets first."
+            )
+            return
+        ok, key, step, out_dir, mode = ProfileExportDialog.get_values(
+            parent=self,
+            keys=exportable_keys,
+            step_default=self.cxt.ho.step,
+            dir_default=self.cxt.ho.root_dir / "profiles",
+            title="Export profiles")
+        if not ok:
+            logger.info(f"Export cancelled in dialogue")
+            return
+        try:
+            pt.export_profile_to_csv(self.cxt.ho, key, out_dir, mode, step)
+        except (KeyError, ValueError) as e:
+            logger.error("Failed to export dataset", exc_info=True)
+            QMessageBox.warning(
+                self, "Failed export", 
+                f"Failed to export dataset to csv: {e}")
+            return
+        logger.info(f"Successfully exported {gen_display_text(key)} for {self.cxt.ho.hole_id}")
+        QMessageBox.information(self, "Exported", f"Successfully exported {gen_display_text(key)} for {self.cxt.ho.hole_id}")
+        
 
 # ---------downhole data control handlers---------------------------------------------------------
     def _on_display_btn_clicked(self):

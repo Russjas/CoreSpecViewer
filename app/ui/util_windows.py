@@ -7,6 +7,7 @@ used outside and embedded in the main pages.
 
 
 from contextlib import contextmanager
+from pathlib import Path
 
 import matplotlib
 matplotlib.rcParams['savefig.dpi'] = 600
@@ -44,6 +45,8 @@ from PyQt5.QtWidgets import (
     QToolBar,
     QVBoxLayout,
     QWidget,
+    QComboBox,
+    QDoubleSpinBox
     
 )
 
@@ -52,6 +55,7 @@ logger = logging.getLogger(__name__)
 my_map = matplotlib.colormaps['viridis']
 my_map.set_bad('black')
 
+from .display_text import gen_display_text
 from ..interface import tools as t
 from ..spectral_ops import spectral_functions as sf
 
@@ -948,7 +952,6 @@ class SpectrumWindow(QMainWindow):
         self.clear_all()
 
 
-
 class LibMetadataDialog(QDialog):
     """
     Dialog that dynamically builds metadata fields from a list of column names.
@@ -1001,6 +1004,9 @@ class LibMetadataDialog(QDialog):
 
 
 class MetadataDialog(QDialog):
+    """
+    Dialog that requests mandatory metadata values
+    """
     def __init__(self, meta=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Specim Metadata")
@@ -1113,6 +1119,149 @@ class WavelengthRangeDialog(QDialog):
         return False, None, None
 
 
+class ProfileExportDialog(QDialog):
+    """
+    Dialog to choose:
+      - a dataset key (dropdown)
+      - a step value (numeric)
+      - an output directory (browse)
+
+    Usage:
+        ok, key, step, out_dir, mode = ProfileExportDialog.get_values(
+            parent=self,
+            keys=keys,
+            step_default=hole.step,
+            dir_default=hole.root / "profiles",
+            title="Export profiles")
+    """
+
+    def __init__(
+        self,
+        parent=None,
+        keys=None,
+        step_default=None,
+        dir_default=None,
+        title="Export profile csv",
+    ):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+
+        self.keys = list(keys or [])
+        self.display_keys = [gen_display_text(key) for key in self.keys]
+        self.key_map = dict(zip(self.display_keys, self.keys))
+        
+        dir_default = Path(dir_default) if dir_default is not None else None
+
+        # --- Widgets ---
+        key_label = QLabel("Dataset key:")
+        self.key_combo = QComboBox()
+        self.key_combo.addItems([str(k) for k in self.display_keys])
+
+        step_label = QLabel("Step:")
+        self.step_spin = QDoubleSpinBox()
+        self.step_spin.setDecimals(2)
+        self.step_spin.setSingleStep(0.01)
+        self.step_spin.setMinimum(0.01)        # avoid zero unless meaningful
+        self.step_spin.setMaximum(1_000_000.0) # arbitrary large ceiling
+        if step_default is not None:
+            self.step_spin.setValue(float(step_default))
+
+        dir_label = QLabel("Output folder:")
+        self.dir_edit = QLineEdit()
+        self.dir_edit.setReadOnly(False)  # set True if you want browse-only
+        if dir_default is not None:
+            self.dir_edit.setText(str(dir_default))
+
+        self.browse_btn = QPushButton("Browse…")
+        self.browse_btn.clicked.connect(self._browse_for_dir)
+
+        export_modes = ["full", "stepped", "both"]
+        export_labels = ["Every pixel", "Resampled data", "Both"]
+        self.mode_map = dict(zip(export_labels, export_modes))
+        mode_label = QLabel("What do you want to export?")
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems([str(k) for k in export_labels])
+        
+
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+            orientation=Qt.Horizontal,
+            parent=self,
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        # --- Layout ---
+        row_key = QHBoxLayout()
+        row_key.addWidget(key_label)
+        row_key.addWidget(self.key_combo)
+
+        row_step = QHBoxLayout()
+        row_step.addWidget(step_label)
+        row_step.addWidget(self.step_spin)
+
+        row_dir = QHBoxLayout()
+        row_dir.addWidget(dir_label)
+        row_dir.addWidget(self.dir_edit)
+        row_dir.addWidget(self.browse_btn)
+        
+        row_mode = QHBoxLayout()
+        row_mode.addWidget(mode_label)
+        row_mode.addWidget(self.mode_combo)
+
+        main = QVBoxLayout()
+        main.addLayout(row_key)
+        main.addLayout(row_step)
+        main.addLayout(row_dir)
+        main.addLayout(row_mode)
+        main.addWidget(buttons)
+        self.setLayout(main)
+
+    def _browse_for_dir(self):
+        start_dir = self.dir_edit.text().strip() or ""
+        chosen = QFileDialog.getExistingDirectory(
+            self,
+            "Select output folder",
+            start_dir,
+        )
+        if chosen:
+            self.dir_edit.setText(chosen)
+
+    def values(self):
+        """
+        Return (key, step, out_dirpath) or (None, None, None) if invalid.
+        """
+        display = self.key_combo.currentText().strip()
+        step = float(self.step_spin.value())
+        out_text = self.dir_edit.text().strip()
+        mode_selected = self.mode_combo.currentText().strip()
+    
+        if not display or not out_text:
+            return None, None, None, None
+    
+        key = self.key_map.get(display)
+        if key is None:
+            return None, None, None, None
+        
+        mode = self.mode_map.get(mode_selected)
+    
+        return key, step, Path(out_text), mode
+
+    @classmethod
+    def get_values(cls, parent=None, keys=None, step_default=None, dir_default=None, title=None):
+        dlg = cls(
+            parent=parent,
+            keys=keys,
+            step_default=step_default,
+            dir_default=dir_default,
+            title=title or "Select export options",
+        )
+        result = dlg.exec_()
+        if result == QDialog.Accepted:
+            key, step, out_dir, mode = dlg.values()
+            return True, key, step, out_dir, mode
+        return False, None, None, None, None
 
 class AutoSettingsDialog(QDialog):
     def __init__(self, parent=None):
