@@ -7,14 +7,14 @@
   - [x] Log levels: DEBUG, INFO, WARNING, ERROR
   - [x] Write logs to file in user directory
   
-- [ ] **Sort test harness**
-  - [ ] Set up test framework
+- [x] **Sort test harness**
+  - [x] Set up test framework
   - [x] Create test data fixtures (small example datasets)
-  - [ ] Basic smoke tests for loading/saving
+  - [x] Basic smoke tests for loading/saving
   
-- [ ] **Dependency updates**
-  - [ ] Test with newer versions where appropriate
-  - [ ] Document any version constraints
+- [x] **Dependency updates**
+  - [x] Test with newer versions where appropriate
+  - [x] Document any version constraints
   
 - [ ] **Refactor spectral_functions.py**
   - [ ] Split into logical modules (io, processing, visualization, correlation)
@@ -32,12 +32,12 @@
   - [X] Minimum wavelength mapping for 1D profiles
   
 - [ ] **Export profiles csv, ascii, las**
-  - [ ] CSV with header/metadata
+  - [x] CSV with header/metadata
   - [ ] ASCII columnar format
   - [ ] LAS format for geological software compatibility
   
 - [ ] **Import external data**
-  - [ ] Generic ENVI file support
+  - [x] Generic ENVI file support
   - [ ] Tabular data (CSV/Excel/las) for overlays
   - [ ] HyLogger format if needed
   
@@ -112,4 +112,4 @@
   
 ---
 
-_Last Updated: 2026-01-25_
+_Last Updated: 2026-01-30_
