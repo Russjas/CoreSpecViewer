@@ -1,0 +1,1540 @@
+2026-01-31 18:07:50,968 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:50,968 - __main__ - DEBUG -   CoreSpecViewer Integration Test
+2026-01-31 18:07:50,968 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:50,969 - __main__ - INFO - Python version: 3.11.5 | packaged by conda-forge | (main, Aug 27 2023, 03:23:48) [MSC v.1936 64 bit (AMD64)]
+2026-01-31 18:07:50,970 - __main__ - INFO - Test configuration:
+2026-01-31 18:07:50,970 - __main__ - INFO -   Raw directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\Synthetic_test_box
+2026-01-31 18:07:50,970 - __main__ - INFO -   Baseline directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\baselines
+2026-01-31 18:07:50,970 - __main__ - INFO -   Output directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs
+2026-01-31 18:07:50,970 - __main__ - INFO -   Library database: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\TestDB.db
+2026-01-31 18:07:50,970 - __main__ - INFO -   Creating baseline data
+2026-01-31 18:07:50,971 - __main__ - INFO - Running raw loading test
+2026-01-31 18:07:50,971 - __main__ - DEBUG - 
+2026-01-31 18:07:50,971 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:50,971 - __main__ - DEBUG -   PART 1A: Loading Raw Lumo Directory
+2026-01-31 18:07:50,971 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:51,073 - __main__ - DEBUG - PASS Successfully loaded raw object
+2026-01-31 18:07:51,073 - __main__ - DEBUG - RawObject Information:
+2026-01-31 18:07:51,073 - __main__ - DEBUG -   Basename: synthetic_test
+2026-01-31 18:07:51,073 - __main__ - DEBUG -   Root dir: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\Synthetic_test_box
+2026-01-31 18:07:51,075 - __main__ - DEBUG -   Metadata keys: ['sensor type', 'sensor id', 'frame rate', 'integration time', 'samples', 'active bands', 'spatial binning', 'spectral binning', 'frames recorded', 'frames dropped']...
+2026-01-31 18:07:51,075 - __main__ - DEBUG -   Reflectance shape: (100, 110, 249)
+2026-01-31 18:07:51,075 - __main__ - INFO - Running crop test
+2026-01-31 18:07:51,075 - __main__ - DEBUG - 
+2026-01-31 18:07:51,075 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:51,075 - __main__ - DEBUG -   PART 1B: Cropping Raw Data
+2026-01-31 18:07:51,075 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:51,075 - __main__ - DEBUG - Applying crop: y[2:98], x[8:96]
+2026-01-31 18:07:51,076 - __main__ - DEBUG - PASS Cropped shape: (96, 88, 249)
+2026-01-31 18:07:51,076 - __main__ - INFO - Running process test
+2026-01-31 18:07:51,076 - __main__ - DEBUG - 
+2026-01-31 18:07:51,076 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:51,076 - __main__ - DEBUG -   PART 1C: Processing to Reflectance
+2026-01-31 18:07:51,076 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:51,076 - __main__ - DEBUG - Processing raw data...
+2026-01-31 18:07:53,557 - __main__ - DEBUG - PASS Successfully created ProcessedObject
+2026-01-31 18:07:53,558 - __main__ - DEBUG - ProcessedObject Information:
+2026-01-31 18:07:53,558 - __main__ - DEBUG -   Basename: synthetic_test
+2026-01-31 18:07:53,558 - __main__ - DEBUG -   Root dir: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\Synthetic_test_box
+2026-01-31 18:07:53,558 - __main__ - DEBUG -   Metadata keys: ['sensor type', 'sensor id', 'frame rate', 'integration time', 'samples', 'active bands', 'spatial binning', 'spectral binning', 'frames recorded', 'frames dropped']...
+2026-01-31 18:07:53,558 - __main__ - DEBUG -   Datasets: ['metadata', 'cropped', 'bands', 'savgol', 'savgol_cr', 'mask']
+2026-01-31 18:07:53,558 - __main__ - DEBUG - Updating output directory to: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs
+2026-01-31 18:07:53,559 - __main__ - DEBUG - PASS All base datasets present: ['cropped', 'savgol', 'savgol_cr', 'bands', 'metadata', 'mask']
+2026-01-31 18:07:53,559 - __main__ - INFO - Running masking tests
+2026-01-31 18:07:53,559 - __main__ - DEBUG - 
+2026-01-31 18:07:53,559 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:53,559 - __main__ - DEBUG -   PART 2A: Create New Mask
+2026-01-31 18:07:53,560 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:07:53,560 - __main__ - DEBUG - Creating new mask using pixel (5, 54)
+2026-01-31 18:07:53,560 - __main__ - DEBUG - Correlation threshold: 0.9 (pixels with corr > 0.9 will be masked)
+2026-01-31 18:07:53,560 - __main__ - DEBUG - Initial mask Statistics:
+2026-01-31 18:07:53,560 - __main__ - DEBUG -   Shape: (96, 88)
+2026-01-31 18:07:53,560 - __main__ - DEBUG -   Total pixels: 8448
+2026-01-31 18:07:53,560 - __main__ - DEBUG -   Masked pixels: 0 (0.0%)
+2026-01-31 18:07:53,560 - __main__ - DEBUG -   Valid pixels: 8448 (100.0%)
+2026-01-31 18:08:00,467 - __main__ - DEBUG - PASS New mask created
+2026-01-31 18:08:00,467 - __main__ - DEBUG - New mask Statistics:
+2026-01-31 18:08:00,467 - __main__ - DEBUG -   Shape: (96, 88)
+2026-01-31 18:08:00,468 - __main__ - DEBUG -   Total pixels: 8448
+2026-01-31 18:08:00,468 - __main__ - DEBUG -   Masked pixels: 3164 (37.5%)
+2026-01-31 18:08:00,468 - __main__ - DEBUG -   Valid pixels: 5284 (62.5%)
+2026-01-31 18:08:00,468 - __main__ - DEBUG - Changed pixels from initial: 3164
+2026-01-31 18:08:00,468 - __main__ - DEBUG - 
+2026-01-31 18:08:00,468 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,469 - __main__ - DEBUG -   PART 2B: Enhance Mask
+2026-01-31 18:08:00,469 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,469 - __main__ - DEBUG - Enhancing mask using pixel (93, 57)
+2026-01-31 18:08:00,505 - __main__ - DEBUG - PASS Mask enhanced
+2026-01-31 18:08:00,507 - __main__ - DEBUG - Additional pixels masked: 16
+2026-01-31 18:08:00,507 - __main__ - DEBUG - Enhanced mask Statistics:
+2026-01-31 18:08:00,507 - __main__ - DEBUG -   Shape: (96, 88)
+2026-01-31 18:08:00,507 - __main__ - DEBUG -   Total pixels: 8448
+2026-01-31 18:08:00,508 - __main__ - DEBUG -   Masked pixels: 3180 (37.6%)
+2026-01-31 18:08:00,508 - __main__ - DEBUG -   Valid pixels: 5268 (62.4%)
+2026-01-31 18:08:00,508 - __main__ - DEBUG - 
+2026-01-31 18:08:00,508 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,508 - __main__ - DEBUG -   PART 2C: Despeckle Mask
+2026-01-31 18:08:00,509 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,509 - __main__ - DEBUG - Running despeckle operation to remove isolated pixels
+2026-01-31 18:08:00,514 - __main__ - DEBUG - PASS Mask despeckled
+2026-01-31 18:08:00,514 - __main__ - DEBUG - Pixels changed: 268
+2026-01-31 18:08:00,514 - __main__ - DEBUG - 
+2026-01-31 18:08:00,514 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,515 - __main__ - DEBUG -   PART 2D: Improve Mask
+2026-01-31 18:08:00,515 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,515 - __main__ - DEBUG - Running heuristic mask improvement
+2026-01-31 18:08:00,517 - __main__ - DEBUG - PASS Mask improved
+2026-01-31 18:08:00,518 - __main__ - DEBUG - Pixels changed: 2077
+2026-01-31 18:08:00,518 - __main__ - DEBUG - Improved mask Statistics:
+2026-01-31 18:08:00,518 - __main__ - DEBUG -   Shape: (96, 88)
+2026-01-31 18:08:00,518 - __main__ - DEBUG -   Total pixels: 8448
+2026-01-31 18:08:00,518 - __main__ - DEBUG -   Masked pixels: 5525 (65.4%)
+2026-01-31 18:08:00,519 - __main__ - DEBUG -   Valid pixels: 2923 (34.6%)
+2026-01-31 18:08:00,519 - __main__ - DEBUG - 
+2026-01-31 18:08:00,519 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,519 - __main__ - DEBUG -   PART 2E: Calculate Unwrap Stats
+2026-01-31 18:08:00,519 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,519 - __main__ - DEBUG - Calculating connected components for downhole unwrapping
+2026-01-31 18:08:00,521 - __main__ - DEBUG - PASS Unwrap stats calculated
+2026-01-31 18:08:00,521 - __main__ - DEBUG -   Segments shape: (96, 88)
+2026-01-31 18:08:00,521 - __main__ - DEBUG -   Segments range: [0.000, 1.000]
+2026-01-31 18:08:00,521 - __main__ - DEBUG -   Number of segments: 2
+2026-01-31 18:08:00,521 - __main__ - DEBUG - 
+2026-01-31 18:08:00,521 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,522 - __main__ - DEBUG -   PART 2F: Generate Unwrap Preview
+2026-01-31 18:08:00,522 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,522 - __main__ - DEBUG - Generating unwrapped preview (depth 100.0 to 105.0)
+2026-01-31 18:08:00,527 - __main__ - DEBUG - PASS Unwrapped preview generated
+2026-01-31 18:08:00,527 - __main__ - DEBUG -   DholeAverage shape: (96, 21, 249)
+2026-01-31 18:08:00,527 - __main__ - DEBUG -   Depth range: [100.00, 105.00]
+2026-01-31 18:08:00,527 - __main__ - INFO - Running analysis tests
+2026-01-31 18:08:00,527 - __main__ - DEBUG - 
+2026-01-31 18:08:00,528 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,528 - __main__ - DEBUG -   PART 3A: K-means Clustering
+2026-01-31 18:08:00,528 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,528 - __main__ - DEBUG - Running k-means: 5 clusters, 100 iterations
+2026-01-31 18:08:00,638 - __main__ - DEBUG - PASS Clustering complete
+2026-01-31 18:08:00,638 - __main__ - DEBUG -   Cluster map shape: (96, 88)
+2026-01-31 18:08:00,639 - __main__ - DEBUG -   Centroids shape: (5, 249)
+2026-01-31 18:08:00,639 - __main__ - DEBUG -   Unique clusters: [0 1 2 3 4]
+2026-01-31 18:08:00,639 - __main__ - DEBUG - 
+2026-01-31 18:08:00,639 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,639 - __main__ - DEBUG -   PART 3B: Feature Extraction
+2026-01-31 18:08:00,640 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:00,640 - __main__ - DEBUG - Extracting feature: 1400W
+2026-01-31 18:08:02,758 - __main__ - DEBUG -   PASS 1400W: position shape (96, 88)
+2026-01-31 18:08:02,758 - __main__ - DEBUG - Extracting feature: 1900W
+2026-01-31 18:08:02,994 - __main__ - DEBUG -   PASS 1900W: position shape (96, 88)
+2026-01-31 18:08:02,994 - __main__ - DEBUG - Extracting feature: 2200W
+2026-01-31 18:08:03,253 - __main__ - DEBUG -   PASS 2200W: position shape (96, 88)
+2026-01-31 18:08:03,253 - __main__ - DEBUG - Extracting feature: 2320W
+2026-01-31 18:08:03,488 - __main__ - DEBUG -   PASS 2320W: position shape (96, 88)
+2026-01-31 18:08:03,488 - __main__ - DEBUG - Extracting feature: 2350W
+2026-01-31 18:08:03,722 - __main__ - DEBUG -   PASS 2350W: position shape (96, 88)
+2026-01-31 18:08:03,722 - __main__ - DEBUG - 
+Feature extraction summary: 5/5 successful
+2026-01-31 18:08:03,722 - __main__ - DEBUG - 
+2026-01-31 18:08:03,722 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:03,722 - __main__ - DEBUG -   PART 3C: Band Math Expressions
+2026-01-31 18:08:03,722 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:03,722 - __main__ - DEBUG - Evaluating: test_ratio_2200_2320
+2026-01-31 18:08:03,723 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:08:03,724 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:08:03,725 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:08:03,725 - __main__ - DEBUG -   PASS Value range: [0.924, 1.249]
+2026-01-31 18:08:03,725 - __main__ - DEBUG - Evaluating: test_difference_cr
+2026-01-31 18:08:03,725 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:08:03,726 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:08:03,728 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:08:03,728 - __main__ - DEBUG -   PASS Value range: [-0.549, 0.645]
+2026-01-31 18:08:03,728 - __main__ - DEBUG - 
+Band math summary: 2/2 successful
+2026-01-31 18:08:03,729 - __main__ - INFO - Running save box test
+2026-01-31 18:08:03,729 - __main__ - DEBUG - 
+2026-01-31 18:08:03,729 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:03,729 - __main__ - DEBUG -   PART 4: Saving ProcessedObject
+2026-01-31 18:08:03,729 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:03,730 - __main__ - DEBUG - Committing temporary datasets...
+2026-01-31 18:08:03,788 - __main__ - DEBUG - PASS Committed 25 datasets
+2026-01-31 18:08:03,788 - __main__ - DEBUG - Saving to disk...
+2026-01-31 18:08:03,940 - __main__ - DEBUG - PASS Saved to: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\baselines
+2026-01-31 18:08:03,940 - __main__ - DEBUG - PASS Files on disk: 43
+2026-01-31 18:08:03,940 - __main__ - DEBUG -     synthetic_test_1400WDEP.npz
+2026-01-31 18:08:03,942 - __main__ - DEBUG -     synthetic_test_1400WDEPthumb.jpg
+2026-01-31 18:08:03,942 - __main__ - DEBUG -     synthetic_test_1400WPOS.npz
+2026-01-31 18:08:03,942 - __main__ - DEBUG -     synthetic_test_1400WPOSthumb.jpg
+2026-01-31 18:08:03,942 - __main__ - DEBUG -     synthetic_test_1900WDEP.npz
+2026-01-31 18:08:03,942 - __main__ - DEBUG -     synthetic_test_1900WDEPthumb.jpg
+2026-01-31 18:08:03,942 - __main__ - DEBUG -     synthetic_test_1900WPOS.npz
+2026-01-31 18:08:03,943 - __main__ - DEBUG -     synthetic_test_1900WPOSthumb.jpg
+2026-01-31 18:08:03,943 - __main__ - DEBUG -     synthetic_test_2200WDEP.npz
+2026-01-31 18:08:03,943 - __main__ - DEBUG -     synthetic_test_2200WDEPthumb.jpg
+2026-01-31 18:08:03,943 - __main__ - DEBUG -     ... and 33 more
+2026-01-31 18:08:03,943 - __main__ - INFO - Running library tests
+2026-01-31 18:08:03,943 - __main__ - DEBUG - 
+2026-01-31 18:08:03,943 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:03,943 - __main__ - DEBUG -   PART 5A: Loading Spectral Library & Creating Collection
+2026-01-31 18:08:03,943 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:03,947 - __main__ - DEBUG - PASS Library loaded successfully
+2026-01-31 18:08:03,947 - __main__ - DEBUG -   Total samples in database: 3
+2026-01-31 18:08:03,947 - __main__ - DEBUG -   Collected 3 sample IDs for test collection
+2026-01-31 18:08:03,948 - __main__ - DEBUG - PASS Created collection 'test_collection'
+2026-01-31 18:08:03,948 - __main__ - DEBUG -   Added: 3 samples
+2026-01-31 18:08:03,949 - __main__ - DEBUG -   Total: 3 samples
+2026-01-31 18:08:03,949 - __main__ - DEBUG -   Active collections: ['test_collection']
+2026-01-31 18:08:03,949 - __main__ - DEBUG - PASS Collection exemplars built: 3 spectra
+2026-01-31 18:08:03,950 - __main__ - DEBUG -   Example spectrum: 'Calcite CaCO3'
+2026-01-31 18:08:03,950 - __main__ - DEBUG -     Wavelength range: 2079.5 - 25044.2 nm
+2026-01-31 18:08:03,950 - __main__ - DEBUG -     Reflectance range: 9.863 - 102.723
+2026-01-31 18:08:03,950 - __main__ - INFO - Running reload tests
+2026-01-31 18:08:03,951 - __main__ - DEBUG - 
+2026-01-31 18:08:03,951 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:03,951 - __main__ - DEBUG -   PART 5B: Reloading Saved ProcessedObject
+2026-01-31 18:08:03,951 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:04,146 - __main__ - DEBUG - PASS Successfully reloaded ProcessedObject
+2026-01-31 18:08:04,146 - __main__ - DEBUG - Reloaded ProcessedObject Information:
+2026-01-31 18:08:04,146 - __main__ - DEBUG -   Basename: synthetic_test
+2026-01-31 18:08:04,146 - __main__ - DEBUG -   Root dir: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\baselines
+2026-01-31 18:08:04,147 - __main__ - DEBUG -   Metadata keys: ['sensor type', 'sensor id', 'frame rate', 'integration time', 'samples', 'active bands', 'spatial binning', 'spectral binning', 'frames recorded', 'frames dropped']...
+2026-01-31 18:08:04,147 - __main__ - DEBUG -   Datasets: ['1400WDEP', '1400WPOS', '1900WDEP', '1900WPOS', '2200WDEP', '2200WPOS', '2320WDEP', '2320WPOS', '2350WDEP', '2350WPOS', 'bands', 'cropped', 'DholeAverage', 'DholeDepths', 'DholeMask', 'kmeans-5-100CLUSTERS', 'kmeans-5-100INDEX', 'mask', 'metadata', 'savgol', 'savgol_cr', 'segments', 'stats', 'test-difference-cr', 'test-ratio-2200-2320']
+2026-01-31 18:08:04,161 - __main__ - DEBUG - PASS Reloaded all datasets from disk
+2026-01-31 18:08:04,161 - __main__ - INFO - Running correlation tests
+2026-01-31 18:08:04,161 - __main__ - DEBUG - 
+2026-01-31 18:08:04,161 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:04,161 - __main__ - DEBUG -   PART 5C: Correlation Analysis
+2026-01-31 18:08:04,161 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:04,163 - __main__ - DEBUG - Using collection 'test_collection' with 3 spectra
+2026-01-31 18:08:04,163 - __main__ - DEBUG - 
+Running pearson correlation...
+2026-01-31 18:08:04,194 - __main__ - DEBUG -   PASS pearson: created datasets
+2026-01-31 18:08:04,195 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:04,195 - __main__ - DEBUG -     Unique classes: 1
+2026-01-31 18:08:04,195 - __main__ - DEBUG -     Confidence range: [-0.420, 0.718]
+2026-01-31 18:08:04,195 - __main__ - DEBUG - 
+Running SAM correlation...
+2026-01-31 18:08:04,214 - __main__ - DEBUG -   PASS SAM: created datasets
+2026-01-31 18:08:04,215 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:04,215 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:04,215 - __main__ - DEBUG -     Confidence range: [11.233, 31.702]
+2026-01-31 18:08:04,215 - __main__ - DEBUG - 
+Running MSAM correlation...
+2026-01-31 18:08:04,245 - __main__ - DEBUG -   PASS MSAM: created datasets
+2026-01-31 18:08:04,245 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:04,245 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:04,246 - __main__ - DEBUG -     Confidence range: [-0.276, 0.510]
+2026-01-31 18:08:04,247 - __main__ - DEBUG - 
+Correlation summary: 3/3 successful
+2026-01-31 18:08:04,247 - __main__ - DEBUG - 
+Saving correlation results...
+2026-01-31 18:08:04,275 - __main__ - DEBUG - PASS Correlation results saved
+2026-01-31 18:08:04,275 - __main__ - INFO - Running Full hole tests
+2026-01-31 18:08:04,275 - __main__ - DEBUG - CREATE THREE-BOX HOLE DATASET
+2026-01-31 18:08:04,276 - __main__ - DEBUG - Hole ID: TEST_HOLE_001
+2026-01-31 18:08:04,276 - __main__ - DEBUG - Depth per box: 1.0m
+2026-01-31 18:08:04,276 - __main__ - DEBUG - Starting depth: 0.0m
+2026-01-31 18:08:04,276 - __main__ - DEBUG - Create baseline: True
+2026-01-31 18:08:04,276 - __main__ - DEBUG - STEP 1: Verifying Template Box
+2026-01-31 18:08:04,276 - __main__ - DEBUG - Template has 25 datasets
+2026-01-31 18:08:04,276 - __main__ - DEBUG - PASS Template box has all required datasets
+2026-01-31 18:08:04,276 - __main__ - DEBUG - 
+2026-01-31 18:08:04,276 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:04,277 - __main__ - DEBUG -   STEP 2: Creating Three-Box Hole Structure
+2026-01-31 18:08:04,277 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:04,277 - __main__ - DEBUG - Hole directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\baselines\TEST_HOLE_001
+2026-01-31 18:08:04,280 - __main__ - DEBUG - STEP 3: Creating Individual Boxes
+2026-01-31 18:08:04,280 - __main__ - DEBUG - 
+Creating Box 1...
+2026-01-31 18:08:04,280 - __main__ - DEBUG -   Copying 25 datasets...
+2026-01-31 18:08:04,287 - __main__ - DEBUG -   Saving to disk...
+2026-01-31 18:08:04,328 - __main__ - DEBUG -   PASS Box 1 created: 25 files
+2026-01-31 18:08:04,328 - __main__ - DEBUG -     Depth range: 0.00 - 1.00m
+2026-01-31 18:08:04,328 - __main__ - DEBUG - 
+Creating Box 2...
+2026-01-31 18:08:04,332 - __main__ - DEBUG -   Copying 25 datasets...
+2026-01-31 18:08:04,339 - __main__ - DEBUG -   Saving to disk...
+2026-01-31 18:08:04,378 - __main__ - DEBUG -   PASS Box 2 created: 25 files
+2026-01-31 18:08:04,378 - __main__ - DEBUG -     Depth range: 1.00 - 2.00m
+2026-01-31 18:08:04,379 - __main__ - DEBUG - 
+Creating Box 3...
+2026-01-31 18:08:04,381 - __main__ - DEBUG -   Copying 25 datasets...
+2026-01-31 18:08:04,392 - __main__ - DEBUG -   Saving to disk...
+2026-01-31 18:08:04,432 - __main__ - DEBUG -   PASS Box 3 created: 25 files
+2026-01-31 18:08:04,432 - __main__ - DEBUG -     Depth range: 2.00 - 3.00m
+2026-01-31 18:08:04,432 - __main__ - DEBUG - STEP 4: Loading and Verifying HoleObject
+2026-01-31 18:08:04,432 - __main__ - DEBUG - Loading hole from directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\baselines\TEST_HOLE_001
+2026-01-31 18:08:05,022 - __main__ - DEBUG - PASS HoleObject loaded successfully
+2026-01-31 18:08:05,022 - __main__ - DEBUG -   Hole ID: TEST_HOLE_001
+2026-01-31 18:08:05,022 - __main__ - DEBUG -   Number of boxes: 3
+2026-01-31 18:08:05,022 - __main__ - DEBUG -   Box range: 1 to 3
+2026-01-31 18:08:05,023 - __main__ - DEBUG -   Root directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\baselines\TEST_HOLE_001
+2026-01-31 18:08:05,024 - __main__ - DEBUG - 
+  Box 1:
+2026-01-31 18:08:05,025 - __main__ - DEBUG -     Basename: TEST_HOLE_001_1
+2026-01-31 18:08:05,025 - __main__ - DEBUG -     Datasets: 25
+2026-01-31 18:08:05,026 - __main__ - DEBUG -     Depth: 0.00 - 1.00m
+2026-01-31 18:08:05,026 - __main__ - DEBUG -     All required datasets present
+2026-01-31 18:08:05,026 - __main__ - DEBUG - 
+  Box 2:
+2026-01-31 18:08:05,027 - __main__ - DEBUG -     Basename: TEST_HOLE_001_2
+2026-01-31 18:08:05,027 - __main__ - DEBUG -     Datasets: 25
+2026-01-31 18:08:05,027 - __main__ - DEBUG -     Depth: 1.00 - 2.00m
+2026-01-31 18:08:05,027 - __main__ - DEBUG -     All required datasets present
+2026-01-31 18:08:05,027 - __main__ - DEBUG - 
+  Box 3:
+2026-01-31 18:08:05,028 - __main__ - DEBUG -     Basename: TEST_HOLE_001_3
+2026-01-31 18:08:05,028 - __main__ - DEBUG -     Datasets: 25
+2026-01-31 18:08:05,028 - __main__ - DEBUG -     Depth: 2.00 - 3.00m
+2026-01-31 18:08:05,028 - __main__ - DEBUG -     All required datasets present
+2026-01-31 18:08:05,028 - __main__ - DEBUG - 
+PASS HoleObject verification complete
+2026-01-31 18:08:05,028 - __main__ - DEBUG - Hole dataset ready for downhole analysis at: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\baselines\TEST_HOLE_001
+2026-01-31 18:08:05,029 - __main__ - DEBUG - Testing hole iteration...
+2026-01-31 18:08:05,029 - __main__ - DEBUG -   Box 1: TEST_HOLE_001_1
+2026-01-31 18:08:05,029 - __main__ - DEBUG -   Box 2: TEST_HOLE_001_2
+2026-01-31 18:08:05,029 - __main__ - DEBUG -   Box 3: TEST_HOLE_001_3
+2026-01-31 18:08:05,029 - __main__ - DEBUG - PASS Iterated over 3 boxes
+2026-01-31 18:08:05,029 - __main__ - DEBUG - Testing hole indexing...
+2026-01-31 18:08:05,029 - __main__ - DEBUG -   Single box access: TEST_HOLE_001_1
+2026-01-31 18:08:05,029 - __main__ - DEBUG -   Slice access: 1 boxes
+2026-01-31 18:08:05,029 - __main__ - DEBUG - PASS Indexing works
+2026-01-31 18:08:05,029 - __main__ - DEBUG - 
+2026-01-31 18:08:05,029 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:05,029 - __main__ - DEBUG -   PART 3C: Band Math Expressions
+2026-01-31 18:08:05,029 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:05,029 - __main__ - DEBUG - Evaluating: test_ratio_2200_2320
+2026-01-31 18:08:05,029 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:08:05,030 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:08:05,034 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:08:05,034 - __main__ - DEBUG -   PASS Value range: [0.924, 1.249]
+2026-01-31 18:08:05,034 - __main__ - DEBUG - Evaluating: test_difference_cr
+2026-01-31 18:08:05,034 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:08:05,034 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:08:05,040 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:08:05,040 - __main__ - DEBUG -   PASS Value range: [-0.549, 0.645]
+2026-01-31 18:08:05,040 - __main__ - DEBUG - 
+Band math summary: 2/2 successful
+2026-01-31 18:08:05,040 - __main__ - DEBUG - 
+2026-01-31 18:08:05,040 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:05,040 - __main__ - DEBUG -   PART 5C: Correlation Analysis
+2026-01-31 18:08:05,040 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:05,040 - __main__ - DEBUG - Using collection 'test_collection' with 3 spectra
+2026-01-31 18:08:05,041 - __main__ - DEBUG - 
+Running pearson correlation...
+2026-01-31 18:08:05,076 - __main__ - DEBUG -   PASS pearson: created datasets
+2026-01-31 18:08:05,078 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:05,078 - __main__ - DEBUG -     Unique classes: 1
+2026-01-31 18:08:05,078 - __main__ - DEBUG -     Confidence range: [-0.420, 0.718]
+2026-01-31 18:08:05,078 - __main__ - DEBUG - 
+Running SAM correlation...
+2026-01-31 18:08:05,096 - __main__ - DEBUG -   PASS SAM: created datasets
+2026-01-31 18:08:05,097 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:05,097 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:05,098 - __main__ - DEBUG -     Confidence range: [11.233, 31.702]
+2026-01-31 18:08:05,098 - __main__ - DEBUG - 
+Running MSAM correlation...
+2026-01-31 18:08:05,122 - __main__ - DEBUG -   PASS MSAM: created datasets
+2026-01-31 18:08:05,122 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:05,122 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:05,122 - __main__ - DEBUG -     Confidence range: [-0.276, 0.510]
+2026-01-31 18:08:05,123 - __main__ - DEBUG - 
+Correlation summary: 3/3 successful
+2026-01-31 18:08:05,123 - __main__ - DEBUG - 
+Saving correlation results...
+2026-01-31 18:08:05,264 - __main__ - DEBUG - PASS Correlation results saved
+2026-01-31 18:08:05,264 - __main__ - DEBUG - 
+2026-01-31 18:08:05,265 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:05,265 - __main__ - DEBUG -   PART 3B: Feature Extraction
+2026-01-31 18:08:05,266 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:05,266 - __main__ - DEBUG - Extracting feature: 1400W
+2026-01-31 18:08:05,586 - __main__ - DEBUG -   PASS 1400W: position shape (96, 88)
+2026-01-31 18:08:05,586 - __main__ - DEBUG - Extracting feature: 1900W
+2026-01-31 18:08:05,910 - __main__ - DEBUG -   PASS 1900W: position shape (96, 88)
+2026-01-31 18:08:05,911 - __main__ - DEBUG - Extracting feature: 2200W
+2026-01-31 18:08:06,256 - __main__ - DEBUG -   PASS 2200W: position shape (96, 88)
+2026-01-31 18:08:06,256 - __main__ - DEBUG - Extracting feature: 2320W
+2026-01-31 18:08:06,582 - __main__ - DEBUG -   PASS 2320W: position shape (96, 88)
+2026-01-31 18:08:06,583 - __main__ - DEBUG - Extracting feature: 2350W
+2026-01-31 18:08:06,903 - __main__ - DEBUG -   PASS 2350W: position shape (96, 88)
+2026-01-31 18:08:06,904 - __main__ - DEBUG - 
+Feature extraction summary: 5/5 successful
+2026-01-31 18:08:07,475 - __main__ - DEBUG - PO 1 band maths, correlation and feature extraction success
+2026-01-31 18:08:07,475 - __main__ - DEBUG - 
+2026-01-31 18:08:07,475 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:07,476 - __main__ - DEBUG -   PART 3C: Band Math Expressions
+2026-01-31 18:08:07,476 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:07,476 - __main__ - DEBUG - Evaluating: test_ratio_2200_2320
+2026-01-31 18:08:07,477 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:08:07,477 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:08:07,482 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:08:07,483 - __main__ - DEBUG -   PASS Value range: [0.924, 1.249]
+2026-01-31 18:08:07,483 - __main__ - DEBUG - Evaluating: test_difference_cr
+2026-01-31 18:08:07,483 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:08:07,483 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:08:07,490 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:08:07,490 - __main__ - DEBUG -   PASS Value range: [-0.549, 0.645]
+2026-01-31 18:08:07,490 - __main__ - DEBUG - 
+Band math summary: 2/2 successful
+2026-01-31 18:08:07,490 - __main__ - DEBUG - 
+2026-01-31 18:08:07,491 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:07,492 - __main__ - DEBUG -   PART 5C: Correlation Analysis
+2026-01-31 18:08:07,492 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:07,492 - __main__ - DEBUG - Using collection 'test_collection' with 3 spectra
+2026-01-31 18:08:07,492 - __main__ - DEBUG - 
+Running pearson correlation...
+2026-01-31 18:08:07,520 - __main__ - DEBUG -   PASS pearson: created datasets
+2026-01-31 18:08:07,521 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:07,521 - __main__ - DEBUG -     Unique classes: 1
+2026-01-31 18:08:07,521 - __main__ - DEBUG -     Confidence range: [-0.420, 0.718]
+2026-01-31 18:08:07,521 - __main__ - DEBUG - 
+Running SAM correlation...
+2026-01-31 18:08:07,540 - __main__ - DEBUG -   PASS SAM: created datasets
+2026-01-31 18:08:07,541 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:07,542 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:07,542 - __main__ - DEBUG -     Confidence range: [11.233, 31.702]
+2026-01-31 18:08:07,542 - __main__ - DEBUG - 
+Running MSAM correlation...
+2026-01-31 18:08:07,570 - __main__ - DEBUG -   PASS MSAM: created datasets
+2026-01-31 18:08:07,570 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:07,570 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:07,570 - __main__ - DEBUG -     Confidence range: [-0.276, 0.510]
+2026-01-31 18:08:07,571 - __main__ - DEBUG - 
+Correlation summary: 3/3 successful
+2026-01-31 18:08:07,571 - __main__ - DEBUG - 
+Saving correlation results...
+2026-01-31 18:08:07,720 - __main__ - DEBUG - PASS Correlation results saved
+2026-01-31 18:08:07,720 - __main__ - DEBUG - 
+2026-01-31 18:08:07,721 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:07,721 - __main__ - DEBUG -   PART 3B: Feature Extraction
+2026-01-31 18:08:07,721 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:07,721 - __main__ - DEBUG - Extracting feature: 1400W
+2026-01-31 18:08:08,041 - __main__ - DEBUG -   PASS 1400W: position shape (96, 88)
+2026-01-31 18:08:08,041 - __main__ - DEBUG - Extracting feature: 1900W
+2026-01-31 18:08:08,365 - __main__ - DEBUG -   PASS 1900W: position shape (96, 88)
+2026-01-31 18:08:08,365 - __main__ - DEBUG - Extracting feature: 2200W
+2026-01-31 18:08:08,712 - __main__ - DEBUG -   PASS 2200W: position shape (96, 88)
+2026-01-31 18:08:08,712 - __main__ - DEBUG - Extracting feature: 2320W
+2026-01-31 18:08:09,031 - __main__ - DEBUG -   PASS 2320W: position shape (96, 88)
+2026-01-31 18:08:09,031 - __main__ - DEBUG - Extracting feature: 2350W
+2026-01-31 18:08:09,352 - __main__ - DEBUG -   PASS 2350W: position shape (96, 88)
+2026-01-31 18:08:09,352 - __main__ - DEBUG - 
+Feature extraction summary: 5/5 successful
+2026-01-31 18:08:09,929 - __main__ - DEBUG - PO 2 band maths, correlation and feature extraction success
+2026-01-31 18:08:09,930 - __main__ - DEBUG - 
+2026-01-31 18:08:09,930 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:09,930 - __main__ - DEBUG -   PART 3C: Band Math Expressions
+2026-01-31 18:08:09,930 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:09,930 - __main__ - DEBUG - Evaluating: test_ratio_2200_2320
+2026-01-31 18:08:09,930 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:08:09,930 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:08:09,936 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:08:09,936 - __main__ - DEBUG -   PASS Value range: [0.924, 1.249]
+2026-01-31 18:08:09,936 - __main__ - DEBUG - Evaluating: test_difference_cr
+2026-01-31 18:08:09,936 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:08:09,936 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:08:09,942 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:08:09,942 - __main__ - DEBUG -   PASS Value range: [-0.549, 0.645]
+2026-01-31 18:08:09,942 - __main__ - DEBUG - 
+Band math summary: 2/2 successful
+2026-01-31 18:08:09,942 - __main__ - DEBUG - 
+2026-01-31 18:08:09,942 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:09,943 - __main__ - DEBUG -   PART 5C: Correlation Analysis
+2026-01-31 18:08:09,943 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:09,944 - __main__ - DEBUG - Using collection 'test_collection' with 3 spectra
+2026-01-31 18:08:09,944 - __main__ - DEBUG - 
+Running pearson correlation...
+2026-01-31 18:08:09,972 - __main__ - DEBUG -   PASS pearson: created datasets
+2026-01-31 18:08:09,972 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:09,972 - __main__ - DEBUG -     Unique classes: 1
+2026-01-31 18:08:09,972 - __main__ - DEBUG -     Confidence range: [-0.420, 0.718]
+2026-01-31 18:08:09,973 - __main__ - DEBUG - 
+Running SAM correlation...
+2026-01-31 18:08:09,993 - __main__ - DEBUG -   PASS SAM: created datasets
+2026-01-31 18:08:09,993 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:09,993 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:09,993 - __main__ - DEBUG -     Confidence range: [11.233, 31.702]
+2026-01-31 18:08:09,994 - __main__ - DEBUG - 
+Running MSAM correlation...
+2026-01-31 18:08:10,018 - __main__ - DEBUG -   PASS MSAM: created datasets
+2026-01-31 18:08:10,018 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:08:10,018 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:10,019 - __main__ - DEBUG -     Confidence range: [-0.276, 0.510]
+2026-01-31 18:08:10,019 - __main__ - DEBUG - 
+Correlation summary: 3/3 successful
+2026-01-31 18:08:10,019 - __main__ - DEBUG - 
+Saving correlation results...
+2026-01-31 18:08:10,166 - __main__ - DEBUG - PASS Correlation results saved
+2026-01-31 18:08:10,166 - __main__ - DEBUG - 
+2026-01-31 18:08:10,166 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:10,167 - __main__ - DEBUG -   PART 3B: Feature Extraction
+2026-01-31 18:08:10,167 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:10,167 - __main__ - DEBUG - Extracting feature: 1400W
+2026-01-31 18:08:10,487 - __main__ - DEBUG -   PASS 1400W: position shape (96, 88)
+2026-01-31 18:08:10,488 - __main__ - DEBUG - Extracting feature: 1900W
+2026-01-31 18:08:10,812 - __main__ - DEBUG -   PASS 1900W: position shape (96, 88)
+2026-01-31 18:08:10,813 - __main__ - DEBUG - Extracting feature: 2200W
+2026-01-31 18:08:11,159 - __main__ - DEBUG -   PASS 2200W: position shape (96, 88)
+2026-01-31 18:08:11,160 - __main__ - DEBUG - Extracting feature: 2320W
+2026-01-31 18:08:11,479 - __main__ - DEBUG -   PASS 2320W: position shape (96, 88)
+2026-01-31 18:08:11,479 - __main__ - DEBUG - Extracting feature: 2350W
+2026-01-31 18:08:11,797 - __main__ - DEBUG -   PASS 2350W: position shape (96, 88)
+2026-01-31 18:08:11,798 - __main__ - DEBUG - 
+Feature extraction summary: 5/5 successful
+2026-01-31 18:08:12,373 - __main__ - DEBUG - PO 3 band maths, correlation and feature extraction success
+2026-01-31 18:08:12,373 - __main__ - DEBUG - Testing create_base_datasets...
+2026-01-31 18:08:13,014 - __main__ - DEBUG -   depths shape: (288,)
+2026-01-31 18:08:13,014 - __main__ - DEBUG -   AvSpectra shape: (288, 249)
+2026-01-31 18:08:13,014 - __main__ - DEBUG - PASS Base datasets created
+2026-01-31 18:08:13,015 - __main__ - DEBUG - Testing base datasets save and reload...
+2026-01-31 18:08:13,035 - __main__ - DEBUG - PASS Base datasets saved and reloaded
+2026-01-31 18:08:13,035 - __main__ - DEBUG - Testing create_dhole_minmap with MinMap-pearson-testcollectionINDEX...
+2026-01-31 18:08:13,095 - __main__ - DEBUG -   Created MinMap-pearson-testcollectionFRACTIONS and MinMap-pearson-testcollectionDOM-MIN
+2026-01-31 18:08:13,095 - __main__ - DEBUG - PASS create_dhole_minmap works
+2026-01-31 18:08:13,096 - __main__ - DEBUG - Testing create_dhole_features with 1400WPOS...
+2026-01-31 18:08:13,147 - __main__ - DEBUG -   Created 1400WPOS
+2026-01-31 18:08:13,148 - __main__ - DEBUG - PASS create_dhole_features works
+2026-01-31 18:08:13,148 - __main__ - DEBUG - Testing step_product_dataset with FRACTIONS...
+2026-01-31 18:08:13,151 - __main__ - DEBUG -   Stepped depths shape: (61,)
+2026-01-31 18:08:13,151 - __main__ - DEBUG -   Stepped fractions shape: (61, 4)
+2026-01-31 18:08:13,151 - __main__ - DEBUG -   Stepped dominant shape: (61,)
+2026-01-31 18:08:13,151 - __main__ - DEBUG - PASS step_product (FRACTIONS) works
+2026-01-31 18:08:13,151 - __main__ - DEBUG - Testing step_product_dataset with DOM-MIN (indices)...
+2026-01-31 18:08:13,153 - __main__ - DEBUG -   Stepped depths shape: (61,)
+2026-01-31 18:08:13,153 - __main__ - DEBUG -   Stepped indices shape: (61, 4)
+2026-01-31 18:08:13,153 - __main__ - DEBUG - PASS step_product (indices) works
+2026-01-31 18:08:13,154 - __main__ - DEBUG - Testing step_product_dataset with continuous feature...
+2026-01-31 18:08:13,162 - __main__ - DEBUG -   Stepped depths shape: (61,)
+2026-01-31 18:08:13,162 - __main__ - DEBUG -   Stepped values shape: (61,)
+2026-01-31 18:08:13,162 - __main__ - DEBUG - PASS step_product (continuous) works
+2026-01-31 18:08:13,162 - __main__ - DEBUG - Evaluating profile band math: test_ratio_2200_2320
+2026-01-31 18:08:13,162 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:08:13,162 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:08:13,163 - __main__ - DEBUG -   PASS test_ratio_2200_2320: shape (288,)
+2026-01-31 18:08:13,163 - __main__ - DEBUG -     Value range: [1.064, 1.185]
+2026-01-31 18:08:13,163 - __main__ - DEBUG - Evaluating profile band math: test_difference_cr
+2026-01-31 18:08:13,163 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:08:13,163 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:08:13,165 - __main__ - DEBUG -   PASS test_difference_cr: shape (288,)
+2026-01-31 18:08:13,165 - __main__ - DEBUG -     Value range: [0.170, 0.777]
+2026-01-31 18:08:13,166 - __main__ - DEBUG - Profile band math summary: 2/2 successful
+2026-01-31 18:08:13,166 - __main__ - DEBUG - Running profile k-means clustering...
+2026-01-31 18:08:13,166 - __main__ - DEBUG -   Clusters: 5
+2026-01-31 18:08:13,166 - __main__ - DEBUG -   Iterations: 100
+2026-01-31 18:08:13,169 - __main__ - DEBUG - PASS Profile k-means clustering successful
+2026-01-31 18:08:13,170 - __main__ - DEBUG -   Cluster map shape: (288,)
+2026-01-31 18:08:13,170 - __main__ - DEBUG -   Centroids shape: (5, 249)
+2026-01-31 18:08:13,170 - __main__ - DEBUG -   Unique clusters: [1 2]
+2026-01-31 18:08:13,170 - __main__ - DEBUG - Extracting profile feature: 1400W
+2026-01-31 18:08:13,182 - __main__ - DEBUG -   PASS 1400W: position shape (288,)
+2026-01-31 18:08:13,182 - __main__ - DEBUG -     Depth range: [0.790, 0.834]
+2026-01-31 18:08:13,182 - __main__ - DEBUG - Extracting profile feature: 1900W
+2026-01-31 18:08:13,193 - __main__ - DEBUG -   PASS 1900W: position shape (288,)
+2026-01-31 18:08:13,193 - __main__ - DEBUG -     Depth range: [0.951, 0.982]
+2026-01-31 18:08:13,193 - __main__ - DEBUG - Extracting profile feature: 2200W
+2026-01-31 18:08:13,206 - __main__ - DEBUG -   PASS 2200W: position shape (288,)
+2026-01-31 18:08:13,207 - __main__ - DEBUG -     Depth range: [--, --]
+2026-01-31 18:08:13,207 - __main__ - DEBUG - Extracting profile feature: 2320W
+2026-01-31 18:08:13,218 - __main__ - DEBUG -   PASS 2320W: position shape (288,)
+2026-01-31 18:08:13,219 - __main__ - DEBUG -     Depth range: [0.790, 0.820]
+2026-01-31 18:08:13,219 - __main__ - DEBUG - Extracting profile feature: 2350W
+2026-01-31 18:08:13,229 - __main__ - DEBUG -   PASS 2350W: position shape (288,)
+2026-01-31 18:08:13,229 - __main__ - DEBUG -     Depth range: [0.768, 0.870]
+2026-01-31 18:08:13,229 - __main__ - DEBUG - Profile feature extraction summary: 5/5 successful
+2026-01-31 18:08:13,230 - __main__ - DEBUG - Running profile pearson correlation...
+2026-01-31 18:08:13,232 - __main__ - DEBUG -   PASS Profile pearson: created datasets
+2026-01-31 18:08:13,232 - __main__ - DEBUG -     Index shape: (288,)
+2026-01-31 18:08:13,232 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:13,234 - __main__ - DEBUG -     Confidence range: [0.148, 0.356]
+2026-01-31 18:08:13,234 - __main__ - DEBUG - Running profile SAM correlation...
+2026-01-31 18:08:13,236 - __main__ - DEBUG -   PASS Profile SAM: created datasets
+2026-01-31 18:08:13,237 - __main__ - DEBUG -     Index shape: (288,)
+2026-01-31 18:08:13,237 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:13,237 - __main__ - DEBUG -     Confidence range: [16.502, 19.769]
+2026-01-31 18:08:13,237 - __main__ - DEBUG - Running profile MSAM correlation...
+2026-01-31 18:08:13,240 - __main__ - DEBUG -   PASS Profile MSAM: created datasets
+2026-01-31 18:08:13,240 - __main__ - DEBUG -     Index shape: (288,)
+2026-01-31 18:08:13,240 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:08:13,240 - __main__ - DEBUG -     Confidence range: [0.095, 0.232]
+2026-01-31 18:08:13,240 - __main__ - DEBUG - Profile correlation summary: 3/3 successful
+2026-01-31 18:08:13,240 - __main__ - DEBUG - Testing save_product_datasets...
+2026-01-31 18:08:13,265 - __main__ - DEBUG -   Saved 28/28 product datasets
+2026-01-31 18:08:13,266 - __main__ - DEBUG - PASS Product datasets saved
+2026-01-31 18:08:13,266 - __main__ - DEBUG - Exporting MinMap-pearson-testcollectionFRACTIONS to CSV...
+2026-01-31 18:08:13,274 - __main__ - DEBUG -   PASS MinMap-pearson-testcollectionFRACTIONS: exported 2 CSV files
+2026-01-31 18:08:13,274 - __main__ - DEBUG -     Created: TEST_HOLE_001-MinMap-pearson-testcollectionFRACTIONS-full.csv
+2026-01-31 18:08:13,274 - __main__ - DEBUG -     Created: TEST_HOLE_001-MinMap-pearson-testcollectionFRACTIONS-stepped.csv
+2026-01-31 18:08:13,274 - __main__ - DEBUG - Exporting MinMap-pearson-testcollectionDOM-MIN to CSV...
+2026-01-31 18:08:13,280 - __main__ - DEBUG -   PASS MinMap-pearson-testcollectionDOM-MIN: exported 2 CSV files
+2026-01-31 18:08:13,280 - __main__ - DEBUG -     Created: TEST_HOLE_001-MinMap-pearson-testcollectionDOM-MIN-full.csv
+2026-01-31 18:08:13,280 - __main__ - DEBUG -     Created: TEST_HOLE_001-MinMap-pearson-testcollectionDOM-MIN-stepped.csv
+2026-01-31 18:08:13,281 - __main__ - DEBUG -   Skipping MinMap-pearson-testcollectionLEGEND (not exportable)
+2026-01-31 18:08:13,281 - __main__ - DEBUG - Exporting 1400WPOS to CSV...
+2026-01-31 18:08:13,291 - __main__ - DEBUG -   PASS 1400WPOS: exported 2 CSV files
+2026-01-31 18:08:13,291 - __main__ - DEBUG -     Created: TEST_HOLE_001-1400WPOS-full.csv
+2026-01-31 18:08:13,291 - __main__ - DEBUG -     Created: TEST_HOLE_001-1400WPOS-stepped.csv
+2026-01-31 18:08:13,291 - __main__ - DEBUG - Exporting test-ratio-2200-2320 to CSV...
+2026-01-31 18:08:13,297 - __main__ - DEBUG -   PASS test-ratio-2200-2320: exported 2 CSV files
+2026-01-31 18:08:13,297 - __main__ - DEBUG -     Created: TEST_HOLE_001-test-ratio-2200-2320-full.csv
+2026-01-31 18:08:13,297 - __main__ - DEBUG -     Created: TEST_HOLE_001-test-ratio-2200-2320-stepped.csv
+2026-01-31 18:08:13,299 - __main__ - DEBUG - Exporting test-difference-cr to CSV...
+2026-01-31 18:08:13,304 - __main__ - DEBUG -   PASS test-difference-cr: exported 2 CSV files
+2026-01-31 18:08:13,304 - __main__ - DEBUG -     Created: TEST_HOLE_001-test-difference-cr-full.csv
+2026-01-31 18:08:13,305 - __main__ - DEBUG -     Created: TEST_HOLE_001-test-difference-cr-stepped.csv
+2026-01-31 18:08:13,305 - __main__ - DEBUG - Exporting PROF-kmeans-5-100INDEX to CSV...
+2026-01-31 18:08:13,327 - __main__ - DEBUG -   PASS PROF-kmeans-5-100INDEX: exported 2 CSV files
+2026-01-31 18:08:13,328 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-kmeans-5-100INDEX-full.csv
+2026-01-31 18:08:13,328 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-kmeans-5-100INDEX-stepped.csv
+2026-01-31 18:08:13,329 - __main__ - DEBUG -   Skipping PROF-kmeans-5-100CLUSTERS (not exportable)
+2026-01-31 18:08:13,329 - __main__ - DEBUG -   Skipping PROF-kmeans-5-100LEGEND (not exportable)
+2026-01-31 18:08:13,329 - __main__ - DEBUG - Exporting PROF-1400WPOS to CSV...
+2026-01-31 18:08:13,344 - __main__ - DEBUG -   PASS PROF-1400WPOS: exported 2 CSV files
+2026-01-31 18:08:13,344 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1400WPOS-full.csv
+2026-01-31 18:08:13,345 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1400WPOS-stepped.csv
+2026-01-31 18:08:13,345 - __main__ - DEBUG - Exporting PROF-1400WDEP to CSV...
+2026-01-31 18:08:13,359 - __main__ - DEBUG -   PASS PROF-1400WDEP: exported 2 CSV files
+2026-01-31 18:08:13,360 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1400WDEP-full.csv
+2026-01-31 18:08:13,360 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1400WDEP-stepped.csv
+2026-01-31 18:08:13,360 - __main__ - DEBUG - Exporting PROF-1900WPOS to CSV...
+2026-01-31 18:08:13,374 - __main__ - DEBUG -   PASS PROF-1900WPOS: exported 2 CSV files
+2026-01-31 18:08:13,374 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1900WPOS-full.csv
+2026-01-31 18:08:13,374 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1900WPOS-stepped.csv
+2026-01-31 18:08:13,375 - __main__ - DEBUG - Exporting PROF-1900WDEP to CSV...
+2026-01-31 18:08:13,388 - __main__ - DEBUG -   PASS PROF-1900WDEP: exported 2 CSV files
+2026-01-31 18:08:13,388 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1900WDEP-full.csv
+2026-01-31 18:08:13,389 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1900WDEP-stepped.csv
+2026-01-31 18:08:13,389 - __main__ - DEBUG - Exporting PROF-2200WPOS to CSV...
+2026-01-31 18:08:13,403 - __main__ - DEBUG -   PASS PROF-2200WPOS: exported 2 CSV files
+2026-01-31 18:08:13,404 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2200WPOS-full.csv
+2026-01-31 18:08:13,404 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2200WPOS-stepped.csv
+2026-01-31 18:08:13,404 - __main__ - DEBUG - Exporting PROF-2200WDEP to CSV...
+2026-01-31 18:08:13,418 - __main__ - DEBUG -   PASS PROF-2200WDEP: exported 2 CSV files
+2026-01-31 18:08:13,419 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2200WDEP-full.csv
+2026-01-31 18:08:13,419 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2200WDEP-stepped.csv
+2026-01-31 18:08:13,419 - __main__ - DEBUG - Exporting PROF-2320WPOS to CSV...
+2026-01-31 18:08:13,434 - __main__ - DEBUG -   PASS PROF-2320WPOS: exported 2 CSV files
+2026-01-31 18:08:13,435 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2320WPOS-full.csv
+2026-01-31 18:08:13,435 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2320WPOS-stepped.csv
+2026-01-31 18:08:13,435 - __main__ - DEBUG - Exporting PROF-2320WDEP to CSV...
+2026-01-31 18:08:13,449 - __main__ - DEBUG -   PASS PROF-2320WDEP: exported 2 CSV files
+2026-01-31 18:08:13,449 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2320WDEP-full.csv
+2026-01-31 18:08:13,449 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2320WDEP-stepped.csv
+2026-01-31 18:08:13,449 - __main__ - DEBUG - Exporting PROF-2350WPOS to CSV...
+2026-01-31 18:08:13,463 - __main__ - DEBUG -   PASS PROF-2350WPOS: exported 2 CSV files
+2026-01-31 18:08:13,463 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2350WPOS-full.csv
+2026-01-31 18:08:13,464 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2350WPOS-stepped.csv
+2026-01-31 18:08:13,464 - __main__ - DEBUG - Exporting PROF-2350WDEP to CSV...
+2026-01-31 18:08:13,477 - __main__ - DEBUG -   PASS PROF-2350WDEP: exported 2 CSV files
+2026-01-31 18:08:13,477 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2350WDEP-full.csv
+2026-01-31 18:08:13,477 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2350WDEP-stepped.csv
+2026-01-31 18:08:13,478 - __main__ - DEBUG - Exporting PROF-MinMap-pearson-testcollectionINDEX to CSV...
+2026-01-31 18:08:13,500 - __main__ - DEBUG -   PASS PROF-MinMap-pearson-testcollectionINDEX: exported 2 CSV files
+2026-01-31 18:08:13,501 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-pearson-testcollectionINDEX-full.csv
+2026-01-31 18:08:13,501 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-pearson-testcollectionINDEX-stepped.csv
+2026-01-31 18:08:13,501 - __main__ - DEBUG - Exporting PROF-MinMap-pearson-testcollectionCONF to CSV...
+2026-01-31 18:08:13,506 - __main__ - DEBUG -   PASS PROF-MinMap-pearson-testcollectionCONF: exported 2 CSV files
+2026-01-31 18:08:13,506 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-pearson-testcollectionCONF-full.csv
+2026-01-31 18:08:13,507 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-pearson-testcollectionCONF-stepped.csv
+2026-01-31 18:08:13,507 - __main__ - DEBUG -   Skipping PROF-MinMap-pearson-testcollectionLEGEND (not exportable)
+2026-01-31 18:08:13,507 - __main__ - DEBUG - Exporting PROF-MinMap-SAM-testcollectionINDEX to CSV...
+2026-01-31 18:08:13,529 - __main__ - DEBUG -   PASS PROF-MinMap-SAM-testcollectionINDEX: exported 2 CSV files
+2026-01-31 18:08:13,529 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-SAM-testcollectionINDEX-full.csv
+2026-01-31 18:08:13,529 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-SAM-testcollectionINDEX-stepped.csv
+2026-01-31 18:08:13,530 - __main__ - DEBUG - Exporting PROF-MinMap-SAM-testcollectionCONF to CSV...
+2026-01-31 18:08:13,535 - __main__ - DEBUG -   PASS PROF-MinMap-SAM-testcollectionCONF: exported 2 CSV files
+2026-01-31 18:08:13,535 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-SAM-testcollectionCONF-full.csv
+2026-01-31 18:08:13,535 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-SAM-testcollectionCONF-stepped.csv
+2026-01-31 18:08:13,535 - __main__ - DEBUG -   Skipping PROF-MinMap-SAM-testcollectionLEGEND (not exportable)
+2026-01-31 18:08:13,536 - __main__ - DEBUG - Exporting PROF-MinMap-MSAM-testcollectionINDEX to CSV...
+2026-01-31 18:08:13,558 - __main__ - DEBUG -   PASS PROF-MinMap-MSAM-testcollectionINDEX: exported 2 CSV files
+2026-01-31 18:08:13,558 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-MSAM-testcollectionINDEX-full.csv
+2026-01-31 18:08:13,559 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-MSAM-testcollectionINDEX-stepped.csv
+2026-01-31 18:08:13,559 - __main__ - DEBUG - Exporting PROF-MinMap-MSAM-testcollectionCONF to CSV...
+2026-01-31 18:08:13,567 - __main__ - DEBUG -   PASS PROF-MinMap-MSAM-testcollectionCONF: exported 2 CSV files
+2026-01-31 18:08:13,568 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-MSAM-testcollectionCONF-full.csv
+2026-01-31 18:08:13,568 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-MSAM-testcollectionCONF-stepped.csv
+2026-01-31 18:08:13,569 - __main__ - DEBUG -   Skipping PROF-MinMap-MSAM-testcollectionLEGEND (not exportable)
+2026-01-31 18:08:13,569 - __main__ - DEBUG - CSV export summary: 22/22 datasets exported
+2026-01-31 18:08:13,570 - __main__ - DEBUG - 
+2026-01-31 18:08:13,570 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:13,570 - __main__ - DEBUG -   TEST RESULTS SUMMARY
+2026-01-31 18:08:13,571 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:08:13,571 - __main__ - INFO - 
+2026-01-31 18:08:13,571 - __main__ - INFO -   PASS: raw_loading
+2026-01-31 18:08:13,572 - __main__ - INFO -   PASS: crop
+2026-01-31 18:08:13,572 - __main__ - INFO -   PASS: process
+2026-01-31 18:08:13,572 - __main__ - INFO -   PASS: mask_new
+2026-01-31 18:08:13,572 - __main__ - INFO -   PASS: mask_enhance
+2026-01-31 18:08:13,573 - __main__ - INFO -   PASS: mask_despeckle
+2026-01-31 18:08:13,573 - __main__ - INFO -   PASS: mask_improve
+2026-01-31 18:08:13,573 - __main__ - INFO -   PASS: mask_stats
+2026-01-31 18:08:13,573 - __main__ - INFO -   PASS: mask_unwrap
+2026-01-31 18:08:13,574 - __main__ - INFO -   PASS: kmeans
+2026-01-31 18:08:13,574 - __main__ - INFO -   PASS: features
+2026-01-31 18:08:13,574 - __main__ - INFO -   PASS: band_math
+2026-01-31 18:08:13,574 - __main__ - INFO -   PASS: save
+2026-01-31 18:08:13,574 - __main__ - INFO -   PASS: library
+2026-01-31 18:08:13,575 - __main__ - INFO -   PASS: reload
+2026-01-31 18:08:13,575 - __main__ - INFO -   PASS: correlation
+2026-01-31 18:08:13,575 - __main__ - INFO -   PASS: hole created
+2026-01-31 18:08:13,575 - __main__ - INFO -   PASS: hole iteration
+2026-01-31 18:08:13,575 - __main__ - INFO -   PASS: hole indexing
+2026-01-31 18:08:13,577 - __main__ - INFO -   PASS: box by box data creation
+2026-01-31 18:08:13,577 - __main__ - INFO -   PASS: base datasets, create and reload
+2026-01-31 18:08:13,577 - __main__ - INFO -   PASS: downhole minmap
+2026-01-31 18:08:13,577 - __main__ - INFO -   PASS: downhole features
+2026-01-31 18:08:13,577 - __main__ - INFO -   PASS: stepping downhole
+2026-01-31 18:08:13,578 - __main__ - INFO -   PASS: profile bandmaths
+2026-01-31 18:08:13,578 - __main__ - INFO -   PASS: profile kmeans
+2026-01-31 18:08:13,578 - __main__ - INFO -   PASS: profile features
+2026-01-31 18:08:13,578 - __main__ - INFO -   PASS: profile correlation
+2026-01-31 18:08:13,578 - __main__ - INFO -   PASS: Saving product datasets
+2026-01-31 18:08:13,579 - __main__ - INFO -   PASS: Export csvs
+2026-01-31 18:08:13,579 - __main__ - INFO - 
+2026-01-31 18:08:13,579 - __main__ - INFO - Overall: 30/30 tests passed
+2026-01-31 18:08:13,579 - __main__ - INFO - ALL TESTS PASSED!
+2026-01-31 18:12:54,177 - __main__ - DEBUG - 
+2026-01-31 18:12:54,177 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:54,178 - __main__ - DEBUG -   CoreSpecViewer Integration Test
+2026-01-31 18:12:54,178 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:54,178 - __main__ - INFO - Python version: 3.13.11 | packaged by conda-forge | (main, Jan 26 2026, 23:43:44) [MSC v.1944 64 bit (AMD64)]
+2026-01-31 18:12:54,178 - __main__ - INFO - Test configuration:
+2026-01-31 18:12:54,178 - __main__ - INFO -   Raw directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\Synthetic_test_box
+2026-01-31 18:12:54,178 - __main__ - INFO -   Baseline directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\baselines
+2026-01-31 18:12:54,179 - __main__ - INFO -   Output directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs
+2026-01-31 18:12:54,179 - __main__ - INFO -   Library database: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\TestDB.db
+2026-01-31 18:12:54,179 - __main__ - INFO - Running raw loading test
+2026-01-31 18:12:54,179 - __main__ - DEBUG - 
+2026-01-31 18:12:54,179 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:54,180 - __main__ - DEBUG -   PART 1A: Loading Raw Lumo Directory
+2026-01-31 18:12:54,180 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:54,268 - __main__ - DEBUG - PASS Successfully loaded raw object
+2026-01-31 18:12:54,268 - __main__ - DEBUG - RawObject Information:
+2026-01-31 18:12:54,268 - __main__ - DEBUG -   Basename: synthetic_test
+2026-01-31 18:12:54,268 - __main__ - DEBUG -   Root dir: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\Synthetic_test_box
+2026-01-31 18:12:54,269 - __main__ - DEBUG -   Metadata keys: ['sensor type', 'sensor id', 'frame rate', 'integration time', 'samples', 'active bands', 'spatial binning', 'spectral binning', 'frames recorded', 'frames dropped']...
+2026-01-31 18:12:54,269 - __main__ - DEBUG -   Reflectance shape: (100, 110, 249)
+2026-01-31 18:12:54,269 - __main__ - INFO - Running crop test
+2026-01-31 18:12:54,269 - __main__ - DEBUG - 
+2026-01-31 18:12:54,269 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:54,269 - __main__ - DEBUG -   PART 1B: Cropping Raw Data
+2026-01-31 18:12:54,270 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:54,270 - __main__ - DEBUG - Applying crop: y[2:98], x[8:96]
+2026-01-31 18:12:54,270 - __main__ - DEBUG - PASS Cropped shape: (96, 88, 249)
+2026-01-31 18:12:54,270 - __main__ - INFO - Running process test
+2026-01-31 18:12:54,270 - __main__ - DEBUG - 
+2026-01-31 18:12:54,271 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:54,271 - __main__ - DEBUG -   PART 1C: Processing to Reflectance
+2026-01-31 18:12:54,271 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:54,271 - __main__ - DEBUG - Processing raw data...
+2026-01-31 18:12:56,735 - __main__ - DEBUG - PASS Successfully created ProcessedObject
+2026-01-31 18:12:56,735 - __main__ - DEBUG - ProcessedObject Information:
+2026-01-31 18:12:56,735 - __main__ - DEBUG -   Basename: synthetic_test
+2026-01-31 18:12:56,735 - __main__ - DEBUG -   Root dir: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\Synthetic_test_box
+2026-01-31 18:12:56,735 - __main__ - DEBUG -   Metadata keys: ['sensor type', 'sensor id', 'frame rate', 'integration time', 'samples', 'active bands', 'spatial binning', 'spectral binning', 'frames recorded', 'frames dropped']...
+2026-01-31 18:12:56,735 - __main__ - DEBUG -   Datasets: ['metadata', 'cropped', 'bands', 'savgol', 'savgol_cr', 'mask']
+2026-01-31 18:12:56,736 - __main__ - DEBUG - Updating output directory to: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs
+2026-01-31 18:12:56,736 - __main__ - DEBUG - PASS All base datasets present: ['cropped', 'savgol', 'savgol_cr', 'bands', 'metadata', 'mask']
+2026-01-31 18:12:56,736 - __main__ - INFO - Running masking tests
+2026-01-31 18:12:56,736 - __main__ - DEBUG - 
+2026-01-31 18:12:56,736 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:56,736 - __main__ - DEBUG -   PART 2A: Create New Mask
+2026-01-31 18:12:56,736 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:12:56,737 - __main__ - DEBUG - Creating new mask using pixel (5, 54)
+2026-01-31 18:12:56,737 - __main__ - DEBUG - Correlation threshold: 0.9 (pixels with corr > 0.9 will be masked)
+2026-01-31 18:12:56,737 - __main__ - DEBUG - Initial mask Statistics:
+2026-01-31 18:12:56,737 - __main__ - DEBUG -   Shape: (96, 88)
+2026-01-31 18:12:56,737 - __main__ - DEBUG -   Total pixels: 8448
+2026-01-31 18:12:56,737 - __main__ - DEBUG -   Masked pixels: 0 (0.0%)
+2026-01-31 18:12:56,738 - __main__ - DEBUG -   Valid pixels: 8448 (100.0%)
+2026-01-31 18:13:04,758 - __main__ - DEBUG - PASS New mask created
+2026-01-31 18:13:04,758 - __main__ - DEBUG - New mask Statistics:
+2026-01-31 18:13:04,758 - __main__ - DEBUG -   Shape: (96, 88)
+2026-01-31 18:13:04,758 - __main__ - DEBUG -   Total pixels: 8448
+2026-01-31 18:13:04,758 - __main__ - DEBUG -   Masked pixels: 3164 (37.5%)
+2026-01-31 18:13:04,759 - __main__ - DEBUG -   Valid pixels: 5284 (62.5%)
+2026-01-31 18:13:04,759 - __main__ - DEBUG - Changed pixels from initial: 3164
+2026-01-31 18:13:04,759 - __main__ - DEBUG - 
+2026-01-31 18:13:04,759 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,759 - __main__ - DEBUG -   PART 2B: Enhance Mask
+2026-01-31 18:13:04,760 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,760 - __main__ - DEBUG - Enhancing mask using pixel (93, 57)
+2026-01-31 18:13:04,787 - __main__ - DEBUG - PASS Mask enhanced
+2026-01-31 18:13:04,787 - __main__ - DEBUG - Additional pixels masked: 16
+2026-01-31 18:13:04,788 - __main__ - DEBUG - Enhanced mask Statistics:
+2026-01-31 18:13:04,788 - __main__ - DEBUG -   Shape: (96, 88)
+2026-01-31 18:13:04,788 - __main__ - DEBUG -   Total pixels: 8448
+2026-01-31 18:13:04,788 - __main__ - DEBUG -   Masked pixels: 3180 (37.6%)
+2026-01-31 18:13:04,788 - __main__ - DEBUG -   Valid pixels: 5268 (62.4%)
+2026-01-31 18:13:04,788 - __main__ - DEBUG - 
+2026-01-31 18:13:04,789 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,789 - __main__ - DEBUG -   PART 2C: Despeckle Mask
+2026-01-31 18:13:04,789 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,789 - __main__ - DEBUG - Running despeckle operation to remove isolated pixels
+2026-01-31 18:13:04,793 - __main__ - DEBUG - PASS Mask despeckled
+2026-01-31 18:13:04,793 - __main__ - DEBUG - Pixels changed: 268
+2026-01-31 18:13:04,794 - __main__ - DEBUG - 
+2026-01-31 18:13:04,794 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,794 - __main__ - DEBUG -   PART 2D: Improve Mask
+2026-01-31 18:13:04,794 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,794 - __main__ - DEBUG - Running heuristic mask improvement
+2026-01-31 18:13:04,795 - __main__ - DEBUG - PASS Mask improved
+2026-01-31 18:13:04,795 - __main__ - DEBUG - Pixels changed: 2077
+2026-01-31 18:13:04,796 - __main__ - DEBUG - Improved mask Statistics:
+2026-01-31 18:13:04,796 - __main__ - DEBUG -   Shape: (96, 88)
+2026-01-31 18:13:04,796 - __main__ - DEBUG -   Total pixels: 8448
+2026-01-31 18:13:04,796 - __main__ - DEBUG -   Masked pixels: 5525 (65.4%)
+2026-01-31 18:13:04,796 - __main__ - DEBUG -   Valid pixels: 2923 (34.6%)
+2026-01-31 18:13:04,796 - __main__ - DEBUG - 
+2026-01-31 18:13:04,797 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,797 - __main__ - DEBUG -   PART 2E: Calculate Unwrap Stats
+2026-01-31 18:13:04,797 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,797 - __main__ - DEBUG - Calculating connected components for downhole unwrapping
+2026-01-31 18:13:04,799 - __main__ - DEBUG - PASS Unwrap stats calculated
+2026-01-31 18:13:04,799 - __main__ - DEBUG -   Segments shape: (96, 88)
+2026-01-31 18:13:04,799 - __main__ - DEBUG -   Segments range: [0.000, 1.000]
+2026-01-31 18:13:04,799 - __main__ - DEBUG -   Number of segments: 2
+2026-01-31 18:13:04,800 - __main__ - DEBUG - 
+2026-01-31 18:13:04,800 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,800 - __main__ - DEBUG -   PART 2F: Generate Unwrap Preview
+2026-01-31 18:13:04,800 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,800 - __main__ - DEBUG - Generating unwrapped preview (depth 100.0 to 105.0)
+2026-01-31 18:13:04,807 - __main__ - DEBUG - PASS Unwrapped preview generated
+2026-01-31 18:13:04,807 - __main__ - DEBUG -   DholeAverage shape: (96, 21, 249)
+2026-01-31 18:13:04,807 - __main__ - DEBUG -   Depth range: [100.00, 105.00]
+2026-01-31 18:13:04,807 - __main__ - INFO - Running analysis tests
+2026-01-31 18:13:04,808 - __main__ - DEBUG - 
+2026-01-31 18:13:04,808 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,808 - __main__ - DEBUG -   PART 3A: K-means Clustering
+2026-01-31 18:13:04,808 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,808 - __main__ - DEBUG - Running k-means: 5 clusters, 100 iterations
+2026-01-31 18:13:04,933 - __main__ - DEBUG - PASS Clustering complete
+2026-01-31 18:13:04,933 - __main__ - DEBUG -   Cluster map shape: (96, 88)
+2026-01-31 18:13:04,933 - __main__ - DEBUG -   Centroids shape: (5, 249)
+2026-01-31 18:13:04,933 - __main__ - DEBUG -   Unique clusters: [0 1 2 3 4]
+2026-01-31 18:13:04,934 - __main__ - DEBUG - 
+2026-01-31 18:13:04,934 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,934 - __main__ - DEBUG -   PART 3B: Feature Extraction
+2026-01-31 18:13:04,934 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:04,934 - __main__ - DEBUG - Extracting feature: 1400W
+2026-01-31 18:13:07,006 - __main__ - DEBUG -   PASS 1400W: position shape (96, 88)
+2026-01-31 18:13:07,006 - __main__ - DEBUG - Extracting feature: 1900W
+2026-01-31 18:13:07,250 - __main__ - DEBUG -   PASS 1900W: position shape (96, 88)
+2026-01-31 18:13:07,251 - __main__ - DEBUG - Extracting feature: 2200W
+2026-01-31 18:13:07,517 - __main__ - DEBUG -   PASS 2200W: position shape (96, 88)
+2026-01-31 18:13:07,517 - __main__ - DEBUG - Extracting feature: 2320W
+2026-01-31 18:13:07,758 - __main__ - DEBUG -   PASS 2320W: position shape (96, 88)
+2026-01-31 18:13:07,758 - __main__ - DEBUG - Extracting feature: 2350W
+2026-01-31 18:13:07,996 - __main__ - DEBUG -   PASS 2350W: position shape (96, 88)
+2026-01-31 18:13:07,996 - __main__ - DEBUG - 
+Feature extraction summary: 5/5 successful
+2026-01-31 18:13:07,996 - __main__ - DEBUG - 
+2026-01-31 18:13:07,996 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:07,997 - __main__ - DEBUG -   PART 3C: Band Math Expressions
+2026-01-31 18:13:07,997 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:07,997 - __main__ - DEBUG - Evaluating: test_ratio_2200_2320
+2026-01-31 18:13:07,997 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:13:07,997 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:13:07,999 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:13:07,999 - __main__ - DEBUG -   PASS Value range: [0.924, 1.249]
+2026-01-31 18:13:07,999 - __main__ - DEBUG - Evaluating: test_difference_cr
+2026-01-31 18:13:07,999 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:13:07,999 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:13:08,001 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:13:08,001 - __main__ - DEBUG -   PASS Value range: [-0.549, 0.645]
+2026-01-31 18:13:08,001 - __main__ - DEBUG - 
+Band math summary: 2/2 successful
+2026-01-31 18:13:08,001 - __main__ - INFO - Running save box test
+2026-01-31 18:13:08,001 - __main__ - DEBUG - 
+2026-01-31 18:13:08,001 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,002 - __main__ - DEBUG -   PART 4: Saving ProcessedObject
+2026-01-31 18:13:08,002 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,002 - __main__ - DEBUG - Committing temporary datasets...
+2026-01-31 18:13:08,068 - __main__ - DEBUG - PASS Committed 25 datasets
+2026-01-31 18:13:08,068 - __main__ - DEBUG - Saving to disk...
+2026-01-31 18:13:08,209 - __main__ - DEBUG - PASS Saved to: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs
+2026-01-31 18:13:08,210 - __main__ - DEBUG - PASS Files on disk: 43
+2026-01-31 18:13:08,210 - __main__ - DEBUG -     synthetic_test_1400WDEP.npz
+2026-01-31 18:13:08,210 - __main__ - DEBUG -     synthetic_test_1400WDEPthumb.jpg
+2026-01-31 18:13:08,210 - __main__ - DEBUG -     synthetic_test_1400WPOS.npz
+2026-01-31 18:13:08,210 - __main__ - DEBUG -     synthetic_test_1400WPOSthumb.jpg
+2026-01-31 18:13:08,211 - __main__ - DEBUG -     synthetic_test_1900WDEP.npz
+2026-01-31 18:13:08,211 - __main__ - DEBUG -     synthetic_test_1900WDEPthumb.jpg
+2026-01-31 18:13:08,211 - __main__ - DEBUG -     synthetic_test_1900WPOS.npz
+2026-01-31 18:13:08,211 - __main__ - DEBUG -     synthetic_test_1900WPOSthumb.jpg
+2026-01-31 18:13:08,211 - __main__ - DEBUG -     synthetic_test_2200WDEP.npz
+2026-01-31 18:13:08,211 - __main__ - DEBUG -     synthetic_test_2200WDEPthumb.jpg
+2026-01-31 18:13:08,211 - __main__ - DEBUG -     ... and 33 more
+2026-01-31 18:13:08,211 - __main__ - INFO - Running library tests
+2026-01-31 18:13:08,211 - __main__ - DEBUG - 
+2026-01-31 18:13:08,211 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,211 - __main__ - DEBUG -   PART 5A: Loading Spectral Library & Creating Collection
+2026-01-31 18:13:08,211 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,215 - __main__ - DEBUG - PASS Library loaded successfully
+2026-01-31 18:13:08,215 - __main__ - DEBUG -   Total samples in database: 3
+2026-01-31 18:13:08,215 - __main__ - DEBUG -   Collected 3 sample IDs for test collection
+2026-01-31 18:13:08,215 - __main__ - DEBUG - PASS Created collection 'test_collection'
+2026-01-31 18:13:08,215 - __main__ - DEBUG -   Added: 3 samples
+2026-01-31 18:13:08,216 - __main__ - DEBUG -   Total: 3 samples
+2026-01-31 18:13:08,216 - __main__ - DEBUG -   Active collections: ['test_collection']
+2026-01-31 18:13:08,216 - __main__ - DEBUG - PASS Collection exemplars built: 3 spectra
+2026-01-31 18:13:08,216 - __main__ - DEBUG -   Example spectrum: 'Calcite CaCO3'
+2026-01-31 18:13:08,216 - __main__ - DEBUG -     Wavelength range: 2079.5 - 25044.2 nm
+2026-01-31 18:13:08,217 - __main__ - DEBUG -     Reflectance range: 9.863 - 102.723
+2026-01-31 18:13:08,217 - __main__ - INFO - Running reload tests
+2026-01-31 18:13:08,217 - __main__ - DEBUG - 
+2026-01-31 18:13:08,217 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,217 - __main__ - DEBUG -   PART 5B: Reloading Saved ProcessedObject
+2026-01-31 18:13:08,217 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,412 - __main__ - DEBUG - PASS Successfully reloaded ProcessedObject
+2026-01-31 18:13:08,412 - __main__ - DEBUG - Reloaded ProcessedObject Information:
+2026-01-31 18:13:08,412 - __main__ - DEBUG -   Basename: synthetic_test
+2026-01-31 18:13:08,412 - __main__ - DEBUG -   Root dir: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs
+2026-01-31 18:13:08,413 - __main__ - DEBUG -   Metadata keys: ['sensor type', 'sensor id', 'frame rate', 'integration time', 'samples', 'active bands', 'spatial binning', 'spectral binning', 'frames recorded', 'frames dropped']...
+2026-01-31 18:13:08,413 - __main__ - DEBUG -   Datasets: ['1400WDEP', '1400WPOS', '1900WDEP', '1900WPOS', '2200WDEP', '2200WPOS', '2320WDEP', '2320WPOS', '2350WDEP', '2350WPOS', 'bands', 'cropped', 'DholeAverage', 'DholeDepths', 'DholeMask', 'kmeans-5-100CLUSTERS', 'kmeans-5-100INDEX', 'mask', 'metadata', 'savgol', 'savgol_cr', 'segments', 'stats', 'test-difference-cr', 'test-ratio-2200-2320']
+2026-01-31 18:13:08,426 - __main__ - DEBUG - PASS Reloaded all datasets from disk
+2026-01-31 18:13:08,426 - __main__ - INFO - Running correlation tests
+2026-01-31 18:13:08,427 - __main__ - DEBUG - 
+2026-01-31 18:13:08,427 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,427 - __main__ - DEBUG -   PART 5C: Correlation Analysis
+2026-01-31 18:13:08,427 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,427 - __main__ - DEBUG - Using collection 'test_collection' with 3 spectra
+2026-01-31 18:13:08,428 - __main__ - DEBUG - 
+Running pearson correlation...
+2026-01-31 18:13:08,466 - __main__ - DEBUG -   PASS pearson: created datasets
+2026-01-31 18:13:08,466 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:08,466 - __main__ - DEBUG -     Unique classes: 1
+2026-01-31 18:13:08,467 - __main__ - DEBUG -     Confidence range: [-0.420, 0.718]
+2026-01-31 18:13:08,467 - __main__ - DEBUG - 
+Running SAM correlation...
+2026-01-31 18:13:08,489 - __main__ - DEBUG -   PASS SAM: created datasets
+2026-01-31 18:13:08,489 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:08,489 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:08,489 - __main__ - DEBUG -     Confidence range: [11.233, 31.702]
+2026-01-31 18:13:08,489 - __main__ - DEBUG - 
+Running MSAM correlation...
+2026-01-31 18:13:08,520 - __main__ - DEBUG -   PASS MSAM: created datasets
+2026-01-31 18:13:08,520 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:08,520 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:08,520 - __main__ - DEBUG -     Confidence range: [-0.276, 0.510]
+2026-01-31 18:13:08,520 - __main__ - DEBUG - 
+Correlation summary: 3/3 successful
+2026-01-31 18:13:08,520 - __main__ - DEBUG - 
+Saving correlation results...
+2026-01-31 18:13:08,548 - __main__ - DEBUG - PASS Correlation results saved
+2026-01-31 18:13:08,548 - __main__ - INFO - Running Full hole tests
+2026-01-31 18:13:08,548 - __main__ - DEBUG - CREATE THREE-BOX HOLE DATASET
+2026-01-31 18:13:08,548 - __main__ - DEBUG - Hole ID: TEST_HOLE_001
+2026-01-31 18:13:08,548 - __main__ - DEBUG - Depth per box: 1.0m
+2026-01-31 18:13:08,549 - __main__ - DEBUG - Starting depth: 0.0m
+2026-01-31 18:13:08,549 - __main__ - DEBUG - Create baseline: False
+2026-01-31 18:13:08,549 - __main__ - DEBUG - STEP 1: Verifying Template Box
+2026-01-31 18:13:08,549 - __main__ - DEBUG - Template has 25 datasets
+2026-01-31 18:13:08,549 - __main__ - DEBUG - PASS Template box has all required datasets
+2026-01-31 18:13:08,549 - __main__ - DEBUG - 
+2026-01-31 18:13:08,549 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,549 - __main__ - DEBUG -   STEP 2: Creating Three-Box Hole Structure
+2026-01-31 18:13:08,549 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:08,550 - __main__ - DEBUG - Hole directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs\TEST_HOLE_001
+2026-01-31 18:13:08,552 - __main__ - DEBUG - STEP 3: Creating Individual Boxes
+2026-01-31 18:13:08,552 - __main__ - DEBUG - 
+Creating Box 1...
+2026-01-31 18:13:08,552 - __main__ - DEBUG -   Copying 25 datasets...
+2026-01-31 18:13:08,565 - __main__ - DEBUG -   Saving to disk...
+2026-01-31 18:13:08,607 - __main__ - DEBUG -   PASS Box 1 created: 25 files
+2026-01-31 18:13:08,608 - __main__ - DEBUG -     Depth range: 0.00 - 1.00m
+2026-01-31 18:13:08,608 - __main__ - DEBUG - 
+Creating Box 2...
+2026-01-31 18:13:08,610 - __main__ - DEBUG -   Copying 25 datasets...
+2026-01-31 18:13:08,622 - __main__ - DEBUG -   Saving to disk...
+2026-01-31 18:13:08,659 - __main__ - DEBUG -   PASS Box 2 created: 25 files
+2026-01-31 18:13:08,659 - __main__ - DEBUG -     Depth range: 1.00 - 2.00m
+2026-01-31 18:13:08,659 - __main__ - DEBUG - 
+Creating Box 3...
+2026-01-31 18:13:08,662 - __main__ - DEBUG -   Copying 25 datasets...
+2026-01-31 18:13:08,673 - __main__ - DEBUG -   Saving to disk...
+2026-01-31 18:13:08,710 - __main__ - DEBUG -   PASS Box 3 created: 25 files
+2026-01-31 18:13:08,711 - __main__ - DEBUG -     Depth range: 2.00 - 3.00m
+2026-01-31 18:13:08,711 - __main__ - DEBUG - STEP 4: Loading and Verifying HoleObject
+2026-01-31 18:13:08,711 - __main__ - DEBUG - Loading hole from directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs\TEST_HOLE_001
+2026-01-31 18:13:09,298 - __main__ - DEBUG - PASS HoleObject loaded successfully
+2026-01-31 18:13:09,298 - __main__ - DEBUG -   Hole ID: TEST_HOLE_001
+2026-01-31 18:13:09,298 - __main__ - DEBUG -   Number of boxes: 3
+2026-01-31 18:13:09,298 - __main__ - DEBUG -   Box range: 1 to 3
+2026-01-31 18:13:09,299 - __main__ - DEBUG -   Root directory: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs\TEST_HOLE_001
+2026-01-31 18:13:09,301 - __main__ - DEBUG - 
+  Box 1:
+2026-01-31 18:13:09,302 - __main__ - DEBUG -     Basename: TEST_HOLE_001_1
+2026-01-31 18:13:09,302 - __main__ - DEBUG -     Datasets: 25
+2026-01-31 18:13:09,302 - __main__ - DEBUG -     Depth: 0.00 - 1.00m
+2026-01-31 18:13:09,302 - __main__ - DEBUG -     All required datasets present
+2026-01-31 18:13:09,302 - __main__ - DEBUG - 
+  Box 2:
+2026-01-31 18:13:09,303 - __main__ - DEBUG -     Basename: TEST_HOLE_001_2
+2026-01-31 18:13:09,303 - __main__ - DEBUG -     Datasets: 25
+2026-01-31 18:13:09,303 - __main__ - DEBUG -     Depth: 1.00 - 2.00m
+2026-01-31 18:13:09,303 - __main__ - DEBUG -     All required datasets present
+2026-01-31 18:13:09,303 - __main__ - DEBUG - 
+  Box 3:
+2026-01-31 18:13:09,304 - __main__ - DEBUG -     Basename: TEST_HOLE_001_3
+2026-01-31 18:13:09,304 - __main__ - DEBUG -     Datasets: 25
+2026-01-31 18:13:09,304 - __main__ - DEBUG -     Depth: 2.00 - 3.00m
+2026-01-31 18:13:09,304 - __main__ - DEBUG -     All required datasets present
+2026-01-31 18:13:09,304 - __main__ - DEBUG - 
+PASS HoleObject verification complete
+2026-01-31 18:13:09,304 - __main__ - DEBUG - Hole dataset ready for downhole analysis at: C:\Users\russj\Documents\GitHub\CoreSpecViewer\test_data\test_outputs\TEST_HOLE_001
+2026-01-31 18:13:09,305 - __main__ - DEBUG - Testing hole iteration...
+2026-01-31 18:13:09,305 - __main__ - DEBUG -   Box 1: TEST_HOLE_001_1
+2026-01-31 18:13:09,305 - __main__ - DEBUG -   Box 2: TEST_HOLE_001_2
+2026-01-31 18:13:09,305 - __main__ - DEBUG -   Box 3: TEST_HOLE_001_3
+2026-01-31 18:13:09,305 - __main__ - DEBUG - PASS Iterated over 3 boxes
+2026-01-31 18:13:09,305 - __main__ - DEBUG - Testing hole indexing...
+2026-01-31 18:13:09,305 - __main__ - DEBUG -   Single box access: TEST_HOLE_001_1
+2026-01-31 18:13:09,305 - __main__ - DEBUG -   Slice access: 1 boxes
+2026-01-31 18:13:09,305 - __main__ - DEBUG - PASS Indexing works
+2026-01-31 18:13:09,306 - __main__ - DEBUG - 
+2026-01-31 18:13:09,306 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:09,306 - __main__ - DEBUG -   PART 3C: Band Math Expressions
+2026-01-31 18:13:09,306 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:09,306 - __main__ - DEBUG - Evaluating: test_ratio_2200_2320
+2026-01-31 18:13:09,306 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:13:09,306 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:13:09,310 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:13:09,310 - __main__ - DEBUG -   PASS Value range: [0.924, 1.249]
+2026-01-31 18:13:09,310 - __main__ - DEBUG - Evaluating: test_difference_cr
+2026-01-31 18:13:09,310 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:13:09,310 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:13:09,316 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:13:09,316 - __main__ - DEBUG -   PASS Value range: [-0.549, 0.645]
+2026-01-31 18:13:09,316 - __main__ - DEBUG - 
+Band math summary: 2/2 successful
+2026-01-31 18:13:09,316 - __main__ - DEBUG - 
+2026-01-31 18:13:09,317 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:09,317 - __main__ - DEBUG -   PART 5C: Correlation Analysis
+2026-01-31 18:13:09,317 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:09,317 - __main__ - DEBUG - Using collection 'test_collection' with 3 spectra
+2026-01-31 18:13:09,317 - __main__ - DEBUG - 
+Running pearson correlation...
+2026-01-31 18:13:09,351 - __main__ - DEBUG -   PASS pearson: created datasets
+2026-01-31 18:13:09,351 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:09,351 - __main__ - DEBUG -     Unique classes: 1
+2026-01-31 18:13:09,351 - __main__ - DEBUG -     Confidence range: [-0.420, 0.718]
+2026-01-31 18:13:09,351 - __main__ - DEBUG - 
+Running SAM correlation...
+2026-01-31 18:13:09,373 - __main__ - DEBUG -   PASS SAM: created datasets
+2026-01-31 18:13:09,373 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:09,373 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:09,373 - __main__ - DEBUG -     Confidence range: [11.233, 31.702]
+2026-01-31 18:13:09,374 - __main__ - DEBUG - 
+Running MSAM correlation...
+2026-01-31 18:13:09,407 - __main__ - DEBUG -   PASS MSAM: created datasets
+2026-01-31 18:13:09,407 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:09,408 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:09,408 - __main__ - DEBUG -     Confidence range: [-0.276, 0.510]
+2026-01-31 18:13:09,408 - __main__ - DEBUG - 
+Correlation summary: 3/3 successful
+2026-01-31 18:13:09,408 - __main__ - DEBUG - 
+Saving correlation results...
+2026-01-31 18:13:09,555 - __main__ - DEBUG - PASS Correlation results saved
+2026-01-31 18:13:09,555 - __main__ - DEBUG - 
+2026-01-31 18:13:09,556 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:09,556 - __main__ - DEBUG -   PART 3B: Feature Extraction
+2026-01-31 18:13:09,556 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:09,556 - __main__ - DEBUG - Extracting feature: 1400W
+2026-01-31 18:13:09,874 - __main__ - DEBUG -   PASS 1400W: position shape (96, 88)
+2026-01-31 18:13:09,875 - __main__ - DEBUG - Extracting feature: 1900W
+2026-01-31 18:13:10,195 - __main__ - DEBUG -   PASS 1900W: position shape (96, 88)
+2026-01-31 18:13:10,195 - __main__ - DEBUG - Extracting feature: 2200W
+2026-01-31 18:13:10,540 - __main__ - DEBUG -   PASS 2200W: position shape (96, 88)
+2026-01-31 18:13:10,540 - __main__ - DEBUG - Extracting feature: 2320W
+2026-01-31 18:13:10,858 - __main__ - DEBUG -   PASS 2320W: position shape (96, 88)
+2026-01-31 18:13:10,859 - __main__ - DEBUG - Extracting feature: 2350W
+2026-01-31 18:13:11,175 - __main__ - DEBUG -   PASS 2350W: position shape (96, 88)
+2026-01-31 18:13:11,175 - __main__ - DEBUG - 
+Feature extraction summary: 5/5 successful
+2026-01-31 18:13:11,846 - __main__ - DEBUG - PO 1 band maths, correlation and feature extraction success
+2026-01-31 18:13:11,846 - __main__ - DEBUG - 
+2026-01-31 18:13:11,846 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:11,847 - __main__ - DEBUG -   PART 3C: Band Math Expressions
+2026-01-31 18:13:11,847 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:11,847 - __main__ - DEBUG - Evaluating: test_ratio_2200_2320
+2026-01-31 18:13:11,847 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:13:11,847 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:13:11,853 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:13:11,853 - __main__ - DEBUG -   PASS Value range: [0.924, 1.249]
+2026-01-31 18:13:11,853 - __main__ - DEBUG - Evaluating: test_difference_cr
+2026-01-31 18:13:11,853 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:13:11,853 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:13:11,861 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:13:11,861 - __main__ - DEBUG -   PASS Value range: [-0.549, 0.645]
+2026-01-31 18:13:11,861 - __main__ - DEBUG - 
+Band math summary: 2/2 successful
+2026-01-31 18:13:11,861 - __main__ - DEBUG - 
+2026-01-31 18:13:11,861 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:11,861 - __main__ - DEBUG -   PART 5C: Correlation Analysis
+2026-01-31 18:13:11,862 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:11,862 - __main__ - DEBUG - Using collection 'test_collection' with 3 spectra
+2026-01-31 18:13:11,862 - __main__ - DEBUG - 
+Running pearson correlation...
+2026-01-31 18:13:11,898 - __main__ - DEBUG -   PASS pearson: created datasets
+2026-01-31 18:13:11,898 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:11,899 - __main__ - DEBUG -     Unique classes: 1
+2026-01-31 18:13:11,899 - __main__ - DEBUG -     Confidence range: [-0.420, 0.718]
+2026-01-31 18:13:11,899 - __main__ - DEBUG - 
+Running SAM correlation...
+2026-01-31 18:13:11,923 - __main__ - DEBUG -   PASS SAM: created datasets
+2026-01-31 18:13:11,923 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:11,923 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:11,923 - __main__ - DEBUG -     Confidence range: [11.233, 31.702]
+2026-01-31 18:13:11,923 - __main__ - DEBUG - 
+Running MSAM correlation...
+2026-01-31 18:13:11,953 - __main__ - DEBUG -   PASS MSAM: created datasets
+2026-01-31 18:13:11,954 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:11,954 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:11,954 - __main__ - DEBUG -     Confidence range: [-0.276, 0.510]
+2026-01-31 18:13:11,954 - __main__ - DEBUG - 
+Correlation summary: 3/3 successful
+2026-01-31 18:13:11,954 - __main__ - DEBUG - 
+Saving correlation results...
+2026-01-31 18:13:12,118 - __main__ - DEBUG - PASS Correlation results saved
+2026-01-31 18:13:12,118 - __main__ - DEBUG - 
+2026-01-31 18:13:12,118 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:12,118 - __main__ - DEBUG -   PART 3B: Feature Extraction
+2026-01-31 18:13:12,118 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:12,118 - __main__ - DEBUG - Extracting feature: 1400W
+2026-01-31 18:13:12,454 - __main__ - DEBUG -   PASS 1400W: position shape (96, 88)
+2026-01-31 18:13:12,455 - __main__ - DEBUG - Extracting feature: 1900W
+2026-01-31 18:13:12,779 - __main__ - DEBUG -   PASS 1900W: position shape (96, 88)
+2026-01-31 18:13:12,779 - __main__ - DEBUG - Extracting feature: 2200W
+2026-01-31 18:13:13,121 - __main__ - DEBUG -   PASS 2200W: position shape (96, 88)
+2026-01-31 18:13:13,121 - __main__ - DEBUG - Extracting feature: 2320W
+2026-01-31 18:13:13,439 - __main__ - DEBUG -   PASS 2320W: position shape (96, 88)
+2026-01-31 18:13:13,439 - __main__ - DEBUG - Extracting feature: 2350W
+2026-01-31 18:13:13,756 - __main__ - DEBUG -   PASS 2350W: position shape (96, 88)
+2026-01-31 18:13:13,756 - __main__ - DEBUG - 
+Feature extraction summary: 5/5 successful
+2026-01-31 18:13:14,417 - __main__ - DEBUG - PO 2 band maths, correlation and feature extraction success
+2026-01-31 18:13:14,418 - __main__ - DEBUG - 
+2026-01-31 18:13:14,418 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:14,418 - __main__ - DEBUG -   PART 3C: Band Math Expressions
+2026-01-31 18:13:14,418 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:14,418 - __main__ - DEBUG - Evaluating: test_ratio_2200_2320
+2026-01-31 18:13:14,419 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:13:14,419 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:13:14,423 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:13:14,424 - __main__ - DEBUG -   PASS Value range: [0.924, 1.249]
+2026-01-31 18:13:14,424 - __main__ - DEBUG - Evaluating: test_difference_cr
+2026-01-31 18:13:14,424 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:13:14,424 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:13:14,430 - __main__ - DEBUG -   PASS Result shape: (96, 88)
+2026-01-31 18:13:14,431 - __main__ - DEBUG -   PASS Value range: [-0.549, 0.645]
+2026-01-31 18:13:14,431 - __main__ - DEBUG - 
+Band math summary: 2/2 successful
+2026-01-31 18:13:14,431 - __main__ - DEBUG - 
+2026-01-31 18:13:14,431 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:14,431 - __main__ - DEBUG -   PART 5C: Correlation Analysis
+2026-01-31 18:13:14,432 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:14,432 - __main__ - DEBUG - Using collection 'test_collection' with 3 spectra
+2026-01-31 18:13:14,432 - __main__ - DEBUG - 
+Running pearson correlation...
+2026-01-31 18:13:14,459 - __main__ - DEBUG -   PASS pearson: created datasets
+2026-01-31 18:13:14,459 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:14,460 - __main__ - DEBUG -     Unique classes: 1
+2026-01-31 18:13:14,460 - __main__ - DEBUG -     Confidence range: [-0.420, 0.718]
+2026-01-31 18:13:14,460 - __main__ - DEBUG - 
+Running SAM correlation...
+2026-01-31 18:13:14,477 - __main__ - DEBUG -   PASS SAM: created datasets
+2026-01-31 18:13:14,478 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:14,478 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:14,478 - __main__ - DEBUG -     Confidence range: [11.233, 31.702]
+2026-01-31 18:13:14,478 - __main__ - DEBUG - 
+Running MSAM correlation...
+2026-01-31 18:13:14,501 - __main__ - DEBUG -   PASS MSAM: created datasets
+2026-01-31 18:13:14,501 - __main__ - DEBUG -     Index shape: (96, 88)
+2026-01-31 18:13:14,501 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:14,501 - __main__ - DEBUG -     Confidence range: [-0.276, 0.510]
+2026-01-31 18:13:14,501 - __main__ - DEBUG - 
+Correlation summary: 3/3 successful
+2026-01-31 18:13:14,502 - __main__ - DEBUG - 
+Saving correlation results...
+2026-01-31 18:13:14,654 - __main__ - DEBUG - PASS Correlation results saved
+2026-01-31 18:13:14,654 - __main__ - DEBUG - 
+2026-01-31 18:13:14,654 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:14,655 - __main__ - DEBUG -   PART 3B: Feature Extraction
+2026-01-31 18:13:14,655 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:14,655 - __main__ - DEBUG - Extracting feature: 1400W
+2026-01-31 18:13:14,972 - __main__ - DEBUG -   PASS 1400W: position shape (96, 88)
+2026-01-31 18:13:14,972 - __main__ - DEBUG - Extracting feature: 1900W
+2026-01-31 18:13:15,293 - __main__ - DEBUG -   PASS 1900W: position shape (96, 88)
+2026-01-31 18:13:15,293 - __main__ - DEBUG - Extracting feature: 2200W
+2026-01-31 18:13:15,637 - __main__ - DEBUG -   PASS 2200W: position shape (96, 88)
+2026-01-31 18:13:15,637 - __main__ - DEBUG - Extracting feature: 2320W
+2026-01-31 18:13:15,953 - __main__ - DEBUG -   PASS 2320W: position shape (96, 88)
+2026-01-31 18:13:15,953 - __main__ - DEBUG - Extracting feature: 2350W
+2026-01-31 18:13:16,268 - __main__ - DEBUG -   PASS 2350W: position shape (96, 88)
+2026-01-31 18:13:16,268 - __main__ - DEBUG - 
+Feature extraction summary: 5/5 successful
+2026-01-31 18:13:16,939 - __main__ - DEBUG - PO 3 band maths, correlation and feature extraction success
+2026-01-31 18:13:16,939 - __main__ - DEBUG - Testing create_base_datasets...
+2026-01-31 18:13:17,543 - __main__ - DEBUG -   depths shape: (288,)
+2026-01-31 18:13:17,543 - __main__ - DEBUG -   AvSpectra shape: (288, 249)
+2026-01-31 18:13:17,543 - __main__ - DEBUG - PASS Base datasets created
+2026-01-31 18:13:17,543 - __main__ - DEBUG - Testing base datasets save and reload...
+2026-01-31 18:13:17,564 - __main__ - DEBUG - PASS Base datasets saved and reloaded
+2026-01-31 18:13:17,564 - __main__ - DEBUG - Testing create_dhole_minmap with MinMap-pearson-testcollectionINDEX...
+2026-01-31 18:13:17,618 - __main__ - DEBUG -   Created MinMap-pearson-testcollectionFRACTIONS and MinMap-pearson-testcollectionDOM-MIN
+2026-01-31 18:13:17,618 - __main__ - DEBUG - PASS create_dhole_minmap works
+2026-01-31 18:13:17,619 - __main__ - DEBUG - Testing create_dhole_features with 1400WPOS...
+2026-01-31 18:13:17,668 - __main__ - DEBUG -   Created 1400WPOS
+2026-01-31 18:13:17,668 - __main__ - DEBUG - PASS create_dhole_features works
+2026-01-31 18:13:17,668 - __main__ - DEBUG - Testing step_product_dataset with FRACTIONS...
+2026-01-31 18:13:17,671 - __main__ - DEBUG -   Stepped depths shape: (61,)
+2026-01-31 18:13:17,671 - __main__ - DEBUG -   Stepped fractions shape: (61, 4)
+2026-01-31 18:13:17,671 - __main__ - DEBUG -   Stepped dominant shape: (61,)
+2026-01-31 18:13:17,671 - __main__ - DEBUG - PASS step_product (FRACTIONS) works
+2026-01-31 18:13:17,672 - __main__ - DEBUG - Testing step_product_dataset with DOM-MIN (indices)...
+2026-01-31 18:13:17,674 - __main__ - DEBUG -   Stepped depths shape: (61,)
+2026-01-31 18:13:17,674 - __main__ - DEBUG -   Stepped indices shape: (61, 4)
+2026-01-31 18:13:17,675 - __main__ - DEBUG - PASS step_product (indices) works
+2026-01-31 18:13:17,675 - __main__ - DEBUG - Testing step_product_dataset with continuous feature...
+2026-01-31 18:13:17,681 - __main__ - DEBUG -   Stepped depths shape: (61,)
+2026-01-31 18:13:17,681 - __main__ - DEBUG -   Stepped values shape: (61,)
+2026-01-31 18:13:17,682 - __main__ - DEBUG - PASS step_product (continuous) works
+2026-01-31 18:13:17,682 - __main__ - DEBUG - Evaluating profile band math: test_ratio_2200_2320
+2026-01-31 18:13:17,682 - __main__ - DEBUG -   Expression: R2200 / R2320
+2026-01-31 18:13:17,682 - __main__ - DEBUG -   Continuum removed: False
+2026-01-31 18:13:17,683 - __main__ - DEBUG -   PASS test_ratio_2200_2320: shape (288,)
+2026-01-31 18:13:17,683 - __main__ - DEBUG -     Value range: [1.064, 1.185]
+2026-01-31 18:13:17,683 - __main__ - DEBUG - Evaluating profile band math: test_difference_cr
+2026-01-31 18:13:17,683 - __main__ - DEBUG -   Expression: R2200 - R2320
+2026-01-31 18:13:17,683 - __main__ - DEBUG -   Continuum removed: True
+2026-01-31 18:13:17,686 - __main__ - DEBUG -   PASS test_difference_cr: shape (288,)
+2026-01-31 18:13:17,686 - __main__ - DEBUG -     Value range: [0.170, 0.777]
+2026-01-31 18:13:17,686 - __main__ - DEBUG - Profile band math summary: 2/2 successful
+2026-01-31 18:13:17,686 - __main__ - DEBUG - Running profile k-means clustering...
+2026-01-31 18:13:17,687 - __main__ - DEBUG -   Clusters: 5
+2026-01-31 18:13:17,687 - __main__ - DEBUG -   Iterations: 100
+2026-01-31 18:13:17,692 - __main__ - DEBUG - PASS Profile k-means clustering successful
+2026-01-31 18:13:17,692 - __main__ - DEBUG -   Cluster map shape: (288,)
+2026-01-31 18:13:17,692 - __main__ - DEBUG -   Centroids shape: (5, 249)
+2026-01-31 18:13:17,693 - __main__ - DEBUG -   Unique clusters: [1 2]
+2026-01-31 18:13:17,693 - __main__ - DEBUG - Extracting profile feature: 1400W
+2026-01-31 18:13:17,706 - __main__ - DEBUG -   PASS 1400W: position shape (288,)
+2026-01-31 18:13:17,706 - __main__ - DEBUG -     Depth range: [0.790, 0.834]
+2026-01-31 18:13:17,706 - __main__ - DEBUG - Extracting profile feature: 1900W
+2026-01-31 18:13:17,718 - __main__ - DEBUG -   PASS 1900W: position shape (288,)
+2026-01-31 18:13:17,719 - __main__ - DEBUG -     Depth range: [0.951, 0.982]
+2026-01-31 18:13:17,719 - __main__ - DEBUG - Extracting profile feature: 2200W
+2026-01-31 18:13:17,732 - __main__ - DEBUG -   PASS 2200W: position shape (288,)
+2026-01-31 18:13:17,732 - __main__ - DEBUG -     Depth range: [--, --]
+2026-01-31 18:13:17,733 - __main__ - DEBUG - Extracting profile feature: 2320W
+2026-01-31 18:13:17,744 - __main__ - DEBUG -   PASS 2320W: position shape (288,)
+2026-01-31 18:13:17,744 - __main__ - DEBUG -     Depth range: [0.790, 0.820]
+2026-01-31 18:13:17,745 - __main__ - DEBUG - Extracting profile feature: 2350W
+2026-01-31 18:13:17,756 - __main__ - DEBUG -   PASS 2350W: position shape (288,)
+2026-01-31 18:13:17,756 - __main__ - DEBUG -     Depth range: [0.768, 0.870]
+2026-01-31 18:13:17,756 - __main__ - DEBUG - Profile feature extraction summary: 5/5 successful
+2026-01-31 18:13:17,757 - __main__ - DEBUG - Running profile pearson correlation...
+2026-01-31 18:13:17,760 - __main__ - DEBUG -   PASS Profile pearson: created datasets
+2026-01-31 18:13:17,760 - __main__ - DEBUG -     Index shape: (288,)
+2026-01-31 18:13:17,760 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:17,760 - __main__ - DEBUG -     Confidence range: [0.148, 0.356]
+2026-01-31 18:13:17,760 - __main__ - DEBUG - Running profile SAM correlation...
+2026-01-31 18:13:17,763 - __main__ - DEBUG -   PASS Profile SAM: created datasets
+2026-01-31 18:13:17,763 - __main__ - DEBUG -     Index shape: (288,)
+2026-01-31 18:13:17,763 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:17,763 - __main__ - DEBUG -     Confidence range: [16.502, 19.769]
+2026-01-31 18:13:17,763 - __main__ - DEBUG - Running profile MSAM correlation...
+2026-01-31 18:13:17,767 - __main__ - DEBUG -   PASS Profile MSAM: created datasets
+2026-01-31 18:13:17,767 - __main__ - DEBUG -     Index shape: (288,)
+2026-01-31 18:13:17,767 - __main__ - DEBUG -     Unique classes: 0
+2026-01-31 18:13:17,767 - __main__ - DEBUG -     Confidence range: [0.095, 0.232]
+2026-01-31 18:13:17,767 - __main__ - DEBUG - Profile correlation summary: 3/3 successful
+2026-01-31 18:13:17,767 - __main__ - DEBUG - Testing save_product_datasets...
+2026-01-31 18:13:17,791 - __main__ - DEBUG -   Saved 28/28 product datasets
+2026-01-31 18:13:17,791 - __main__ - DEBUG - PASS Product datasets saved
+2026-01-31 18:13:17,791 - __main__ - DEBUG - Exporting MinMap-pearson-testcollectionFRACTIONS to CSV...
+2026-01-31 18:13:17,799 - __main__ - DEBUG -   PASS MinMap-pearson-testcollectionFRACTIONS: exported 2 CSV files
+2026-01-31 18:13:17,799 - __main__ - DEBUG -     Created: TEST_HOLE_001-MinMap-pearson-testcollectionFRACTIONS-full.csv
+2026-01-31 18:13:17,799 - __main__ - DEBUG -     Created: TEST_HOLE_001-MinMap-pearson-testcollectionFRACTIONS-stepped.csv
+2026-01-31 18:13:17,799 - __main__ - DEBUG - Exporting MinMap-pearson-testcollectionDOM-MIN to CSV...
+2026-01-31 18:13:17,804 - __main__ - DEBUG -   PASS MinMap-pearson-testcollectionDOM-MIN: exported 2 CSV files
+2026-01-31 18:13:17,804 - __main__ - DEBUG -     Created: TEST_HOLE_001-MinMap-pearson-testcollectionDOM-MIN-full.csv
+2026-01-31 18:13:17,804 - __main__ - DEBUG -     Created: TEST_HOLE_001-MinMap-pearson-testcollectionDOM-MIN-stepped.csv
+2026-01-31 18:13:17,804 - __main__ - DEBUG -   Skipping MinMap-pearson-testcollectionLEGEND (not exportable)
+2026-01-31 18:13:17,804 - __main__ - DEBUG - Exporting 1400WPOS to CSV...
+2026-01-31 18:13:17,813 - __main__ - DEBUG -   PASS 1400WPOS: exported 2 CSV files
+2026-01-31 18:13:17,813 - __main__ - DEBUG -     Created: TEST_HOLE_001-1400WPOS-full.csv
+2026-01-31 18:13:17,813 - __main__ - DEBUG -     Created: TEST_HOLE_001-1400WPOS-stepped.csv
+2026-01-31 18:13:17,814 - __main__ - DEBUG - Exporting test-ratio-2200-2320 to CSV...
+2026-01-31 18:13:17,818 - __main__ - DEBUG -   PASS test-ratio-2200-2320: exported 2 CSV files
+2026-01-31 18:13:17,818 - __main__ - DEBUG -     Created: TEST_HOLE_001-test-ratio-2200-2320-full.csv
+2026-01-31 18:13:17,818 - __main__ - DEBUG -     Created: TEST_HOLE_001-test-ratio-2200-2320-stepped.csv
+2026-01-31 18:13:17,818 - __main__ - DEBUG - Exporting test-difference-cr to CSV...
+2026-01-31 18:13:17,823 - __main__ - DEBUG -   PASS test-difference-cr: exported 2 CSV files
+2026-01-31 18:13:17,823 - __main__ - DEBUG -     Created: TEST_HOLE_001-test-difference-cr-full.csv
+2026-01-31 18:13:17,823 - __main__ - DEBUG -     Created: TEST_HOLE_001-test-difference-cr-stepped.csv
+2026-01-31 18:13:17,823 - __main__ - DEBUG - Exporting PROF-kmeans-5-100INDEX to CSV...
+2026-01-31 18:13:17,849 - __main__ - DEBUG -   PASS PROF-kmeans-5-100INDEX: exported 2 CSV files
+2026-01-31 18:13:17,849 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-kmeans-5-100INDEX-full.csv
+2026-01-31 18:13:17,850 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-kmeans-5-100INDEX-stepped.csv
+2026-01-31 18:13:17,850 - __main__ - DEBUG -   Skipping PROF-kmeans-5-100CLUSTERS (not exportable)
+2026-01-31 18:13:17,850 - __main__ - DEBUG -   Skipping PROF-kmeans-5-100LEGEND (not exportable)
+2026-01-31 18:13:17,850 - __main__ - DEBUG - Exporting PROF-1400WPOS to CSV...
+2026-01-31 18:13:17,863 - __main__ - DEBUG -   PASS PROF-1400WPOS: exported 2 CSV files
+2026-01-31 18:13:17,863 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1400WPOS-full.csv
+2026-01-31 18:13:17,863 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1400WPOS-stepped.csv
+2026-01-31 18:13:17,863 - __main__ - DEBUG - Exporting PROF-1400WDEP to CSV...
+2026-01-31 18:13:17,876 - __main__ - DEBUG -   PASS PROF-1400WDEP: exported 2 CSV files
+2026-01-31 18:13:17,876 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1400WDEP-full.csv
+2026-01-31 18:13:17,876 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1400WDEP-stepped.csv
+2026-01-31 18:13:17,876 - __main__ - DEBUG - Exporting PROF-1900WPOS to CSV...
+2026-01-31 18:13:17,889 - __main__ - DEBUG -   PASS PROF-1900WPOS: exported 2 CSV files
+2026-01-31 18:13:17,889 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1900WPOS-full.csv
+2026-01-31 18:13:17,889 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1900WPOS-stepped.csv
+2026-01-31 18:13:17,889 - __main__ - DEBUG - Exporting PROF-1900WDEP to CSV...
+2026-01-31 18:13:17,901 - __main__ - DEBUG -   PASS PROF-1900WDEP: exported 2 CSV files
+2026-01-31 18:13:17,901 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1900WDEP-full.csv
+2026-01-31 18:13:17,902 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-1900WDEP-stepped.csv
+2026-01-31 18:13:17,902 - __main__ - DEBUG - Exporting PROF-2200WPOS to CSV...
+2026-01-31 18:13:17,914 - __main__ - DEBUG -   PASS PROF-2200WPOS: exported 2 CSV files
+2026-01-31 18:13:17,914 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2200WPOS-full.csv
+2026-01-31 18:13:17,914 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2200WPOS-stepped.csv
+2026-01-31 18:13:17,914 - __main__ - DEBUG - Exporting PROF-2200WDEP to CSV...
+2026-01-31 18:13:17,927 - __main__ - DEBUG -   PASS PROF-2200WDEP: exported 2 CSV files
+2026-01-31 18:13:17,927 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2200WDEP-full.csv
+2026-01-31 18:13:17,927 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2200WDEP-stepped.csv
+2026-01-31 18:13:17,927 - __main__ - DEBUG - Exporting PROF-2320WPOS to CSV...
+2026-01-31 18:13:17,940 - __main__ - DEBUG -   PASS PROF-2320WPOS: exported 2 CSV files
+2026-01-31 18:13:17,940 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2320WPOS-full.csv
+2026-01-31 18:13:17,940 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2320WPOS-stepped.csv
+2026-01-31 18:13:17,940 - __main__ - DEBUG - Exporting PROF-2320WDEP to CSV...
+2026-01-31 18:13:17,953 - __main__ - DEBUG -   PASS PROF-2320WDEP: exported 2 CSV files
+2026-01-31 18:13:17,953 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2320WDEP-full.csv
+2026-01-31 18:13:17,953 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2320WDEP-stepped.csv
+2026-01-31 18:13:17,953 - __main__ - DEBUG - Exporting PROF-2350WPOS to CSV...
+2026-01-31 18:13:17,965 - __main__ - DEBUG -   PASS PROF-2350WPOS: exported 2 CSV files
+2026-01-31 18:13:17,965 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2350WPOS-full.csv
+2026-01-31 18:13:17,966 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2350WPOS-stepped.csv
+2026-01-31 18:13:17,966 - __main__ - DEBUG - Exporting PROF-2350WDEP to CSV...
+2026-01-31 18:13:17,978 - __main__ - DEBUG -   PASS PROF-2350WDEP: exported 2 CSV files
+2026-01-31 18:13:17,978 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2350WDEP-full.csv
+2026-01-31 18:13:17,978 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-2350WDEP-stepped.csv
+2026-01-31 18:13:17,978 - __main__ - DEBUG - Exporting PROF-MinMap-pearson-testcollectionINDEX to CSV...
+2026-01-31 18:13:18,005 - __main__ - DEBUG -   PASS PROF-MinMap-pearson-testcollectionINDEX: exported 2 CSV files
+2026-01-31 18:13:18,005 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-pearson-testcollectionINDEX-full.csv
+2026-01-31 18:13:18,005 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-pearson-testcollectionINDEX-stepped.csv
+2026-01-31 18:13:18,005 - __main__ - DEBUG - Exporting PROF-MinMap-pearson-testcollectionCONF to CSV...
+2026-01-31 18:13:18,010 - __main__ - DEBUG -   PASS PROF-MinMap-pearson-testcollectionCONF: exported 2 CSV files
+2026-01-31 18:13:18,010 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-pearson-testcollectionCONF-full.csv
+2026-01-31 18:13:18,010 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-pearson-testcollectionCONF-stepped.csv
+2026-01-31 18:13:18,010 - __main__ - DEBUG -   Skipping PROF-MinMap-pearson-testcollectionLEGEND (not exportable)
+2026-01-31 18:13:18,010 - __main__ - DEBUG - Exporting PROF-MinMap-SAM-testcollectionINDEX to CSV...
+2026-01-31 18:13:18,037 - __main__ - DEBUG -   PASS PROF-MinMap-SAM-testcollectionINDEX: exported 2 CSV files
+2026-01-31 18:13:18,037 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-SAM-testcollectionINDEX-full.csv
+2026-01-31 18:13:18,037 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-SAM-testcollectionINDEX-stepped.csv
+2026-01-31 18:13:18,037 - __main__ - DEBUG - Exporting PROF-MinMap-SAM-testcollectionCONF to CSV...
+2026-01-31 18:13:18,043 - __main__ - DEBUG -   PASS PROF-MinMap-SAM-testcollectionCONF: exported 2 CSV files
+2026-01-31 18:13:18,044 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-SAM-testcollectionCONF-full.csv
+2026-01-31 18:13:18,044 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-SAM-testcollectionCONF-stepped.csv
+2026-01-31 18:13:18,044 - __main__ - DEBUG -   Skipping PROF-MinMap-SAM-testcollectionLEGEND (not exportable)
+2026-01-31 18:13:18,044 - __main__ - DEBUG - Exporting PROF-MinMap-MSAM-testcollectionINDEX to CSV...
+2026-01-31 18:13:18,070 - __main__ - DEBUG -   PASS PROF-MinMap-MSAM-testcollectionINDEX: exported 2 CSV files
+2026-01-31 18:13:18,071 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-MSAM-testcollectionINDEX-full.csv
+2026-01-31 18:13:18,071 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-MSAM-testcollectionINDEX-stepped.csv
+2026-01-31 18:13:18,071 - __main__ - DEBUG - Exporting PROF-MinMap-MSAM-testcollectionCONF to CSV...
+2026-01-31 18:13:18,076 - __main__ - DEBUG -   PASS PROF-MinMap-MSAM-testcollectionCONF: exported 2 CSV files
+2026-01-31 18:13:18,076 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-MSAM-testcollectionCONF-full.csv
+2026-01-31 18:13:18,076 - __main__ - DEBUG -     Created: TEST_HOLE_001-PROF-MinMap-MSAM-testcollectionCONF-stepped.csv
+2026-01-31 18:13:18,076 - __main__ - DEBUG -   Skipping PROF-MinMap-MSAM-testcollectionLEGEND (not exportable)
+2026-01-31 18:13:18,076 - __main__ - DEBUG - CSV export summary: 22/22 datasets exported
+2026-01-31 18:13:18,077 - __main__ - INFO - Running baseline tests
+2026-01-31 18:13:18,416 - __main__ - DEBUG - 1400WDEP passed baseline comparison
+2026-01-31 18:13:18,416 - __main__ - DEBUG - 1400WPOS passed baseline comparison
+2026-01-31 18:13:18,417 - __main__ - DEBUG - 1900WDEP passed baseline comparison
+2026-01-31 18:13:18,417 - __main__ - DEBUG - 1900WPOS passed baseline comparison
+2026-01-31 18:13:18,417 - __main__ - DEBUG - 2200WDEP passed baseline comparison
+2026-01-31 18:13:18,418 - __main__ - DEBUG - 2200WPOS passed baseline comparison
+2026-01-31 18:13:18,418 - __main__ - DEBUG - 2320WDEP passed baseline comparison
+2026-01-31 18:13:18,418 - __main__ - DEBUG - 2320WPOS passed baseline comparison
+2026-01-31 18:13:18,419 - __main__ - DEBUG - 2350WDEP passed baseline comparison
+2026-01-31 18:13:18,419 - __main__ - DEBUG - 2350WPOS passed baseline comparison
+2026-01-31 18:13:18,424 - __main__ - DEBUG - DholeAverage passed baseline comparison
+2026-01-31 18:13:18,424 - __main__ - DEBUG - DholeAverage passed baseline comparison
+2026-01-31 18:13:18,425 - __main__ - DEBUG - DholeDepths passed baseline comparison
+2026-01-31 18:13:18,425 - __main__ - DEBUG - DholeDepths passed baseline comparison
+2026-01-31 18:13:18,433 - __main__ - DEBUG - DholeMask passed baseline comparison
+2026-01-31 18:13:18,433 - __main__ - DEBUG - DholeMask passed baseline comparison
+2026-01-31 18:13:18,433 - __main__ - DEBUG - MinMap-MSAM-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:18,434 - __main__ - DEBUG - MinMap-MSAM-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:18,434 - __main__ - DEBUG - MinMap-SAM-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:18,435 - __main__ - DEBUG - MinMap-SAM-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:18,435 - __main__ - DEBUG - MinMap-pearson-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:18,435 - __main__ - DEBUG - MinMap-pearson-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:18,436 - __main__ - DEBUG - bands passed baseline comparison
+2026-01-31 18:13:18,457 - __main__ - DEBUG - cropped passed baseline comparison
+2026-01-31 18:13:18,457 - __main__ - DEBUG - kmeans-5-100CLUSTERS passed baseline comparison
+2026-01-31 18:13:18,458 - __main__ - DEBUG - kmeans-5-100INDEX passed baseline comparison
+2026-01-31 18:13:18,458 - __main__ - DEBUG - mask passed baseline comparison
+2026-01-31 18:13:18,479 - __main__ - DEBUG - savgol passed baseline comparison
+2026-01-31 18:13:18,516 - __main__ - DEBUG - savgol_cr passed baseline comparison
+2026-01-31 18:13:18,516 - __main__ - DEBUG - segments passed baseline comparison
+2026-01-31 18:13:18,517 - __main__ - DEBUG - stats passed baseline comparison
+2026-01-31 18:13:18,517 - __main__ - DEBUG - stats passed baseline comparison
+2026-01-31 18:13:18,517 - __main__ - DEBUG - test-difference-cr passed baseline comparison
+2026-01-31 18:13:18,517 - __main__ - DEBUG - test-difference-cr passed baseline comparison
+2026-01-31 18:13:18,518 - __main__ - DEBUG - test-ratio-2200-2320 passed baseline comparison
+2026-01-31 18:13:18,518 - __main__ - DEBUG - test-ratio-2200-2320 passed baseline comparison
+2026-01-31 18:13:18,518 - __main__ - DEBUG - PASS Baseline verification PASSED (actual matches baseline).
+2026-01-31 18:13:19,477 - __main__ - DEBUG - AvSpectra passed baseline comparison
+2026-01-31 18:13:19,477 - __main__ - DEBUG - AvSpectra passed baseline comparison
+2026-01-31 18:13:19,477 - __main__ - DEBUG - depths passed baseline comparison
+2026-01-31 18:13:19,478 - __main__ - DEBUG - depths passed baseline comparison
+2026-01-31 18:13:19,478 - __main__ - DEBUG - PROF-2320WDEP passed baseline comparison
+2026-01-31 18:13:19,478 - __main__ - DEBUG - PROF-2320WDEP passed baseline comparison
+2026-01-31 18:13:19,478 - __main__ - DEBUG - PROF-MinMap-MSAM-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:19,479 - __main__ - DEBUG - PROF-MinMap-MSAM-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:19,479 - __main__ - DEBUG - test-ratio-2200-2320 passed baseline comparison
+2026-01-31 18:13:19,479 - __main__ - DEBUG - test-ratio-2200-2320 passed baseline comparison
+2026-01-31 18:13:19,479 - __main__ - DEBUG - PROF-2350WDEP passed baseline comparison
+2026-01-31 18:13:19,480 - __main__ - DEBUG - PROF-2350WDEP passed baseline comparison
+2026-01-31 18:13:19,480 - __main__ - DEBUG - PROF-1400WDEP passed baseline comparison
+2026-01-31 18:13:19,480 - __main__ - DEBUG - PROF-1400WDEP passed baseline comparison
+2026-01-31 18:13:19,480 - __main__ - DEBUG - PROF-1400WPOS passed baseline comparison
+2026-01-31 18:13:19,481 - __main__ - DEBUG - PROF-1400WPOS passed baseline comparison
+2026-01-31 18:13:19,481 - __main__ - DEBUG - MinMap-pearson-testcollectionDOM-MIN passed baseline comparison
+2026-01-31 18:13:19,481 - __main__ - DEBUG - MinMap-pearson-testcollectionDOM-MIN passed baseline comparison
+2026-01-31 18:13:19,481 - __main__ - DEBUG - PROF-MinMap-pearson-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:19,482 - __main__ - DEBUG - PROF-MinMap-pearson-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:19,482 - __main__ - DEBUG - test-difference-cr passed baseline comparison
+2026-01-31 18:13:19,482 - __main__ - DEBUG - test-difference-cr passed baseline comparison
+2026-01-31 18:13:19,482 - __main__ - DEBUG - PROF-MinMap-SAM-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:19,482 - __main__ - DEBUG - PROF-MinMap-SAM-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:19,482 - __main__ - DEBUG - PROF-2200WPOS passed baseline comparison
+2026-01-31 18:13:19,483 - __main__ - DEBUG - PROF-2200WPOS passed baseline comparison
+2026-01-31 18:13:19,483 - __main__ - DEBUG - PROF-MinMap-pearson-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:19,483 - __main__ - DEBUG - PROF-MinMap-pearson-testcollectionINDEX passed baseline comparison
+2026-01-31 18:13:19,483 - __main__ - DEBUG - 1400WPOS passed baseline comparison
+2026-01-31 18:13:19,484 - __main__ - DEBUG - PROF-2200WDEP passed baseline comparison
+2026-01-31 18:13:19,484 - __main__ - DEBUG - PROF-2200WDEP passed baseline comparison
+2026-01-31 18:13:19,484 - __main__ - DEBUG - PROF-1900WDEP passed baseline comparison
+2026-01-31 18:13:19,484 - __main__ - DEBUG - PROF-1900WDEP passed baseline comparison
+2026-01-31 18:13:19,484 - __main__ - DEBUG - PROF-1900WPOS passed baseline comparison
+2026-01-31 18:13:19,484 - __main__ - DEBUG - PROF-1900WPOS passed baseline comparison
+2026-01-31 18:13:19,485 - __main__ - DEBUG - PROF-kmeans-5-100CLUSTERS passed baseline comparison
+2026-01-31 18:13:19,485 - __main__ - DEBUG - PROF-kmeans-5-100CLUSTERS passed baseline comparison
+2026-01-31 18:13:19,485 - __main__ - DEBUG - PROF-2320WPOS passed baseline comparison
+2026-01-31 18:13:19,486 - __main__ - DEBUG - PROF-2320WPOS passed baseline comparison
+2026-01-31 18:13:19,486 - __main__ - DEBUG - PROF-MinMap-MSAM-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:19,486 - __main__ - DEBUG - PROF-MinMap-MSAM-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:19,486 - __main__ - DEBUG - MinMap-pearson-testcollectionFRACTIONS passed baseline comparison
+2026-01-31 18:13:19,486 - __main__ - DEBUG - MinMap-pearson-testcollectionFRACTIONS passed baseline comparison
+2026-01-31 18:13:19,486 - __main__ - DEBUG - PROF-2350WPOS passed baseline comparison
+2026-01-31 18:13:19,487 - __main__ - DEBUG - PROF-2350WPOS passed baseline comparison
+2026-01-31 18:13:19,487 - __main__ - DEBUG - PROF-MinMap-SAM-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:19,487 - __main__ - DEBUG - PROF-MinMap-SAM-testcollectionCONF passed baseline comparison
+2026-01-31 18:13:19,487 - __main__ - DEBUG - PROF-kmeans-5-100INDEX passed baseline comparison
+2026-01-31 18:13:19,487 - __main__ - DEBUG - PROF-kmeans-5-100INDEX passed baseline comparison
+2026-01-31 18:13:19,488 - __main__ - INFO - PASS Hole baseline verification PASSED (output matches baseline)
+2026-01-31 18:13:19,490 - __main__ - DEBUG - 
+2026-01-31 18:13:19,490 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:19,491 - __main__ - DEBUG -   TEST RESULTS SUMMARY
+2026-01-31 18:13:19,491 - __main__ - DEBUG - ================================================================================
+2026-01-31 18:13:19,491 - __main__ - INFO - 
+2026-01-31 18:13:19,491 - __main__ - INFO -   PASS: raw_loading
+2026-01-31 18:13:19,491 - __main__ - INFO -   PASS: crop
+2026-01-31 18:13:19,491 - __main__ - INFO -   PASS: process
+2026-01-31 18:13:19,491 - __main__ - INFO -   PASS: mask_new
+2026-01-31 18:13:19,492 - __main__ - INFO -   PASS: mask_enhance
+2026-01-31 18:13:19,492 - __main__ - INFO -   PASS: mask_despeckle
+2026-01-31 18:13:19,492 - __main__ - INFO -   PASS: mask_improve
+2026-01-31 18:13:19,492 - __main__ - INFO -   PASS: mask_stats
+2026-01-31 18:13:19,492 - __main__ - INFO -   PASS: mask_unwrap
+2026-01-31 18:13:19,492 - __main__ - INFO -   PASS: kmeans
+2026-01-31 18:13:19,492 - __main__ - INFO -   PASS: features
+2026-01-31 18:13:19,492 - __main__ - INFO -   PASS: band_math
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: save
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: library
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: reload
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: correlation
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: hole created
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: hole iteration
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: hole indexing
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: box by box data creation
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: base datasets, create and reload
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: downhole minmap
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: downhole features
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: stepping downhole
+2026-01-31 18:13:19,493 - __main__ - INFO -   PASS: profile bandmaths
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: profile kmeans
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: profile features
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: profile correlation
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: Saving product datasets
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: Export csvs
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: 1400WDEP baseline compare
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: 1400WPOS baseline compare
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: 1900WDEP baseline compare
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: 1900WPOS baseline compare
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: 2200WDEP baseline compare
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: 2200WPOS baseline compare
+2026-01-31 18:13:19,494 - __main__ - INFO -   PASS: 2320WDEP baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: 2320WPOS baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: 2350WDEP baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: 2350WPOS baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: DholeAverage baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: DholeDepths baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: DholeMask baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: MinMap-MSAM-testcollectionCONF baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: MinMap-MSAM-testcollectionINDEX baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: MinMap-MSAM-testcollectionLEGEND baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: MinMap-SAM-testcollectionCONF baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: MinMap-SAM-testcollectionINDEX baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: MinMap-SAM-testcollectionLEGEND baseline compare
+2026-01-31 18:13:19,495 - __main__ - INFO -   PASS: MinMap-pearson-testcollectionCONF baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: MinMap-pearson-testcollectionINDEX baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: MinMap-pearson-testcollectionLEGEND baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: bands baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: cropped baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: kmeans-5-100CLUSTERS baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: kmeans-5-100INDEX baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: mask baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: metadata baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: savgol baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: savgol_cr baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: segments baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: stats baseline compare
+2026-01-31 18:13:19,496 - __main__ - INFO -   PASS: test-difference-cr baseline compare
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: test-ratio-2200-2320 baseline compare
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_id_match
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: num_boxes_match
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_base_AvSpectra
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_base_depths
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_product_PROF-2320WDEP
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-MSAM-testcollectionINDEX
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_product_test-ratio-2200-2320
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_product_PROF-2350WDEP
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_product_PROF-1400WDEP
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_product_PROF-1400WPOS
+2026-01-31 18:13:19,497 - __main__ - INFO -   PASS: hole_product_MinMap-pearson-testcollectionDOM-MIN
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-pearson-testcollectionCONF
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_test-difference-cr
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-SAM-testcollectionINDEX
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-2200WPOS
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-pearson-testcollectionINDEX
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-SAM-testcollectionLEGEND
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_1400WPOS
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-2200WDEP
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-1900WDEP
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_MinMap-pearson-testcollectionLEGEND
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-1900WPOS
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-kmeans-5-100CLUSTERS
+2026-01-31 18:13:19,498 - __main__ - INFO -   PASS: hole_product_PROF-2320WPOS
+2026-01-31 18:13:19,499 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-MSAM-testcollectionCONF
+2026-01-31 18:13:19,499 - __main__ - INFO -   PASS: hole_product_MinMap-pearson-testcollectionFRACTIONS
+2026-01-31 18:13:19,499 - __main__ - INFO -   PASS: hole_product_PROF-2350WPOS
+2026-01-31 18:13:19,499 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-SAM-testcollectionCONF
+2026-01-31 18:13:19,499 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-MSAM-testcollectionLEGEND
+2026-01-31 18:13:19,499 - __main__ - INFO -   PASS: hole_product_PROF-MinMap-pearson-testcollectionLEGEND
+2026-01-31 18:13:19,499 - __main__ - INFO -   PASS: hole_product_PROF-kmeans-5-100LEGEND
+2026-01-31 18:13:19,499 - __main__ - INFO -   PASS: hole_product_PROF-kmeans-5-100INDEX
+2026-01-31 18:13:19,499 - __main__ - INFO - 
+2026-01-31 18:13:19,499 - __main__ - INFO - Overall: 96/96 tests passed
+2026-01-31 18:13:19,499 - __main__ - INFO - ALL TESTS PASSED!
