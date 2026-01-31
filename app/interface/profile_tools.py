@@ -31,7 +31,7 @@ def profile_kmeans(obj, clusters = 5, iters = 50):
     obj.add_product_dataset(f'PROF-kmeans-{clusters}-{iters}CLUSTERS', classes, '.npy')
     legend = []
     for i in np.unique(img):
-        legend.append({"index" : i, "label" : f"Class {i}"})
+        legend.append({"index" : int(i), "label" : f"Class {i}"})
     obj.add_product_dataset(f'PROF-kmeans-{clusters}-{iters}LEGEND', legend, '.json')
         
     return obj

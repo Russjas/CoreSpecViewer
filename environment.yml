@@ -1,22 +1,16 @@
 name: specviewenv
 channels:
   - conda-forge
-  - defaults
 dependencies:
-  - python=3.11.5
-  - numpy=1.24.3
-  - scipy=1.11.3
-  - numba=0.58.0
-  - llvmlite=0.41.1
-  - matplotlib=3.8.0
+  - python=3.13
+  - numpy>=2.0
+  - scipy
+  - numba
+  - matplotlib
   - pyqt=5.15.10
-  - pillow=10.0.1
-  - opencv=4.6.0         
-  - spectral=0.23.1
+  - opencv
+  - spectral
   - pip
   - pip:
-      - hylite==1.36
-      - gfit==0.2
-        
-  
-
+      - hylite
+      - gfit
