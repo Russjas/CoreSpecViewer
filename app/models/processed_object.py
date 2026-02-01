@@ -328,65 +328,83 @@ class ProcessedObject:
         for ds in self.datasets.values():
             ds.load_dataset()
     
+
     def export_images(self):
-        """
-        Exports image representations of datasets and temp_datasets to the 'outputs' directory.
-        Uses context-specific masks based on the dataset key (Dhole vs. default).
-        """        
+        for key in self.datasets.keys()|self.temp_datasets.keys():
+            try:
+                logger.info(f"Attempting export {self.basename} {key}")
+                self.export_image(key)
+                logger.info(f"exported {self.basename} {key}")
+            except Exception:
+                logger.warning(f"exported {self.basename} {key}", exc_info=True)
+                continue
+        
+        
+    def export_image(self, key):
         output_dir = Path(self.root_dir) / 'outputs'
         output_dir.mkdir(parents=True, exist_ok=True)
-        def process_and_save(ds, key, mask_data):
-            """Processes and saves a single dataset image."""
-            
+        
+        ds = self.temp_datasets.get(key)
+        if ds is None:
+            ds = self.datasets.get(key)
+        if ds is None:
+            return
+        if key == "stats":
+            logger.error(f"Cannot export {key}")
+            return
+        final_path = output_dir / f'{self.basename}-{key}.jpg'  
+        print(final_path)
+        try:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
-                is_index_mode = key.endswith("INDEX")
-                if 'Mask' in key or key == "mask":
-                    im = sf.mk_thumb(ds.data, resize=False)
+                if key.startswith('Dhole'):
+                    if key == 'DholeMask':
+                        im = sf.mk_thumb(ds.data)
+                        im.save(str(final_path), quality = 95)
+                        ds.load_dataset()
+                        logger.info(f"Exported {self.basename} {key}")
+                    else:
+                        mask_to_use = getattr(self, 'DholeMask', None)
+                        if mask_to_use is not None:
+                            mask_data = mask_to_use[:, :, 0] 
+                            im = sf.mk_thumb(ds.data, mask=self.mask, index_mode=True, resize=False)
+                            im.save(str(final_path), quality = 95)
+                            logger.info(f"Exported {self.basename} {key}")
+                            ds.load_dataset()
+                        else:
+                            logger.warning(f"Warning: 'DholeMask' not found on self for key {key}. Skipping.")
+                            ds.load_dataset()
+                            return
+                elif key == "mask":
+                    im = sf.mk_thumb(ds.data)
+                    im.save(str(final_path), quality = 95)
+                    ds.load_dataset()
+                    logger.info(f"Exported {self.basename} {key}")
+                elif key.endswith("INDEX"):
+                    im = sf.mk_thumb(ds.data, mask=self.mask, index_mode=True, resize=False)
+                    im.save(str(final_path), quality = 95)
+                    ds.load_dataset()
+                    logger.info(f"Exported {self.basename} {key}")
                 else:
-                    im = sf.mk_thumb(
-                        ds.data, 
-                        mask=mask_data,  
-                        index_mode=is_index_mode, 
-                        resize=False
-                    )
-                final_path = output_dir / f'{self.basename}-{key}.jpg'
-                im.save(str(final_path), quality = 95)
-                return True
-            elif ds.ext == ".npz":
-                im = sf.mk_thumb(ds.data.data, mask=ds.data.mask, resize=False)
-                final_path = output_dir / f'{self.basename}-{key}.jpg'
-                im.save(str(final_path), quality = 95)
-                return True
+                    im = sf.mk_thumb(ds.data, mask=self.mask, resize=False)
+                    im.save(str(final_path), quality = 95)
+                    ds.load_dataset()
+                    logger.info(f"Exported {self.basename} {key}")
                 
-            return False
 
-        for key in self.datasets.keys() | self.temp_datasets.keys():
-            
-            # Get dataset (concise lookup using the Union)
-            ds = self.temp_datasets.get(key) or self.datasets.get(key)
-            if ds is None:
-                 continue 
-            if key.startswith('Dhole'):
-                mask_to_use = getattr(self, 'DholeMask', None)
-                if mask_to_use is not None:
-                    mask_data = mask_to_use[:, :, 0] 
-                else:
-                    logger.warning(f"Warning: 'DholeMask' not found on self for key {key}. Skipping.")
-                    continue
+            elif ds.ext == ".npz":
+                im = sf.mk_thumb(ds.data.data, mask=ds.data.mask)
+                im.save(str(final_path), quality = 95)
+                ds.load_dataset()
+                logger.info(f"Exported {self.basename} {key}")
+                               
             else:
-                mask_to_use = getattr(self, 'mask', None)
-                mask_data = mask_to_use
-                
-            try:
-                processed = process_and_save(ds, key, mask_data)
-                if not processed:
-                    continue 
-                
-            except ValueError as e:
-                logger.error(f"ValueError processing {key}: {e}")
-                
-                continue
-    
+                logger.warning(f"Failed to export {self.basename} {key}")
+                ds.load_dataset()
+                return
+
+        except ValueError:
+            logger.error(f"ValueError building thumb for {key}")
+            return
     
     def build_thumb(self, key):
         
