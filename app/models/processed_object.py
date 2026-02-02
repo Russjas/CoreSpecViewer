@@ -180,7 +180,7 @@ class ProcessedObject:
         if meta_path is not None:
             metadata = metadata | sf.parse_lumo_metadata(meta_path)
         
-        band_key, bands = sf.find_bands(metadata, savgol)
+        band_key, bands = sf.find_bands(metadata, data)
         
         if bands is None:
             logger.error("Cannot identify band names from the header file")
@@ -365,7 +365,10 @@ class ProcessedObject:
                     else:
                         mask_to_use = getattr(self, 'DholeMask', None)
                         if mask_to_use is not None:
-                            mask_data = mask_to_use[:, :, 0] 
+                            if mask_to_use.ndim == 3:
+                                mask_data = mask_to_use[:, :, 0]
+                            elif mask_to_use.ndim == 2:
+                                mask_data = mask_to_use
                             im = sf.mk_thumb(ds.data, mask=self.mask, index_mode=True, resize=False)
                             im.save(str(final_path), quality = 95)
                             logger.info(f"Exported {self.basename} {key}")

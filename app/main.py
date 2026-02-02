@@ -102,6 +102,7 @@ def setup_logging(log_dir='logs', log_level=logging.INFO):
         )
     except PermissionError:
         # Log file is locked, continue without file logging
+        file_handler = None
         print("Warning: Could not open log file (may be open in another program)")
     
     # Console handler
@@ -109,8 +110,8 @@ def setup_logging(log_dir='logs', log_level=logging.INFO):
     console_handler.setFormatter(
         logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     )
-    
-    logger.addHandler(file_handler)
+    if file_handler is not None:
+        logger.addHandler(file_handler)
     logger.addHandler(console_handler)
     
     return logger 
@@ -422,7 +423,7 @@ class MainRibbonController(QMainWindow):
                     QMessageBox.warning(self, "Open dataset", f"Failed to open hole dataset: {e}")
                     logger.warning(f"failed to open datasets from {path} provided", exc_info=True)
                     return
-                    return
+                    
 
 
     def load_from_disk(self):
