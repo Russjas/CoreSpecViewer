@@ -718,7 +718,8 @@ class SpectralImageCanvas(QWidget):
         self.cube = cube
         self.bands = bands
         rgb = sf.get_false_colour(cube)
-
+        logger.debug(f"nans in rgb: {(np.isnan(rgb).any())}")
+        logger.debug(f"shape of false colour {rgb.shape}")
         self.ax.clear()
         self.ax.imshow(rgb, origin="upper")
         self.ax.set_axis_off()

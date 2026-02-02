@@ -167,10 +167,16 @@ def cr(spectra):
 
 #======== Visualisation helpers =========================================================
 def get_false_colour(array, bands=None):
-    '''
-    accepts a numpy array and returns 3 band image
-    '''
-    return sp.get_rgb(array, bands=bands)
+    """
+    spectral.get_rgb(), but guarantees finite output by replacing NaN/Inf with 0.
+    """
+    rgb = sp.get_rgb(array, bands=bands)
+
+    if not np.isfinite(rgb).all():
+        logger.debug("Non-finite values in display output; zero-filling")
+        rgb = np.nan_to_num(rgb, nan=0.0, posinf=0.0, neginf=0.0, copy=True)
+
+    return rgb
 
 def get_false_colour_fast(array, bands=None):
     """
@@ -882,9 +888,10 @@ def get_fenix_reflectance(path, mode='hylite'):
         hyimg = hyimg[0]
     if mode == 'hylite':
         reflectance = hyimg.data
+        logger.debug(f"Hylite path reflextance shape {reflectance.shape}")
     else:
         reflectance = fenix_smile_correction(np.transpose(hyimg.data, (1, 0, 2)))          # (H, W, B), float32
-    
+        logger.debug(f"derived path reflextance shape {reflectance.shape}")
     bands       = hyimg.get_wavelengths()
     snr         = None # snr workflows not implemented yet
     band_slice = _slice_from_sensor("FENIX Sensor")
@@ -893,6 +900,7 @@ def get_fenix_reflectance(path, mode='hylite'):
         reflectance = np.flip(reflectance, axis = 0)
     else:
         reflectance = np.rot90(reflectance, 2)
+    logger.debug(f"reflectance shape {reflectance.shape}, bands shape {bands.shape}, slice: {band_slice} ")
     return reflectance[:,:, band_slice]*100, bands[band_slice], snr
 
 

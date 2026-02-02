@@ -1906,7 +1906,7 @@ def run_integration_test(create_baseline = False):
         
         
         
-    print(results) 
+    
     return report_results(results)
 
 

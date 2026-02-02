@@ -335,8 +335,9 @@ class ProcessedObject:
                 
                 self.export_image(key)
                 logger.info(f"exported {self.basename} {key}")
-            except Exception:
-                logger.warning(f"export failed for  {self.basename} {key}", exc_info=True)
+            except (ValueError, FileNotFoundError):
+                logger.debug(f"export failed for  {self.basename} {key}", exc_info=True)
+                logger.warning(f"export failed for  {self.basename} {key}")
                 continue
         
         
@@ -360,7 +361,6 @@ class ProcessedObject:
                     if key == 'DholeMask':
                         im = sf.mk_thumb(ds.data)
                         im.save(str(final_path), quality = 95)
-                        ds.load_dataset()
                         logger.info(f"Exported {self.basename} {key}")
                     else:
                         mask_to_use = getattr(self, 'DholeMask', None)
@@ -372,41 +372,40 @@ class ProcessedObject:
                             im = sf.mk_thumb(ds.data, mask=self.mask, index_mode=True, resize=False)
                             im.save(str(final_path), quality = 95)
                             logger.info(f"Exported {self.basename} {key}")
-                            ds.load_dataset()
                         else:
                             logger.warning(f"Warning: 'DholeMask' not found on self for key {key}. Skipping.")
-                            ds.load_dataset()
+                            
                             return
                 elif key == "mask":
                     im = sf.mk_thumb(ds.data)
                     im.save(str(final_path), quality = 95)
-                    ds.load_dataset()
+                    
                     logger.info(f"Exported {self.basename} {key}")
                 elif key.endswith("INDEX"):
                     im = sf.mk_thumb(ds.data, mask=self.mask, index_mode=True, resize=False)
                     im.save(str(final_path), quality = 95)
-                    ds.load_dataset()
+                    
                     logger.info(f"Exported {self.basename} {key}")
                 else:
                     im = sf.mk_thumb(ds.data, mask=self.mask, resize=False)
                     im.save(str(final_path), quality = 95)
-                    ds.load_dataset()
+                    
                     logger.info(f"Exported {self.basename} {key}")
                 
 
             elif ds.ext == ".npz":
                 im = sf.mk_thumb(ds.data.data, mask=ds.data.mask)
                 im.save(str(final_path), quality = 95)
-                ds.load_dataset()
+                
                 logger.info(f"Exported {self.basename} {key}")
                                
             else:
                 logger.warning(f"Failed to export {self.basename} {key}")
-                ds.load_dataset()
+                
                 return
 
         except ValueError:
-            logger.error(f"ValueError building thumb for {key}")
+            logger.error(f"ValueError exporting image for {key}")
             return
     
     def build_thumb(self, key):
