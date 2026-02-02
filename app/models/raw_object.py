@@ -166,7 +166,7 @@ class RawObject:
                 dark_data_path=self.files['dark raw'],
             )
         else:
-            print(len(self.metadata['wavelength']))
+            logger.debug(f"length of loaded bands {len(self.metadata['wavelength'])}")
             if len(self.metadata['wavelength']) < 400:
                 self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='hylite')
             else:
@@ -183,7 +183,7 @@ class RawObject:
         """
         if getattr(self, "reflectance", None) is not None:
             return self.reflectance
-        print(self.sensor.lower())
+        logger.info(f"{(self.sensor.lower())} sensor detected")
         if "fenix" not in self.sensor.lower():
             self.reflectance, self.bands, self.snr = sf.find_snr_and_reflect(
                 self.files['data head'],
@@ -195,7 +195,7 @@ class RawObject:
                 dark_data_path=self.files['dark raw'],
             )
         else:
-            print(len(self.metadata['wavelength']))
+            logger.debug(f"length of loaded bands {len(self.metadata['wavelength'])}")
             if len(self.metadata['wavelength']) < 400:
                 self.reflectance, self.bands, self.snr = sf.get_fenix_reflectance(str(self.root_dir), mode='hylite')
             else:

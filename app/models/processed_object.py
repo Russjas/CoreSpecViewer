@@ -175,7 +175,7 @@ class ProcessedObject:
         """
         path = Path(head_path)
         root = path.parent
-        name = path.name
+        name = path.stem
         data, metadata = sf.load_envi(head_path, data_path)
         if meta_path is not None:
             metadata = metadata | sf.parse_lumo_metadata(meta_path)
@@ -332,11 +332,11 @@ class ProcessedObject:
     def export_images(self):
         for key in self.datasets.keys()|self.temp_datasets.keys():
             try:
-                logger.info(f"Attempting export {self.basename} {key}")
+                
                 self.export_image(key)
                 logger.info(f"exported {self.basename} {key}")
             except Exception:
-                logger.warning(f"exported {self.basename} {key}", exc_info=True)
+                logger.warning(f"export failed for  {self.basename} {key}", exc_info=True)
                 continue
         
         
@@ -353,7 +353,7 @@ class ProcessedObject:
             logger.error(f"Cannot export {key}")
             return
         final_path = output_dir / f'{self.basename}-{key}.jpg'  
-        print(final_path)
+        logger.debug(f"Attempting export {self.basename} {key} to {final_path}")
         try:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
                 if key.startswith('Dhole'):

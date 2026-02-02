@@ -51,6 +51,9 @@ Typical usage
 import re
 import ast
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # Allowed function names
@@ -132,21 +135,6 @@ def preprocess_r_prefix(expr):
     return result
 
 
-# =============================================================================
-# def interp_function(band1, band2):
-#     """
-#     Linear interpolation between two bands.
-#     Returns the average of the two bands.
-#     
-#     Args:
-#         band1: First band array (H, W)
-#         band2: Second band array (H, W)
-#     
-#     Returns:
-#         Interpolated values (H, W)
-#     """
-#     return (band1 + band2) / 2.0
-# =============================================================================
 def interp_function(band1, band2, weight=0.5):
     """
     Linear interpolation between two bands.
@@ -189,7 +177,7 @@ def parse_and_transform_expression(expr):
     expr = sanitize_expression(expr)
     
     if not expr:
-        print("failed on not")
+        logger.debug("No Expression after sanitisation")
         return None, None
     
     # Convert R1400 to R(1400) format

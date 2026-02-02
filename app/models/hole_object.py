@@ -144,7 +144,7 @@ class HoleObject:
                 po.reload_all()
         except Exception as e:
             logger.error(f'many, many things could have gone wrong', exc_info=True)
-            print(f'many, many things could have gone wrong - new code.{e}')
+            
             return self
         self.base_datasets['depths'] = Dataset(base=self.hole_id, 
                                           key="depths", 
@@ -215,7 +215,7 @@ class HoleObject:
         self.add_product_dataset(dom_key, full_dominant, ext=".npy")
         self.add_product_dataset(leg_key, legend, ext=".json")
         
-        print("datasets successfully created!")
+        logger.info("Base datasets successfully created!")
         
     def create_dhole_features(self, key):
         """

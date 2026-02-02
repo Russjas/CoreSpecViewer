@@ -150,10 +150,10 @@ class HoleActions(BaseActions):
             self.cxt.ho.save_product_datasets()
             for po in self.cxt.ho:
                 if po.has_temps:
-                    print(po.metadata['box number'])
+                    logger.info(f"{po.metadata['box number']} box number")
                     po.commit_temps()
                     po.save_all()
-                    print('saved all, reloading')
+                    logger.info('saved all, reloading')
                     po.reload_all()
                     po.load_thumbs()
                     logger.info(f"Data saved for {po.basename}")

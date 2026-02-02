@@ -39,7 +39,7 @@ def _slice_from_sensor(sensor_type: str):
     Derive the edge bands to slice out using the config dict
     """
     s = sensor_type or ""
-    print(s)
+    logger.info(f"Sensor type {s}")
     if "SWIR" in s:
         start, stop = con_dict["swir_slice_start"], con_dict["swir_slice_stop"]
     elif "RGB" in s:
@@ -1867,7 +1867,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
     check_response =  est_peaks_cube_scipy_thresh(savgol_cr, bands, wavrange=(wav_min, wav_max), thresh = thresh)
 
     if technique.upper() == 'QND':
-        print(technique)
+        logger.info(f"Using fit type {technique} for MWL")
         new_bands = bands[cr_crop_min_index:cr_crop_max_index]
         m, n, b = savgol_cr.shape
         data = remove_hull(savgol_cr[:,:, cr_crop_min_index:cr_crop_max_index])
@@ -1880,7 +1880,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
         depth = 1-np.min(data, axis=2)
 
     elif technique.upper() == 'POLY':
-        print(technique)
+        logger.info(f"Using fit type {technique} for MWL")
         hiswir = hylite.HyImage(savgol)
         hiswir.set_wavelengths(bands)
         Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max),
@@ -1889,7 +1889,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
         position = Mpoly.__getitem__([0,'pos'])
         width = Mpoly.__getitem__([0,'width'])
     elif technique.upper() == 'GAUS':
-        print(technique)
+        logger.info(f"Using fit type {technique} for MWL")
         hiswir = hylite.HyImage(savgol)
         hiswir.set_wavelengths(bands)
         Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max),
@@ -1898,7 +1898,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
         position = Mpoly.__getitem__([0,'pos'])
         width = Mpoly.__getitem__([0,'width'])
     elif technique.upper() == 'QUAD':
-        print(technique)
+        logger.info(f"Using fit type {technique} for MWL")
         hiswir = hylite.HyImage(savgol)
         hiswir.set_wavelengths(bands)
         Mpoly = minimum_wavelength( hiswir, float(cr_crop_min), float(cr_crop_max),
@@ -2069,11 +2069,11 @@ def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3
     for i in range(w):
         for j in range(l):
             peak_indices, peak_dict = sc.signal.find_peaks(1-data[i,j], height=(None, None))
-            #print(peak_dict.keys())
+            
             peak_heights = peak_dict['peak_heights']
-            #print(type(peak_heights), type(peak_heights)[0])
+           
             x = [bands[peak_indices[i]] for i in range(len(peak_indices)) if peak_heights[i] >thresh ]
-            #print(len(x))
+           
             for k in x:
                 if k > wavrange[0] and k < wavrange[1]:
                     arr[i,j] = k
@@ -2197,7 +2197,7 @@ def get_SQM_peak_finder_vectorized(data, bands, atol=1e-12):
     if data.ndim == 2:
         data = np.expand_dims(data, 0)  # (1,N,B)
     M, N, B = data.shape
-    print(M,N,B, bands.shape)
+    logger.debgug(f"shape {M,N,B}, bands {bands.shape}")
     # Argmin index at each pixel
     b = np.argmin(data, axis=-1)  # (M,N)
 
@@ -2490,12 +2490,12 @@ def carbonate_facies(savgol, savgol_cr, mask, bands, technique = 'QUAD'):
     wav_max_index_23 = np.argmin(np.abs(np.array(bands)-(feats['2320W'][1])))
 
 
-    print('checking dirty or clean')
+    logger.debug('checking dirty or clean')
     dirty_or_clean = est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min_22, wav_max_22))
-    print('checking how calcitic')
+    logger.debug('checking how calcitic')
     calcitic_or_not = est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min_23, wav_max_23))
     #carb wavelength position
-    print('MWL-ing')
+    logger.debug('MWL-ing')
     calc_or_dolo, _, feat_mask = Combined_MWL(savgol, savgol_cr, mask, bands, '2320W', technique = technique)
 
 
@@ -2609,12 +2609,12 @@ def carbonate_facies_original(savgol, savgol_cr, mask, bands, technique = 'QUAD'
     wav_max_index_23 = np.argmin(np.abs(np.array(bands)-(feats['2320W'][1])))
 
 
-    print('checking dirty or clean')
+    logger.debug('checking dirty or clean')
     dirty_or_clean = est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min_22, wav_max_22))
-    print('checking how calcitic')
+    logger.debug('checking how calcitic')
     calcitic_or_not = est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min_23, wav_max_23))
     #carb wavelength position
-    print('MWL-ing')
+    logger.debug('MWL-ing')
     
     calc_or_dolo, _ = get_SQM_peak_finder_vectorized(remove_hull(savgol[:,:,cr_crop_min_index_23:cr_crop_max_index_23]), bands[cr_crop_min_index_23:cr_crop_max_index_23])
 
