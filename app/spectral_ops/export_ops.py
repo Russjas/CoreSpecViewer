@@ -147,7 +147,7 @@ def write_fractions_profile(
         # Legend entries correspond to columns 0..K-1 in order
         # Column K (last) is unclassified
         for entry in legend:
-            mineral_name = entry.get("name", "unnamed mineral")
+            mineral_name = entry.get("label", "unnamed mineral")
             headers.append(mineral_name)
         
         # Last column is unclassified
@@ -228,7 +228,7 @@ def write_categorical_profile(
                 if legend:
                     # idx_int is position in legend list
                     if 0 <= idx_int < len(legend):
-                        mineral_name = legend[idx_int].get("name", "unnamed mineral")
+                        mineral_name = legend[idx_int].get("label", "unnamed mineral")
                     else:
                         mineral_name = f'Unknown (index {idx_int})'
                     row.append(mineral_name)
