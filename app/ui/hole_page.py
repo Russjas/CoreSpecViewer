@@ -265,7 +265,7 @@ class HoleBoxTable(QTableWidget):
 
         base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
         unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
-        non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands", 'metadata' }
+        non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands", 'metadata', "display" }
         base = []
         unwrapped = []
         products = []
