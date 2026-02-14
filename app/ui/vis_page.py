@@ -177,10 +177,19 @@ class VisualisePage(BasePage):
             return
         if self.current_obj.is_raw:
             return
-        self.left_canvas.show_rgb(self.current_obj.savgol, self.current_obj.bands)
-
+        import time
+        start = time.perf_counter()
+        logger.debug(f"PROFILE VIS PAGE UPDATE DISPLAY: Start : {start:.4f}s")
+        self.left_canvas.show_rgb_direct(self.current_obj.display)
+        checkpoint_1 = time.perf_counter()
+        logger.debug(f"PROFILE UPDATE DISPLAY: Left canvas displayed: {checkpoint_1 - start:.4f}s")
         self.refresh_cache_table()
+        checkpoint_2 = time.perf_counter()
+        logger.debug(f"PROFILE UPDATE DISPLAY: cache table refreshed: {checkpoint_2 - checkpoint_1:.4f}s")
         self._display_product_in_canvas(self.right_canvas, 'mask')
+        checkpoint_3 = time.perf_counter()
+        logger.debug(f"PROFILE UPDATE DISPLAY: right canvas displayed: {checkpoint_3 - checkpoint_1:.4f}s")
+        logger.debug(f"PROFILE UPDATE DISPLAY: TOTAL update display : {checkpoint_3 - start:.4f}s")
 
     def _on_row_activated(self, row: int, col: int):
         """

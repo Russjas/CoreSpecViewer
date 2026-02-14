@@ -477,6 +477,7 @@ class RawObject:
         po.add_dataset('savgol', savgol, ext='.npy')
         po.add_dataset('savgol_cr', savgol_cr, ext='.npy')
         po.add_dataset('mask', mask, ext='.npy')
+        po._generate_display()
         po.build_all_thumbs()
         return po
 

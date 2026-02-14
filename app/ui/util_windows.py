@@ -724,6 +724,14 @@ class SpectralImageCanvas(QWidget):
         self.ax.imshow(rgb, origin="upper")
         self.ax.set_axis_off()
         self.canvas.draw()
+        
+    def show_rgb_direct(self, rgb_array):
+        """Display pre-computed RGB"""
+        self.ax.clear()
+        self.ax.imshow(rgb_array, origin="upper")
+        self.ax.set_xticks([])
+        self.ax.set_yticks([])
+        self.canvas.draw()
 
     # -------- Double-click → spectrum (per-canvas window) --------
     def on_image_click(self, event):

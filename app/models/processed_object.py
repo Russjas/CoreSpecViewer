@@ -14,7 +14,7 @@ from PIL import Image
 from ..spectral_ops import spectral_functions as sf
 from .dataset import Dataset
 
-base_datasets = ["cropped", "savgol", "savgol_cr", "mask", "bands", "metadata"]
+base_datasets = ["cropped", "savgol", "savgol_cr", "mask", "bands", "metadata", "display"]
 logger = logging.getLogger(__name__)
 
 
@@ -136,9 +136,13 @@ class ProcessedObject:
 
             ds = Dataset(base=basename, key=key, path=fp, suffix=key, ext=ext)
             datasets[key] = ds
-            
+        obj = cls(basename=basename, root_dir=root, datasets=datasets)
+        if 'display' not in obj.datasets:
+            obj._generate_display()
+            obj.datasets['display'].save_dataset()
+            obj.reload_all()  # Drop back to memmaps   
 
-        return cls(basename=basename, root_dir=root, datasets=datasets)
+        return obj
 
 
     @classmethod
@@ -200,9 +204,20 @@ class ProcessedObject:
         po.add_dataset('savgol', savgol, ext='.npy')
         po.add_dataset('savgol_cr', savgol_cr, ext='.npy')
         po.add_dataset('mask', mask, ext='.npy')
+        po._generate_display()
         po.build_all_thumbs()
         return po
         
+    def _generate_display(self):
+        """Generate RGB display dataset from savgol"""
+        logger.info(f"Generating display dataset for {self.basename}")
+        
+        rgb = sf.get_false_colour(self.savgol)
+        rgb_uint8 = (rgb * 255).astype(np.uint8)
+        
+        self.add_dataset("display", rgb_uint8, ext=".npy") 
+
+
 
     # ---- disk I/O helpers ----
     def save_all(self, new=False):

@@ -341,10 +341,20 @@ class MainRibbonController(QMainWindow):
             view_key: Optional view to switch to ('raw', 'vis', 'lib', 'hol')
             dataset_key: Dataset key to display (default: 'mask')
         """
+        import time
+        start = time.perf_counter()
+        logger.debug(f"PROFILE CONTROLLER REFRESH: Start controller refesh: {start:.4f}s")
         self._distribute_context()
+        checkpoint_1 = time.perf_counter()
+        logger.debug(f"PROFILE CONTROLLER REFRESH: context distributed: {checkpoint_1 - start:.4f}s")
         if view_key:
             self.choose_view(view_key)
+            checkpoint_2 = time.perf_counter()
+            logger.debug(f"PROFILE CONTROLLER REFRESH: Choose view path: {checkpoint_2 - checkpoint_1:.4f}s")
         self.update_display(key=dataset_key)
+        checkpoint_3 = time.perf_counter()
+        logger.debug(f"PROFILE CONTROLLER REFRESH: after update display (time calculated independent of choose view path): {checkpoint_3 - checkpoint_1:.4f}s")
+        logger.debug(f"PROFILE CONTROLLER REFRESH: Total : {checkpoint_3 - start:.4f}s")
 
 #================= Global actions========================================
 
