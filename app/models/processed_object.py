@@ -479,6 +479,315 @@ class ProcessedObject:
             else:
                 self.build_thumb(key)
     
+    def save_archive_file(self, output_dir: Path | str = None, 
+                  include_products: bool = False) -> Path:
+        """
+        Save ProcessedObject as a legacy NPZ archive file.
+        
+        Creates an NPZ file containing cropped, mask, metadata, and bands datasets
+        in a structured format with optional derived products.
+        
+        Parameters
+        ----------
+        output_path : Path | str, optional
+            Path for the output NPZ file. If None, saves to root_dir with basename.
+        include_products : bool, default=False
+            If True, includes all derived products in a nested 'products' dictionary.
+        
+        Returns
+        -------
+        Path
+            Path to the created NPZ file.
+        
+        Examples
+        --------
+        >>> po = ProcessedObject.from_path("mydata_cropped.npy")
+        >>> # Save only base datasets
+        >>> archive_path = po.save_archive_file()
+        
+        >>> # Save everything including all products
+        >>> archive_path = po.save_archive_file(include_products=True)
+        >>> 
+        >>> # Save to specific location
+        >>> po.save_archive_file("E:/Archives/", include_products=True)
+        
+        Notes
+        -----
+        NPZ structure:
+        - cropped : reflectance data cube (ndarray)
+        - mask : binary mask array (ndarray)
+        - metadata : metadata dictionary (wrapped as numpy object)
+        - bands : wavelength centers (ndarray)
+        - products : nested dictionary (wrapped as numpy object) containing:
+            - key : ndarray (for regular arrays)
+            - keyDATA : ndarray (for masked arrays - data component)
+            - keyMASK : ndarray (for masked arrays - mask component)
+            - key : dict (for dictionary products like legends)
+        
+        The 'products' dictionary preserves the original data types:
+        - Regular ndarrays are stored directly
+        - Masked arrays are split into DATA and MASK components
+        - Dictionaries are stored directly (nested within products dict)
+        
+        All Python objects (metadata dict, products dict, and nested dicts within
+        products) are serialized using NumPy's pickle mechanism via dtype=object.
+        
+        To load:
+        >>> with np.load(path, allow_pickle=True) as npz:
+        >>>     cropped = npz['cropped']
+        >>>     metadata = npz['metadata'].item()
+        >>>     if 'products' in npz.files:
+        >>>         products = npz['products'].item()
+        >>>         # Access regular array:
+        >>>         savgol = products['savgol']
+        >>>         # Reconstruct masked array:
+        >>>         stats = np.ma.array(products['statsDATA'], 
+        >>>                            mask=products['statsMASK'])
+        >>>         # Access nested dict:
+        >>>         legend = products['MinMap-LEGEND']
+        
+        See Also
+        --------
+        hydrate_from_archive : Load ProcessedObject from legacy NPZ archive
+        save_all : Save datasets to individual files
+        """
+        if output_dir is None:
+            output_path = self.root_dir / f"{self.basename}.npz"
+        else:
+            output_path = Path(output_dir) / f"{self.basename}.npz"
+        
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"Saving {self.basename} as archive: {output_path}")
+        
+        # Build the base data dictionary
+        # Arrays are stored directly, dicts are wrapped as numpy objects
+        data_dict = {
+            'cropped': self.cropped,
+            'mask': self.mask,
+            'metadata': np.array(self.metadata, dtype=object),
+            'bands': self.bands
+        }
+        
+        # Add products in nested structure if requested
+        if include_products:
+            products = {}
+            
+            for key, ds in self.datasets.items():
+                # Skip the base ones already added
+                if key in ('savgol', 'savgol_cr', 'metadata', 'bands', 'cropped', 'mask'):
+                    continue
+                
+                # Load dataset if not already in memory
+                if ds.data is None:
+                    ds.load_dataset()
+                
+                # Handle different data types
+                if isinstance(ds.data, dict):
+                    # Dictionary (e.g., legends) - store directly in products dict
+                    # It will be pickled as part of the outer products dict
+                    products[key] = ds.data
+                    logger.debug(f"Including dict: {key}")
+                    
+                elif isinstance(ds.data, np.ma.MaskedArray):
+                    # Masked array - store data and mask separately with suffix
+                    products[f"{key}DATA"] = ds.data.data
+                    products[f"{key}MASK"] = ds.data.mask
+                    logger.debug(f"Including masked_array: {key} (as {key}DATA, {key}MASK)")
+                    
+                elif isinstance(ds.data, np.ndarray):
+                    # Regular ndarray - store directly
+                    products[key] = ds.data
+                    logger.debug(f"Including ndarray: {key}")
+                    
+                else:
+                    logger.warning(f"Skipping unknown data type for {key}: {type(ds.data)}")
+            
+            data_dict['products'] = np.array(products, dtype=object)
+            logger.info(f"Added {len(products)} products to archive")
+        
+        # Save the NPZ
+        np.savez(output_path, **data_dict)
+        
+        logger.info(f"Legacy NPZ saved: {output_path}")
+        return output_path
+        
+    
+    @classmethod
+    def hydrate_from_archive(cls, npz_path: Path | str, 
+                            output_dir: Path | str,
+                            basename: str = None,
+                            load_products: bool = True) -> "ProcessedObject":
+        """
+        Create a ProcessedObject from an archive NPZ file.
+        
+        Loads base datasets and optionally derived products from an NPZ archive
+        created by save_archive_file(). Always generates savgol and savgol_cr
+        from the cropped data.
+        
+        Parameters
+        ----------
+        npz_path : Path | str
+            Path to the archive NPZ file.
+        output_dir : Path | str
+            Directory where the new ProcessedObject files will be saved.
+        basename : str, optional
+            Name for the ProcessedObject. If None, uses the NPZ filename stem.
+        load_products : bool, default=True
+            Whether to load additional products from the 'products' dict if present.
+        
+        Returns
+        -------
+        ProcessedObject
+            New ProcessedObject instance with all datasets extracted and saved.
+        
+        Examples
+        --------
+        >>> # Load archive with all products
+        >>> po = ProcessedObject.hydrate_from_archive(
+        ...     "mydata.npz",
+        ...     "D:/HSI_Processed/"
+        ... )
+        
+        >>> # Load to specific location with custom basename
+        >>> po = ProcessedObject.hydrate_from_archive(
+        ...     "E:/Archives/data.npz",
+        ...     "D:/Restored/",
+        ...     basename="16.101.HILLSTREET_56"
+        ... )
+        
+        >>> # Load only base datasets, skip products
+        >>> po = ProcessedObject.hydrate_from_archive(
+        ...     "data.npz",
+        ...     "output/",
+        ...     load_products=False
+        ... )
+        
+        Notes
+        -----
+        Expected NPZ structure:
+        - cropped : reflectance data cube (ndarray)
+        - mask : binary mask array (ndarray)
+        - metadata : metadata dictionary (numpy object)
+        - bands : wavelength centers (ndarray)
+        - products (optional) : nested dictionary (numpy object) containing:
+            - key : ndarray (for regular arrays)
+            - keyDATA + keyMASK : ndarrays (for masked arrays)
+            - key : dict (for dictionary products)
+        
+        The method will:
+        1. Load base datasets (cropped, mask, metadata, bands)
+        2. Generate savgol and savgol_cr from cropped data (always)
+        3. Load products if load_products=True and products exist in archive
+        4. Reconstruct masked arrays from DATA/MASK pairs
+        5. Build thumbnails for all datasets
+        6. Save all datasets to individual files
+        
+        Note: savgol and savgol_cr are never stored in the archive - they are
+        always regenerated from cropped data to save space and ensure consistency.
+        
+        Raises
+        ------
+        FileNotFoundError
+            If the NPZ file doesn't exist.
+        KeyError
+            If required base datasets (cropped, mask, metadata, bands) are missing.
+        
+        See Also
+        --------
+        save_archive_file : Create an archive NPZ file
+        from_path : Load existing ProcessedObject from directory
+        new : Create a new empty ProcessedObject
+        """
+        npz_path = Path(npz_path)
+        output_dir = Path(output_dir)
+        
+        if not npz_path.exists():
+            raise FileNotFoundError(f"Archive NPZ file not found: {npz_path}")
+        
+        if basename is None:
+            basename = npz_path.stem
+        
+        logger.info(f"Hydrating ProcessedObject from archive: {npz_path.name}")
+        
+        try:
+            with np.load(npz_path, allow_pickle=True) as npz:
+                try:
+                    cropped = npz["cropped"]
+                    mask = npz["mask"].astype(int)
+                    metadata = npz["metadata"].item()
+                    bands = npz["bands"]
+                except KeyError as e:
+                    raise KeyError(f"Missing required dataset in archive: {e}")
+                
+                # Create new ProcessedObject
+                po = cls.new(output_dir, basename)
+                po.add_dataset('metadata', metadata, ext='.json')
+                po.add_dataset('cropped', cropped, ext='.npy')
+                po.add_dataset('bands', bands, ext='.npy')
+                po.add_dataset('mask', mask, ext='.npy')
+                
+                logger.debug(f"Loaded base datasets for {basename}")
+                
+                savgol, savgol_cr, _ = sf.process(cropped)
+                po.add_dataset('savgol', savgol, ext='.npy')
+                po.add_dataset('savgol_cr', savgol_cr, ext='.npy')
+                logger.debug(f"Generated savgol and savgol_cr from cropped data")
+                
+                # Load products if present and requested
+                if load_products and 'products' in npz.files:
+                    products = npz['products'].item()
+                    
+                    # Track which keys are part of masked arrays
+                    handled = set()
+                    
+                    # First pass: identify and reconstruct masked arrays
+                    for key in list(products.keys()):
+                        if key.endswith('DATA'):
+                            base_key = key[:-4]  # Remove 'DATA'
+                            mask_key = f"{base_key}MASK"
+                            
+                            if mask_key in products:
+                                # Reconstruct masked array
+                                data = np.ma.array(products[key], mask=products[mask_key])
+                                po.add_dataset(base_key, data, ext='.npz')
+                                handled.add(key)
+                                handled.add(mask_key)
+                                logger.debug(f"Loaded masked_array: {base_key}")
+                    
+                    # Second pass: load remaining products
+                    for key, data in products.items():
+                        if key in handled:
+                            continue
+                        
+                        if isinstance(data, dict):
+                            # Dictionary product (e.g., legends)
+                            po.add_dataset(key, data, ext='.json')
+                            logger.debug(f"Loaded dict: {key}")
+                        elif isinstance(data, np.ndarray):
+                            # Regular array
+                            po.add_dataset(key, data, ext='.npy')
+                            logger.debug(f"Loaded ndarray: {key}")
+                        else:
+                            logger.warning(f"Skipping unknown product type: {key} ({type(data)})")
+                    
+                    logger.info(f"Loaded {len(products)} products from archive")
+                
+                # Build thumbnails and save all datasets
+                if "display" not in po.datasets.keys():
+                    po._generate_display()
+                po.build_all_thumbs()
+                               
+                logger.info(f"Successfully hydrated {basename} with {len(po.datasets)} datasets")
+                return po
+                
+        except Exception as e:
+            logger.error(f"Failed to hydrate from archive: {npz_path}", exc_info=True)
+            raise
+    
+    
+    
+    
     def delete_dataset(self, key):
         
         """

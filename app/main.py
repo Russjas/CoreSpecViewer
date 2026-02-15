@@ -174,7 +174,11 @@ class MainRibbonController(QMainWindow):
         self.multibox_act.triggered.connect(self.process_multi_raw)
         self.multibox_act.setToolTip("Select a directory to process All raw data inside")
         
-        everpresents = [self.open_act, self.multibox_act, self.save_act, self.save_as_act, self.undo_act]
+        self.archive_box_act = QAction("Archive Box", self)
+        self.archive_box_act.triggered.connect(self.archive_box)
+        self.archive_box_act.setToolTip("Send this box to an archive file")
+        
+        everpresents = [self.open_act, self.multibox_act, self.save_act, self.save_as_act, self.undo_act,self.archive_box_act]
 
         self.ribbon.add_global_actions(everpresents)
         #====== non-tab buttons=================
@@ -447,6 +451,27 @@ class MainRibbonController(QMainWindow):
     def process_multi_raw(self):
         logger.info("Button clicked: multi-box processing")
         multi_box.run_multibox_dialog(self)
+
+    
+    def archive_box(self):
+        logger.info("Button clicked: Archive Box")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Archive", msg)
+            return
+        dest = QFileDialog.getExistingDirectory(self, "Choose save folder", str(self.cxt.current.root_dir))
+        if not dest:
+            return
+        test = two_choice_box('Save product datasets?', 'yes', 'no')
+        try:
+            if test != 'left':
+                self.cxt.current.save_archive_file(dest)
+            else:
+                self.cxt.current.save_archive_file(dest, include_products = True)
+        except (KeyError, FileNotFoundError, PermissionError) as e:
+            logger.error(f"Failed to archive dataset {self.cxt.current.basename}", exc_info=True)
+            QMessageBox.warning(self, "Archive dataset", f"Failed to archive dataset: {e}")
 
 
     def save_clicked(self):

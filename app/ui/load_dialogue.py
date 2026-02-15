@@ -75,14 +75,16 @@ class LoadDialogue(QDialog):
         self.page_hole = self._build_hole_page()
         self.page_raw = self._build_raw_page()
         self.ref_page = self._build_reflectance_page()
-
+        self.page_archive = self._build_archive_page()
+        
         self.stack.addWidget(self.page_menu)       # index 0
         self.stack.addWidget(self.page_processed)  # index 1
         self.stack.addWidget(self.page_lumo)        # index 2
         self.stack.addWidget(self.page_hole)       # index 3
         self.stack.addWidget(self.page_raw)    # index 4
         self.stack.addWidget(self.ref_page)    # index 5
-
+        self.stack.addWidget(self.page_archive)    # index 6
+        
         # Bottom row: Back + Cancel
         bottom = QHBoxLayout()
         bottom.setSpacing(8)
@@ -182,6 +184,22 @@ class LoadDialogue(QDialog):
         env_ref_btn.clicked.connect(lambda: self._show_page(5)) 
         ref_btns.addWidget(env_ref_btn, 0,0)
         lay.addLayout(ref_btns, 1)
+        
+        #Sep + label
+        lay.addWidget(self._hline())
+        lay.addWidget(self._section_label("Open archive files"))
+        
+        # Archive buttons
+        archive_btns = QGridLayout()
+        archive_btns.setHorizontalSpacing(12)
+        archive_btns.setVerticalSpacing(12)
+        
+        archive_btn = QPushButton("Open archive file (NPZ format)") 
+        archive_btn.setToolTip("Load box or hole archives in NPZ format. Hydrates ProcessedObject from compact archive.")
+        archive_btn.clicked.connect(lambda: self._show_page(6))
+        archive_btns.addWidget(archive_btn, 0, 0)
+        lay.addLayout(archive_btns, 1)
+        
 
         return w
 
@@ -475,7 +493,95 @@ class LoadDialogue(QDialog):
         lay.addStretch(1)
         return w
     
-    
+    def _build_archive_page(self) -> QWidget:
+        """
+        Page for loading NPZ archive files (box or hole level).
+        """
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setSpacing(10)
+
+        lay.addWidget(self._section_label("Archive files (NPZ format)"))
+        lay.addWidget(
+            QLabel(
+                "Load compact NPZ archives containing core box or hole data. "
+                "Archives store base datasets (cropped, mask, metadata, bands) and optionally derived products."
+            )
+        )
+
+        # ---------- Box Archive ----------
+        lay.addWidget(self._subsection_label("Box Archive"))
+
+        grid_box = QGridLayout()
+        grid_box.setHorizontalSpacing(8)
+        grid_box.setVerticalSpacing(8)
+
+        self.le_box_archive = self._path_line("Select box archive file (.npz)...")
+        btn_browse_box = QPushButton("Browse file…")
+        btn_browse_box.clicked.connect(
+            lambda: self._browse_file_into(
+                self.le_box_archive,
+                "Select box archive NPZ file",
+                "NPZ Files (*.npz)"
+            )
+        )
+
+        grid_box.addWidget(QLabel("Box archive file:"), 0, 0)
+        grid_box.addWidget(self.le_box_archive, 0, 1)
+        grid_box.addWidget(btn_browse_box, 0, 2)
+
+        lay.addLayout(grid_box)
+
+        btn_load_box = QPushButton("Load Box Archive")
+        btn_load_box.clicked.connect(self._load_box_archive_clicked)
+        lay.addWidget(btn_load_box)
+
+        hint_box = QLabel(
+            "Hydrates ProcessedObject from archive via ProcessedObject.hydrate_from_archive(). "
+            "Automatically generates savgol and savgol_cr from stored cropped data."
+        )
+        hint_box.setWordWrap(True)
+        hint_box.setStyleSheet("color: #666;")
+        lay.addWidget(hint_box)
+
+        # Separator
+        lay.addWidget(self._hline())
+
+        # ---------- Hole Archive ----------
+        lay.addWidget(self._subsection_label("Hole Archive"))
+
+        grid_hole = QGridLayout()
+        grid_hole.setHorizontalSpacing(8)
+        grid_hole.setVerticalSpacing(8)
+
+        self.le_hole_archive = self._path_line("Select hole archive directory...")
+        btn_browse_hole_archive = QPushButton("Browse directory…")
+        btn_browse_hole_archive.clicked.connect(
+            lambda: self._browse_dir_into(
+                self.le_hole_archive,
+                "Select directory containing hole archive NPZ files"
+            )
+        )
+
+        grid_hole.addWidget(QLabel("Hole archive directory:"), 0, 0)
+        grid_hole.addWidget(self.le_hole_archive, 0, 1)
+        grid_hole.addWidget(btn_browse_hole_archive, 0, 2)
+
+        lay.addLayout(grid_hole)
+
+        btn_load_hole_archive = QPushButton("Load Hole Archive")
+        btn_load_hole_archive.clicked.connect(self._load_hole_archive_clicked)
+        lay.addWidget(btn_load_hole_archive)
+
+        hint_hole = QLabel(
+            "NOT YET IMPLEMENTED: Will hydrate all box archives in directory and build HoleObject."
+        )
+        hint_hole.setWordWrap(True)
+        hint_hole.setStyleSheet("color: #666;")
+        lay.addWidget(hint_hole)
+
+        lay.addStretch(1)
+        return w
     
     
     # ----------------------------------------------------------------- NAV
@@ -492,7 +598,8 @@ class LoadDialogue(QDialog):
         2: "lumo_raw",
         3: "hole",
         4: "raw_manual",
-        5: "reflectance"
+        5: "reflectance",
+        6: "archive"
     }
         logger.info(f"Button clicked: show page {page_names[idx]}")
         self.stack.setCurrentIndex(idx)
@@ -666,6 +773,56 @@ class LoadDialogue(QDialog):
         self.view_flag = "vis"
         logger.info(f"loaded processed data {self.cxt.current.basename}")
         self.accept()
+
+    def _load_box_archive_clicked(self):
+        """Load a single box archive NPZ file."""
+        path = (self.le_box_archive.text() or "").strip()
+        logger.info(f"Button clicked: Load Box Archive | path={path}")
+        
+        if not path:
+            self._info("Missing input", "Please select a box archive NPZ file.")
+            return
+
+        try:
+            with busy_cursor("Hydrating box from archive...", self):
+                # Create temporary output directory in same location as archive
+                archive_path = Path(path)
+                temp_output = archive_path.parent / f"{archive_path.stem}_hydrated"
+                
+                obj = ProcessedObject.hydrate_from_archive(
+                    npz_path=path,
+                    output_dir=temp_output
+                )
+        except Exception as e:
+            self._warn("Failed to load box archive", str(e))
+            logger.error(f"Failed to hydrate box archive from {path}", exc_info=True)
+            return
+
+        self.cxt.current = obj
+        self.view_flag = "vis"
+        logger.info(f"loaded box archive {self.cxt.current.basename}")
+        self.accept()
+    
+    def _load_hole_archive_clicked(self):
+        """Load hole archive (stub - not yet implemented)."""
+        path = (self.le_hole_archive.text() or "").strip()
+        logger.info(f"Button clicked: Load Hole Archive | path={path}")
+        
+        if not path:
+            self._info("Missing input", "Please select a hole archive directory.")
+            return
+        
+        # Stub implementation
+        self._info(
+            "Not Yet Implemented",
+            "Hole archive loading is not yet implemented. "
+            "This will eventually hydrate all box archives in the directory and build a HoleObject."
+        )
+        logger.warning("Hole archive loading called but not yet implemented")
+
+
+
+
 
     # metadata validation ====================================================
 
