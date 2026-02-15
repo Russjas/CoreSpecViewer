@@ -906,7 +906,7 @@ class HoleControlPanel(QWidget):
 # ---------Box-derived level control handlers---------------------------------------------------------  
     def prof_kmeans(self):
         logger.info(f"Button clicked: Full hole k-means")
-        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        valid_state, msg = self.cxt.requires(self.cxt.BASE_HOLE)
         if not valid_state:
             logger.info(f"Full hole k-means cancelled because no hole loaded")
             return
@@ -933,7 +933,7 @@ class HoleControlPanel(QWidget):
         
     def prof_feature_extraction(self, key):
         logger.info(f"Button clicked: Full hole feature extraction")
-        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        valid_state, msg = self.cxt.requires(self.cxt.BASE_HOLE)
         if not valid_state:
             logger.info(f"Full hole feature extraction cancelled because no hole loaded")
             return
@@ -1023,7 +1023,7 @@ class HoleControlPanel(QWidget):
         """
         logger.info(f"Button clicked: Profile Mineral Map")
         modes = ['pearson', 'sam', 'msam']
-        valid_state, msg = self.cxt.requires(self.cxt.CORRELATION_MULTI)
+        valid_state, msg = self.cxt.requires([self.cxt.CORRELATION_MULTI,self.cxt.BASE_HOLE])
         if not valid_state:
             logger.warning(msg)
             QMessageBox.information(self, "Mineral Mapping", msg)
@@ -1073,7 +1073,7 @@ class HoleControlPanel(QWidget):
         """
         logger.info(f"Button clicked: Profile Mineral Map")
         modes = ['pearson', 'sam', 'msam']
-        valid_state, msg = self.cxt.requires(self.cxt.CORRELATION_MULTI)
+        valid_state, msg = self.cxt.requires([self.cxt.CORRELATION_MULTI,self.cxt.BASE_HOLE])
         if not valid_state:
             logger.warning(msg)
             QMessageBox.information(self, "Mineral Mapping", msg)
@@ -1129,7 +1129,7 @@ class HoleControlPanel(QWidget):
         - pass them, along with the current object, to the interface layer
         """
         logger.info(f"Button clicked: Full hole Band Maths")
-        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        valid_state, msg = self.cxt.requires(self.cxt.BASE_HOLE)
         if not valid_state:
             logger.info(f"Full hole feature Band Maths cancelled because no hole loaded")
             QMessageBox.information(self, "Band Maths", "No Hole loaded")

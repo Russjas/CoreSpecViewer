@@ -142,6 +142,7 @@ class HoleObject:
                     full_average = np.vstack((full_average, np.ma.mean(img, axis=1)))
                 po.save_all()
                 po.reload_all()
+                logger.info(f"Processed {self.hole_id} box number {po.metadata['box number']}")
         except Exception as e:
             logger.error(f'many, many things could have gone wrong', exc_info=True)
             
@@ -324,7 +325,7 @@ class HoleObject:
 
         # ---- PASS 1: read JSON only (cheap) to detect dominant hole_id if not provided
         hole_ids: list[str] = []
-        for fp in sorted(root.glob("*.json")):
+        for fp in sorted(root.glob("*_metadata.json")):
             try:
                 meta = json.loads(fp.read_text(encoding="utf-8"))
                 h_id = meta.get("borehole id")
@@ -344,9 +345,10 @@ class HoleObject:
         hole = cls.new(hole_id=hole_id, root_dir=root)
 
         # ---- PASS 2: load only boxes; add_box will filter by hole_id & update counters
-        for fp in sorted(root.glob("*.json")):
+        for fp in sorted(root.glob("*_metadata.json")):
             try:
                 po = ProcessedObject.from_path(fp)  # may memmap; acceptable for matching ones
+                logger.info(f"Loaded {po.basename}")
                 hole.add_box(po)                    # will skip/raise if hole_id mismatches
             except ValueError:
                 logger.error(f"mismatched hole_id or bad metadata -> skipped {fp}")

@@ -41,6 +41,7 @@ class CurrentContext:
     PROCESSED = ('processed',)
     RAW = ('raw',)
     HOLE = ('hole',)
+    BASE_HOLE = ('hole_base',)
     LIBRARY = ('library',) 
     COLLECTIONS = ('collections',)
     MASKING_WITH_STATS = ('processed', 'has:stats')
@@ -193,6 +194,7 @@ class CurrentContext:
           'processed'         - Processed scan loaded
           'raw'               - Raw scan loaded
           'hole'              - Hole loaded for multi-box ops
+          'hole_base'         - Hole has base datasets generated
           'library'           - Library database loaded
           'collections'       - Library has collections
           'has:dataset_key'   - Current scan has specific dataset (e.g., 'has:stats')
@@ -226,7 +228,15 @@ class CurrentContext:
             if self.ho is None:
                 return False, "No hole loaded for multi-box operation"
             return True, ""
-        
+        # Hole has base datasets generated
+        if requirement == 'hole_base':
+            if self.ho is None:
+                return False, "No hole loaded for multi-box operation"
+            if not self.ho.base_datasets:
+                return False, "Bases datasets have not been generated for hole"
+                
+            return True, ""
+            
         # Library loaded
         if requirement == 'library':
             if self.library is None:
