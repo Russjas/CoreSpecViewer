@@ -129,24 +129,41 @@ class HoleObject:
         full_depths = None
         full_average = None
         try:
+            import time
+            start = time.perf_counter()
+            full_depths_list = []
+            full_average_list = []
+            
+# =============================================================================
             for po in self:
                 img = sf.unwrap_from_stats(po.mask, po.savgol, po.stats)
+                checkpoint_1 = time.perf_counter()
+                logger.debug(f"Unwrapped {po.datasets['metadata'].data['box number']}: {checkpoint_1 - start:.4f}s")
                 depths = np.linspace(float(po.metadata['core depth start']), 
-                                         float(po.metadata['core depth stop']),
-                                         img.shape[0])
-                if full_depths is None:
-                    full_depths = depths      
-                    full_average = np.ma.mean(img, axis=1)
-                else:
-                    full_depths = np.concatenate((full_depths, depths))
-                    full_average = np.vstack((full_average, np.ma.mean(img, axis=1)))
+                                     float(po.metadata['core depth stop']),
+                                     img.shape[0])
+                full_depths_list.append(depths)
+                full_average_list.append(np.ma.mean(img, axis=1))
+                checkpoint_2 = time.perf_counter()
+                logger.debug(f"appended results {checkpoint_2 - checkpoint_1:.4f}s")
                 po.save_all()
+                checkpoint_3 = time.perf_counter()
+                logger.debug(f"saved all {checkpoint_3 - checkpoint_2:.4f}s")
                 po.reload_all()
+                checkpoint_4 = time.perf_counter()
+                logger.debug(f"Reloaded all {checkpoint_4 - checkpoint_3:.4f}s")
                 logger.info(f"Processed {self.hole_id} box number {po.metadata['box number']}")
+
+        
         except Exception as e:
             logger.error(f'many, many things could have gone wrong', exc_info=True)
-            
             return self
+        
+        
+        full_depths = np.concatenate(full_depths_list)
+        full_average = np.ma.vstack(full_average_list)
+        checkpoint_final = time.perf_counter()
+        logger.debug(f"Total for {self.num_box}: {checkpoint_final - start:.4f}s")
         self.base_datasets['depths'] = Dataset(base=self.hole_id, 
                                           key="depths", 
                                           path=self.root_dir / f"{self.hole_id}_depths.npy", 
@@ -681,7 +698,7 @@ class HoleObject:
             # Create empty HoleObject (counters will be updated by add_box)
             ho = cls.new(hole_id=hole_id, root_dir=save_dir)
             
-        ho._add_archived_boxes(archive_dir)        
+        ho._add_archived_boxes(boxes_dir)        
         logger.info(f"Hydrated hole {ho.hole_id} with {ho.num_box} boxes")
         return ho
     
