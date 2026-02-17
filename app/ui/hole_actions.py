@@ -48,7 +48,7 @@ class HoleActions(BaseActions):
                 ("menu", "Fullhole Features", self.extract_feature_list_multi),
                 ("Band Maths", lambda: self.box_ops.act_band_maths(multi=True))
             ], "Performs operations iteratively on each box in hole"),
-            ("button", "Save All", self.save_all_changes),
+            ("button", "Save All", self.save_all_changes, "This will commit and save all temp datasets without asking for confirmation"),
             ("button", "Generate Images", lambda: self.box_ops.gen_images(multi=True))
         ])
             # --- HOLE actions ---

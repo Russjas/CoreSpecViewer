@@ -71,8 +71,8 @@ class HoleObject:
             ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
 
             ds = Dataset(base=self.hole_id, key=key, path=fp, suffix=key, ext=ext)
-            base = ["depths", "AvSpectra"]
-            if key in base:
+            base_keys = ["depths", "AvSpectra"]
+            if key in base_keys:
                 self.base_datasets[key] = ds
             else:
                 self.product_datasets[key] = ds
@@ -438,6 +438,275 @@ class HoleObject:
         if self.first_box is None:
             raise ValueError("No boxes available in HoleObject")
         return self[self.first_box].bands
+    
+    def save_hole_archive(self, archive_dir: Path | str = None) -> Path:
+        """
+        Save hole-level products as archive.
+        Box archives should be created separately.
+        """
+        if archive_dir is None:
+            archive_dir = self.root_dir / "archives"
+        else:
+            archive_dir = Path(archive_dir)
+        
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        archive_path = archive_dir / f"{self.hole_id}_HOLE_PRODUCTS.npz"
+        
+        # Build products dict
+        base_dict = {}
+        products = {}
+        
+        # Add base datasets
+        for key, ds in self.base_datasets.items():
+            if ds.data is None:
+                ds.load_dataset()
+            base_dict[key] = ds.data
+        
+        # Add product datasets
+        for key, ds in self.product_datasets.items():
+            if ds.data is None:
+                ds.load_dataset()
+            
+            if isinstance(ds.data, np.ma.MaskedArray):
+                products[f"{key}DATA"] = ds.data.data
+                products[f"{key}MASK"] = ds.data.mask
+            elif isinstance(ds.data, dict):
+                products[key] = ds.data
+            else:
+                products[key] = ds.data
+        output_dict = {}
+        output_dict["base_datasets"] = base_dict
+        output_dict["product_datasets"] = products
+        # Save archive
+        np.savez(
+            archive_path,
+            hole_id=np.array(self.hole_id, dtype=object),
+            num_box=self.num_box,
+            first_box=self.first_box,
+            last_box=self.last_box,
+            hole_meta=np.array(self.hole_meta, dtype=object),
+            files=np.array(output_dict, dtype=object)
+        )
+        
+        logger.info(f"Saved hole archive: {archive_path}")
+        return archive_path
+    
+    def save_full_hole_archive(self, archive_dir: Path | str = None,
+                               include_box_products: bool = False) -> Path:
+        """
+        Archive entire hole: all boxes + hole products.
+        """
+        if archive_dir is None:
+            archive_dir = self.root_dir / "archives"
+        else:
+            archive_dir = Path(archive_dir)
+        
+        boxes_dir = archive_dir / "boxes"
+        boxes_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Archive all boxes
+        logger.info(f"Archiving {len(self.boxes)} boxes...")
+        for box_num, po in self.boxes.items():
+            po.save_archive_file(
+                output_dir=boxes_dir,
+                include_products=include_box_products
+            )
+            logger.debug(f"Archived box {box_num}")
+        
+        # Archive hole products
+        hole_archive = self.save_hole_archive(archive_dir)
+        
+        logger.info(f"Full hole archive complete: {archive_dir}")
+        return archive_dir
+    
+    
+    @classmethod
+    def hydrate_hole_from_archive(cls, archive_dir: Path | str, save_dir: Path | str) -> "HoleObject":
+        """
+        Restore HoleObject from archive directory.
+        
+        Two modes:
+        1. Full hole archive: Loads hole products + boxes from *_HOLE_PRODUCTS.npz + boxes/*.npz
+        2. Boxes-only archive: Builds HoleObject from boxes/*.npz only (no hole products)
+        
+        Parameters
+        ----------
+        archive_dir : Path | str
+            Directory containing either:
+            - *_HOLE_PRODUCTS.npz + boxes/ subdirectory (full archive), OR
+            - boxes/ subdirectory only (boxes-only archive)
+        save_dir : Path | str
+            Directory where hydrated data will be saved
+            
+        Returns
+        -------
+        HoleObject
+            Hydrated hole object with all boxes loaded
+            
+        Notes
+        -----
+        Disk space must be available to cache all products to disk.
+        
+        Full archive includes downhole products (depths, AvSpectra, mineral profiles).
+        Boxes-only archive reconstructs HoleObject without these products - they can
+        be regenerated later using create_base_datasets(), create_dhole_minmap(), etc.
+        """
+        archive_dir = Path(archive_dir)
+        save_dir = Path(save_dir)
+        
+        # Check for hole products archive
+        hole_npz_files = list(archive_dir.glob("*_HOLE_PRODUCTS.npz"))
+        
+        if hole_npz_files:
+            # ============================================================
+            # MODE 1: Full hole archive (hole products + boxes)
+            # ============================================================
+            logger.info(f"Found hole products archive, loading full hole")
+            hole_npz = hole_npz_files[0]
+            
+            with np.load(hole_npz, allow_pickle=True) as npz:
+                hole_id = str(npz['hole_id'].item())
+                num_box = int(npz['num_box'])
+                first_box = int(npz['first_box'])
+                last_box = int(npz['last_box'])
+                hole_meta = npz['hole_meta'].item()
+                files_dict = npz['files'].item()
+            
+            # Create HoleObject with metadata from archive
+            ho = cls(
+                hole_id=hole_id,
+                root_dir=save_dir,
+                num_box=num_box,
+                first_box=first_box,
+                last_box=last_box,
+                hole_meta=hole_meta
+            )
+            
+            # Restore base datasets
+            for key, data in files_dict['base_datasets'].items():
+                path = save_dir / f"{hole_id}_{key}.npy"
+                ds = Dataset(base=hole_id, key=key, path=path, suffix=key, ext='.npy', data=data)
+                ho.base_datasets[key] = ds
+            
+            # Restore product datasets
+            handled = set()
+            
+            # First pass: reconstruct masked arrays
+            for key in list(files_dict['product_datasets'].keys()):
+                if key.endswith('DATA'):
+                    base_key = key[:-4]
+                    mask_key = f"{base_key}MASK"
+                    
+                    if mask_key in files_dict['product_datasets']:
+                        data = np.ma.array(
+                            files_dict['product_datasets'][key],
+                            mask=files_dict['product_datasets'][mask_key]
+                        )
+                        path = save_dir / f"{hole_id}_{base_key}.npz"
+                        ds = Dataset(base=hole_id, key=base_key, path=path, suffix=base_key, ext='.npz', data=data)
+                        ho.product_datasets[base_key] = ds
+                        handled.add(key)
+                        handled.add(mask_key)
+                        logger.debug(f"Restored masked array: {base_key}")
+            
+            # Second pass: load remaining products (dicts and regular arrays)
+            for key, data in files_dict['product_datasets'].items():
+                if key in handled:
+                    continue
+                
+                if isinstance(data, dict):
+                    path = save_dir / f"{hole_id}_{key}.json"
+                    ds = Dataset(base=hole_id, key=key, path=path, suffix=key, ext='.json', data=data)
+                    ho.product_datasets[key] = ds
+                    logger.debug(f"Restored dict: {key}")
+                elif isinstance(data, np.ndarray):
+                    path = save_dir / f"{hole_id}_{key}.npy"
+                    ds = Dataset(base=hole_id, key=key, path=path, suffix=key, ext='.npy', data=data)
+                    ho.product_datasets[key] = ds
+                    logger.debug(f"Restored ndarray: {key}")
+            
+            logger.info(f"Restored {len(ho.base_datasets)} base datasets and {len(ho.product_datasets)} product datasets")
+            
+        else:
+            # ============================================================
+            # MODE 2: Boxes-only archive (no hole products)
+            # ============================================================
+            logger.info(f"No hole products archive found, building HoleObject from boxes only")
+            
+            # Check that boxes directory exists
+            boxes_dir = archive_dir / "boxes"
+            if not boxes_dir.exists():
+                boxes_dir = archive_dir
+            if not boxes_dir.exists():
+                raise FileNotFoundError(
+                    f"No hole products archive (*_HOLE_PRODUCTS.npz) and no boxes/ directory found in {archive_dir}"
+                )
+            
+            box_archives = sorted(boxes_dir.glob("*.npz"))
+            if not box_archives:
+                raise FileNotFoundError(f"No box archives found in {boxes_dir}")
+            
+            # Quickly determine hole_id by checking metadata in all boxes
+            hole_ids = []
+            for box_archive in box_archives:
+                try:
+                    with np.load(box_archive, allow_pickle=True) as npz:
+                        if 'metadata' in npz:
+                            meta = npz['metadata'].item()
+                            h_id = meta.get("borehole id")
+                            if h_id:
+                                hole_ids.append(str(h_id))
+                except Exception as e:
+                    logger.warning(f"Could not read metadata from {box_archive.name}: {e}")
+                    continue
+            
+            if not hole_ids:
+                raise ValueError(
+                    f"No box archives in {boxes_dir} contain 'borehole id' in metadata. "
+                    "Cannot determine hole_id."
+                )
+            
+            # Use most common hole_id (handles edge cases with mixed boxes)
+            from collections import Counter
+            hole_id = Counter(hole_ids).most_common(1)[0][0]
+            
+            if len(set(hole_ids)) > 1:
+                logger.warning(
+                    f"Multiple hole IDs found in box archives: {set(hole_ids)}. "
+                    f"Using most common: {hole_id}"
+                )
+            
+            logger.info(f"Determined hole_id: {hole_id} from {len(box_archives)} box archives")
+            
+            # Create empty HoleObject (counters will be updated by add_box)
+            ho = cls.new(hole_id=hole_id, root_dir=save_dir)
+            
+        ho._add_archived_boxes(archive_dir)        
+        logger.info(f"Hydrated hole {ho.hole_id} with {ho.num_box} boxes")
+        return ho
+    
+    
+    def _add_archived_boxes(self, archive_dir: Path | str):
+        archive_dir = Path(archive_dir)
+        
+        if archive_dir.exists():
+            box_archives = sorted(archive_dir.glob("*.npz"))
+            logger.info(f"Loading {len(box_archives)} box archives")
+            
+            for box_archive in box_archives:
+                po = ProcessedObject.hydrate_from_archive(box_archive, self.root_dir)
+                po.save_all()
+                po.reload_all()
+                self.add_box(po)
+                logger.info(f"added box {po.metadata['box number']} to {self.hole_id}")
+        else:
+            logger.warning(f"No boxes/ directory found in {archive_dir}")
+            raise ValueError(f"No boxes/ directory found in {archive_dir}")
+                
+            
+    
+    
+    
     
     def check_for_all_keys(self, key):
         for i in self:

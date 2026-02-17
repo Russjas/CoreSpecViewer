@@ -562,10 +562,21 @@ class LoadDialogue(QDialog):
                 "Select directory containing hole archive NPZ files"
             )
         )
+        self.le_hole_archive_save_path = self._path_line("Select directory for hole...")
+        btn_browse_hole_archive_save = QPushButton("Browse directory…")
+        btn_browse_hole_archive_save.clicked.connect(
+            lambda: self._browse_dir_into(
+                self.le_hole_archive_save_path,
+                "Select directory to save extracted hole"
+            )
+        )
 
         grid_hole.addWidget(QLabel("Hole archive directory:"), 0, 0)
         grid_hole.addWidget(self.le_hole_archive, 0, 1)
         grid_hole.addWidget(btn_browse_hole_archive, 0, 2)
+        grid_hole.addWidget(QLabel("Hole save directory:"), 1, 0)
+        grid_hole.addWidget(self.le_hole_archive_save_path, 1, 1)
+        grid_hole.addWidget(btn_browse_hole_archive_save, 1, 2)
 
         lay.addLayout(grid_hole)
 
@@ -574,7 +585,8 @@ class LoadDialogue(QDialog):
         lay.addWidget(btn_load_hole_archive)
 
         hint_hole = QLabel(
-            "NOT YET IMPLEMENTED: Will hydrate all box archives in directory and build HoleObject."
+            "Hydrates all box archives from the directory and builds a HoleObject. "
+            "Requires disk space to extract all boxes. Large holes may take time to load."
         )
         hint_hole.setWordWrap(True)
         hint_hole.setStyleSheet("color: #666;")
@@ -806,19 +818,29 @@ class LoadDialogue(QDialog):
     def _load_hole_archive_clicked(self):
         """Load hole archive (stub - not yet implemented)."""
         path = (self.le_hole_archive.text() or "").strip()
+        save_path = (self.le_hole_archive_save_path.text() or "").strip()
         logger.info(f"Button clicked: Load Hole Archive | path={path}")
         
         if not path:
             self._info("Missing input", "Please select a hole archive directory.")
             return
+        if not save_path:
+            self._info("Missing input", "Please select a hole save directory.")
+            return
         
-        # Stub implementation
-        self._info(
-            "Not Yet Implemented",
-            "Hole archive loading is not yet implemented. "
-            "This will eventually hydrate all box archives in the directory and build a HoleObject."
-        )
-        logger.warning("Hole archive loading called but not yet implemented")
+        try:
+            with busy_cursor("Hydrating hole from archive...", self):
+                hole = HoleObject.hydrate_hole_from_archive(Path(path), Path(save_path))
+        
+        except Exception as e:
+            self._warn("Failed to load hole archive", str(e))
+            logger.error(f"Failed to hydrate hole archive from {path}", exc_info=True)
+            return
+        self.cxt.ho = hole
+        self.view_flag = "hol"
+        logger.info(f"loaded hole archive {self.cxt.ho.hole_id}")
+        self.accept()
+            
 
 
 
