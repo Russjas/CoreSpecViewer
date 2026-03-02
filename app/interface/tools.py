@@ -8,7 +8,7 @@ import re
 from matplotlib.path import Path as mpl_path
 import numpy as np
 
-from .. import config
+from ..config import config
 from ..models import ProcessedObject, RawObject
 from ..spectral_ops import spectral_functions as sf
 from ..spectral_ops import remap_legend as rl
@@ -22,14 +22,14 @@ def get_config():
     Loads the config dictionary - a single mutable dictionary of config
     patterns used accross the app
     """
-    return sf.con_dict
+    return config.as_dict()
 
 def modify_config(key, value):
     """
     Sets user selected values in the config dictionary - a single mutable 
     dictionary of config patterns used accross the app
     """
-    config.set_value(key, value)
+    config.set(key, value)
 
 #==== Data loading helper functions ===========================================
 

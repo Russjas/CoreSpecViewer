@@ -11,15 +11,8 @@ from ..interface import tools as t
 from .base_actions import BaseActions
 from . import busy_cursor, LibMetadataDialog, WavelengthRangeDialog, LibMetadataDialog
 from .band_math_dialogue import BandMathsDialog
+from ..config import feature_keys as FEATURE_KEYS
 
-FEATURE_KEYS = [
-    '1400W', '1480W', '1550W', '1760W', '1850W',
-    '1900W', '2080W', '2160W', '2200W', '2250W',
-    '2290W', '2320W', '2350W', '2390W', '2950W',
-    '2950AW', '2830W', '3000W', '3500W', '4000W',
-    '4000WIDEW', '4470TRUEW', '4500SW', '4500CW',
-    '4670W', '4920W', '4000V_NARROWW', '4000shortW', '2950BW'
-]
 
 class HoleActions(BaseActions):
     """Raw data operations"""

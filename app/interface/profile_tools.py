@@ -6,11 +6,9 @@ from pathlib import Path
 import re
 import logging
 
-from matplotlib.path import Path as mpl_path
 import numpy as np
 
-from .. import config
-from ..models import ProcessedObject, RawObject, HoleObject
+from ..models import HoleObject
 from ..spectral_ops import spectral_functions as sf
 from ..spectral_ops import band_maths as bm
 from ..spectral_ops import export_ops as exp

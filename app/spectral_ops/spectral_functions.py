@@ -25,7 +25,7 @@ from PIL import Image
 import scipy as sc
 import spectral as sp
 import spectral.io.envi as envi
-from ..config import con_dict  # live shared dict
+from ..config import config  # mutable module singleton
 from .fenix_smile import fenix_smile_correction
 
 logger = logging.getLogger(__name__)
@@ -41,15 +41,15 @@ def _slice_from_sensor(sensor_type: str):
     s = sensor_type or ""
     logger.info(f"Sensor type {s}")
     if "SWIR" in s:
-        start, stop = con_dict["swir_slice_start"], con_dict["swir_slice_stop"]
+        start, stop = config.swir_slice_start, config.swir_slice_stop
     elif "RGB" in s:
-        start, stop = con_dict["rgb_slice_start"], con_dict["rgb_slice_stop"]
+        start, stop = config.rgb_slice_start, config.rgb_slice_stop
     elif "FX50" in s:
-        start, stop = con_dict["mwir_slice_start"], con_dict["mwir_slice_stop"]
+        start, stop = config.mwir_slice_start, config.mwir_slice_stop
     elif "FENIX" in s:
-        start, stop = con_dict["fenix_slice_start"], con_dict["fenix_slice_stop"]
+        start, stop = config.fenix_slice_start, config.fenix_slice_stop
     else:
-        start, stop = con_dict["default_slice_start"], con_dict["default_slice_stop"]
+        start, stop = config.default_slice_start, config.default_slice_stop
     
     return slice(start, stop, None)
 
@@ -913,8 +913,8 @@ def process(cube):
     Perform Savitzky-Golay smoothing and continuum removal on reflectance data
     and return the products with blank mask
     """
-    win = int(con_dict["savgol_window"])
-    poly = int(con_dict["savgol_polyorder"])
+    win = config.savgol_window
+    poly = config.savgol_polyorder
     savgol = sc.signal.savgol_filter(cube, win, poly)
     savgol_cr = remove_hull(savgol)
     mask = np.zeros((cube.shape[0], cube.shape[1]))
@@ -1775,7 +1775,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
     - The `'QND'`` method uses a coarse argmin over continuum-removed spectra
       without fitting; depth is computed as ``1 - min(cr)``.
     """
-    thresh = con_dict["feature detection threshold"]
+    thresh = config.feature_detection_threshold
     feats = {'1400W':(	1387,	1445,	1350,	1450),
     '1480W':(	1471,	1491,	1440,	1520),
     '1550W':(	1520,	1563,	1510,	1610),
