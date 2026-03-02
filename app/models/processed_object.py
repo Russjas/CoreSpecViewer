@@ -384,7 +384,7 @@ class ProcessedObject:
                                 mask_data = mask_to_use[:, :, 0]
                             elif mask_to_use.ndim == 2:
                                 mask_data = mask_to_use
-                            im = sf.mk_thumb(ds.data, mask=self.mask, index_mode=True, resize=False)
+                            im = sf.mk_thumb(ds.data, mask=mask_data, index_mode=True, resize=False)
                             im.save(str(final_path), quality = 95)
                             logger.info(f"Exported {self.basename} {key}")
                         else:
