@@ -130,43 +130,59 @@ CoreSpecViewer/
 │
 └── app/                           # Main application package
     ├── main.py                    # Application entry point, MainRibbonController
-    ├── config.py                  # Global configuration dictionary
+    ├── config.py                  # Global AppConfig singleton and configuration keys
     │
-    ├── models/                    # Data layer: core objects + context
+    ├── models/                    # Data layer: core objects and shared application state
     │   ├── dataset.py             # Generic dataset container with file I/O
-    │   ├── raw_object.py          # RawObject - unprocessed Lumo scans
-    │   ├── processed_object.py    # ProcessedObject - reflectance cubes
-    │   ├── hole_object.py         # HoleObject - multi-box hole aggregation
-    │   ├── context.py             # CurrentContext - shared application state
-    │   └── lib_manager.py         # LibraryManager - spectral library interface
+    │   ├── raw_object.py          # RawObject - unprocessed hyperspectral scans
+    │   ├── processed_object.py    # ProcessedObject - reflectance cubes and derived datasets
+    │   ├── hole_object.py         # HoleObject - multi-box drillhole aggregation
+    │   ├── context.py             # CurrentContext - shared application state manager
+    │   └── lib_manager.py         # LibraryManager - spectral library interface and loading
     │
-    ├── interface/                 # Translation layer between UI and data
-    │   ├── tools.py               # High-level tool functions (crop, mask, unwrap, features)
-    │   ├── profile_tools.py       # High-level tool functions specific to hole profile data
-    │   └── tool_dispatcher.py     # Safe GUI event routing for canvas interactions
+    ├── interface/                 # Translation layer between UI and data models
+    │   ├── tools.py               # High-level processing tools (crop, mask, unwrap, features)
+    │   ├── profile_tools.py       # High-level tools for hole profile datasets
+    │   └── tool_dispatcher.py     # Safe routing of GUI canvas interactions to tool functions
     │
-    ├── ui/                        # Qt pages and widgets
-    │   ├── base_page.py           # BasePage - common page functionality
+    ├── ui/                        # Qt pages, windows, and UI control logic
+    │   │
+    │   ├── # Pages
+    │   ├── base_page.py           # BasePage - shared page behaviour
     │   ├── raw_page.py            # RawPage - raw data viewing and processing
-    │   ├── vis_page.py            # VisualisePage - product visualization and interpretation
-    │   ├── lib_page.py            # LibraryPage - spectral library browsing, collection management
-    │   ├── hole_page.py           # HolePage - hole-level navigation, and interpretation
-    │   ├── ribbon.py              # Ribbon widget with workflow tabs
-    │   ├── util_windows.py        # Canvas widgets, dialogs, tables
-    │   ├── catalogue_window.py    # File browser for dataset loading
-    │   ├── cluster_window.py      # Clustering visualization and controls
+    │   ├── vis_page.py            # VisualisePage - product visualisation and interpretation
+    │   ├── lib_page.py            # LibraryPage - spectral library browsing and management
+    │   ├── hole_page.py           # HolePage - drillhole navigation and interpretation
+    │   │
+    │   ├── # Workflow / action modules
+    │   ├── base_actions.py        # Shared UI action utilities
+    │   ├── raw_actions.py         # Raw page tool actions
+    │   ├── mask_actions.py        # Mask creation and editing actions
+    │   ├── vis_actions.py         # Visualisation tool actions
+    │   ├── hole_actions.py        # Hole-page navigation and operations
+    │   ├── box_ops.py             # Box-level operations used by hole workflows
+    │   │
+    │   ├── # Supporting windows and widgets
+    │   ├── ribbon.py              # Ribbon widget defining workflow tool groups
+    │   ├── util_windows.py        # Shared dialogs, tables, and canvas widgets
+    │   ├── catalogue_window.py    # Dataset browser for loading scans
+    │   ├── cluster_window.py      # Clustering visualisation and controls
     │   ├── load_dialogue.py       # Multi-step dataset loading dialog
-    │   ├── band_math_dialogue.py  # Band math expression editor
+    │   ├── band_math_dialogue.py  # Band-math expression editor
     │   ├── multi_box.py           # Batch processing interface
-    │   └── display_text.py        # Raw key to meaningful description
+    │   └── display_text.py        # Raw metadata keys mapped to human-readable text
     │
-    └── spectral_ops/              # Spectral algorithms and processing
-        ├── spectral_functions.py  # Core algorithms (CR, correlation, features, I/O)
-        ├── band_maths.py          # Band math expression evaluation
-        ├── remap_legend.py        # Legend remapping tools
-        ├── downhole_resampling.py # Downhole profile resampling
-        ├── fenix_smile.py         # FENIX sensor smile correction
-        └── profile_tools.py       # Profile extraction and processing
+    └── spectral_ops/              # Hyperspectral algorithms and processing operations
+        ├── processing.py          # Core spectral processing operations
+        ├── analysis.py            # Spectral analysis and classification algorithms
+        ├── IO.py                  # Hyperspectral file I/O: ENVI loading, metadata parsing
+        ├── masking.py             # Core mask generation and refinement algorithms 
+        ├── visualisation.py       # Cube-to-image transformations 
+        ├── band_maths.py          # Safe evaluation of spectral band-math expressions
+        ├── remap_legend.py        # Ontological mineral class legend remapping 
+        ├── downhole_resampling.py # Resampling of full-hole datasets to regular depth grids
+        ├── fenix_smile.py         # Optional FENIX sensor smile-correction tools 
+        └── export_ops.py          # Export downhole profile datasets to CSV
 ```
 
 ---
@@ -215,7 +231,7 @@ Enables hole‑level interpretation and quality control.
 - Double-click a box to view in visualise page
 - Return to raw view for reprocessing
 - Metadata panel displaying hole information
-- Downhole profile creation and visialisation 
+- Downhole profile creation and visualisation 
 
 ---
 
@@ -258,9 +274,9 @@ Enables hole‑level interpretation and quality control.
   - Select wavelength range - Correlation using any supported method on user-determined range
   - Re-map legends - Uses user-defined ontologies to remap legends
 - **Features** - Minimum wavelength mapping for 29 spectral features  
-    -**Uses *hylite* functions:**  
+    - **Uses *hylite* functions:**  
         Thiele, S. T., Lorenz, S., Kirsch, M., Acosta, I., Tusa, L., Hermann, E., Möckel, R., & Gloaguen, R. (2021). *Multi-scale, multi-sensor data integration for automated 3-D geological mapping.* *Ore Geology Reviews*, **136**, 104252. https://doi.org/10.1016/j.oregeorev.2021.104252  
-    -**Features predominantly defined by:**   
+    - **Features predominantly defined by:**   
         Laukamp, C., Rodger, A., LeGras, M., Lampinen, H., Lau, I. C., Pejcic, B., Stromberg, J., Francis, N., & Ramanaidou, E. (2021). *Mineral Physicochemistry Underlying Feature-Based Extraction of Mineral Abundance and Composition from Shortwave, Mid and Thermal Infrared Reflectance Spectra.*  *Minerals*, **11**(4), 347. https://doi.org/10.3390/min11040347
 - **Band Maths** - Custom band math expressions
 - **Library building** - Add spectra to library from current dataset
@@ -399,7 +415,9 @@ Gracefully requesting prioritisation of [TODO](TODO.md) items to suit your needs
 
 ### Testing
 
-Currently setting up test infrastructure. Contributions to testing are particularly welcome.
+There are currently two test scripts; a full integration test using a synthetic core box, and an integration test of the global configuration.
+
+Contributions of tests are extremely welcome.
 
 ---
 

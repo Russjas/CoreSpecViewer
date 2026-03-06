@@ -59,8 +59,6 @@ my_map.set_bad('black')
 from .display_text import gen_display_text
 from ..interface import tools as t
 from ..spectral_ops.visualisation import get_false_colour
-#from ..spectral_ops import spectral_functions as sf
-
 
 #==========reference passing and cache update======================
 @contextmanager

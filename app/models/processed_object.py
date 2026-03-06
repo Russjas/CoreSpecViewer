@@ -11,7 +11,6 @@ import logging
 import numpy as np
 from PIL import Image
 
-#from ..spectral_ops import spectral_functions as sf
 from ..spectral_ops import IO as io
 from ..spectral_ops.processing import remove_cont, process
 from ..spectral_ops.visualisation import get_false_colour, mk_thumb

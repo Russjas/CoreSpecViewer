@@ -37,7 +37,6 @@ from app.models import RawObject, ProcessedObject, CurrentContext, HoleObject
 from app.models.lib_manager import LibraryManager, ID_COLUMN_INDEX
 from app.interface import tools as t
 from app.interface import profile_tools as pt
-#from app.spectral_ops import spectral_functions as sf
 from app.spectral_ops import band_maths as bm
 
 logging.getLogger("spectral").setLevel(logging.CRITICAL)
