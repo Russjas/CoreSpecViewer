@@ -24,7 +24,7 @@ Part 3: [Full hole datasets](https://www.youtube.com/watch?v=2qlqmRyD4wA)
 
 | Workflow Stage | Demonstration |
 |----------------|---------------|
-| **Open and process Specim Lumo data** | ![Open workflow](resources/gifs/Open_workflow.gif) |
+| **Open and process raw ENVI files data** | ![Open workflow](resources/gifs/Open_workflow.gif) |
 | **Mask and unwrap regions** | ![Mask to unwrap](resources/gifs/Mask_to_unwrap.gif) |
 | **Feature extraction & visualisation** | ![Visualise](resources/gifs/Visualise.gif) |
 | **Spectral library browsing** | ![Library use](resources/gifs/Library_use.gif) |
@@ -39,8 +39,12 @@ Part 3: [Full hole datasets](https://www.youtube.com/watch?v=2qlqmRyD4wA)
 
 CoreSpecViewer provides:
 
-- **Raw data handling** for Specim Lumo exports (`RawObject`)
-- **Processed reflectance cubes** with memory‑mapped `.npy` datasets (`ProcessedObject`)
+- **Raw data handling** (`RawObject`)  
+    - **ENVI file** handling for data and references
+    - **Optional automated file discovery** for Lumo acquisition directories
+- **Processed reflectance cubes** (`ProcessedObject`)
+    - **Pre-calculated reflectance** from ENVI files  
+    - **CoreSpecViewer-created reflectance** in memory-mapped `.npy` files  
 - **Hole‑level aggregation & navigation** (`HoleObject`, `HolePage`)
 - **Batch "multibox" processing** with logging (`multi_box.py`)
 - **Spectral feature extraction**, continuum removal, peak estimation
