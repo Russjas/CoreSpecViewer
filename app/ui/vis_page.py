@@ -269,26 +269,6 @@ class VisualisePage(BasePage):
         products = []
         non_vis = []
         self.cache = set(self.current_obj.datasets.keys()) | set(self.current_obj.temp_datasets.keys())
-
-        if self.current_obj is not None and not self.current_obj.is_raw:
-            try:
-                table_title = f'{self.current_obj.metadata["borehole id"]} {self.current_obj.metadata["box number"]}'
-            except KeyError:
-                table_title = 'Cached products'
-        else:
-            table_title = 'Cached products'
-        self.table.setHorizontalHeaderItem(0, QTableWidgetItem(table_title))
-
-        for k in sorted(self.cache):
-            if k in base_whitelist:
-                base.append(k)
-            elif any(k.startswith(pfx) for pfx in unwrap_prefixes):
-                unwrapped.append(k)
-            elif any(k.endswith(sfx) for sfx in non_vis_suff):
-                non_vis.append(k)
-            else:
-                products.append(k)
-
         def _insert_header(text: str):
             r = self.table.rowCount()
             self.table.insertRow(r)
@@ -309,7 +289,46 @@ class VisualisePage(BasePage):
             it.setFlags(it.flags() & ~Qt.ItemIsEditable)
             self.table.setItem(r, 0, it)
 
+        def _insert_depth_header(text: str):
+            """Special header for depth range - centered and italic"""
+            r = self.table.rowCount()
+            self.table.insertRow(r)
+            it = QTableWidgetItem(text)
+            it.setFlags(Qt.ItemIsEnabled)
+            it.setTextAlignment(Qt.AlignCenter)
+            f = it.font()
+            f.setItalic(True)  # Make it italic to differentiate from section headers
+            it.setFont(f)
+            self.table.setItem(r, 0, it)
+
+
+        if self.current_obj is not None and not self.current_obj.is_raw:
+            try:
+                table_title = f'{self.current_obj.metadata["borehole id"]} {self.current_obj.metadata["box number"]}'
+                first_row = f'{self.current_obj.metadata["core depth start"]}m - {self.current_obj.metadata["core depth stop"]}m'
+            except KeyError:
+                table_title = 'Cached products'
+                first_row = ""
+        else:
+            table_title = 'Cached products'
+            first_row = ""
+        self.table.setHorizontalHeaderItem(0, QTableWidgetItem(table_title))
+        
+
+        for k in sorted(self.cache):
+            if k in base_whitelist:
+                base.append(k)
+            elif any(k.startswith(pfx) for pfx in unwrap_prefixes):
+                unwrapped.append(k)
+            elif any(k.endswith(sfx) for sfx in non_vis_suff):
+                non_vis.append(k)
+            else:
+                products.append(k)
+
+        
+
         self.table.setRowCount(0)
+        _insert_depth_header(first_row)
 
         if base:
             _insert_header("Base processed")
