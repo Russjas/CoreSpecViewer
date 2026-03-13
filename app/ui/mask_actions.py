@@ -19,6 +19,7 @@ class MaskActions(BaseActions):
         """Define and register ribbon buttons"""
         
         self._register_group('Masking', [
+            ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)"),
             ("button", "New mask", lambda: self.act_mask_point('new'), "Creates a blank mask,\n then masks by correlation with selected pixel."),
             ("button", "Enhance mask", lambda: self.act_mask_point('enhance'), "Adds to existing mask by correlation with selected pixel"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
@@ -32,6 +33,7 @@ class MaskActions(BaseActions):
             ]),
             ("button", "Despeckle", self.despeck_mask, "Remove speckles from mask"),
             ("button", "Improve", self.act_mask_improve, "Heuristically improves the mask"),
+            ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom')
         ])
@@ -133,6 +135,29 @@ class MaskActions(BaseActions):
         logger.info(f"{self.cxt.current.basename} connected components calculated for unwrapping stats")
         self.controller.refresh()
 
+
+    def act_mask_all(self):
+        logger.info("Button clicked: Mask All")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Masking", msg)
+            return
+        self.cxt.current = t.mask_all(self.cxt.current)
+        logger.info(f"{self.cxt.current.basename} All pixels masked")
+        self.controller.refresh()
+
+
+    def act_invert_mask(self):
+        logger.info("Button clicked: Invert Mask")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Masking", msg)
+            return
+        self.cxt.current = t.invert_mask(self.cxt.current)
+        logger.info(f"{self.cxt.current.basename} Mask inverted")
+        self.controller.refresh()
 
     def unwrap(self):
         logger.info(f"Button clicked: Unwrap")

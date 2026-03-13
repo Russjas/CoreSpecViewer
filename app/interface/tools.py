@@ -324,6 +324,7 @@ def improve_mask(obj):
     obj.add_temp_dataset('mask', data = msk)
     return obj
 
+
 def despeckle_mask(obj):
     """
     Heuristically thicken a mask column-wise using simple occupancy.
@@ -331,6 +332,30 @@ def despeckle_mask(obj):
     """
     msk = sm.despeckle_mask(obj.mask)
     obj.add_temp_dataset('mask', data = msk)
+    return obj
+
+
+def mask_all(obj):
+    """
+    Set entire mask to 1 (all pixels masked).
+    Useful for starting with everything masked, then selectively unmasking.
+    """
+    if obj.is_raw:
+        return obj
+    H, W = obj.savgol.shape[:2]
+    msk = np.ones((H, W), dtype=np.uint8)
+    obj.add_temp_dataset('mask', data=msk)
+    return obj
+
+def invert_mask(obj):
+    """
+    Flip mask values: 0 → 1, 1 → 0.
+    Useful for inverting imported masks or switching mask conventions.
+    """
+    if obj.is_raw:
+        return obj
+    msk = (~obj.mask.astype(bool)).astype(np.uint8)
+    obj.add_temp_dataset('mask', data=msk)
     return obj
 
 #============ Unwrapping tools ================================================
