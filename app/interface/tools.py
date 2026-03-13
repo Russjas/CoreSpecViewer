@@ -304,6 +304,13 @@ def mask_polygon(obj, vertices_rc, mode = "mask outside"):
     elif mode == "mask inside":
         msk = np.array(obj.mask)
         msk[inside] = 1
+    elif mode == "unmask outside":
+        msk = np.array(obj.mask)
+        msk[~inside] = 0
+    elif mode == "unmask inside":
+        msk = np.array(obj.mask)
+        msk[inside] = 0
+
     obj.add_temp_dataset('mask', data = msk)
     return obj
 

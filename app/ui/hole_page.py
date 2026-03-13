@@ -1398,6 +1398,7 @@ class HolePage(BasePage):
         with busy_cursor('Saving.....', self):
             self.cxt.ho.save_product_datasets()
             for po in self.cxt.ho:
+                po.save_all_thumbs()
                 if po.has_temps:
                     po.commit_temps()
                     po.save_all()

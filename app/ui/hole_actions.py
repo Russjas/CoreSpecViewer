@@ -155,7 +155,9 @@ class HoleActions(BaseActions):
             return
         with busy_cursor('Saving.....', self.controller):
             self.cxt.ho.save_product_datasets()
+            
             for po in self.cxt.ho:
+                po.save_all_thumbs()
                 if po.has_temps:
                     logger.info(f"{po.metadata['box number']} box number")
                     po.commit_temps()

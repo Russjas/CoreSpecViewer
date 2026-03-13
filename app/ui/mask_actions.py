@@ -24,8 +24,11 @@ class MaskActions(BaseActions):
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
             ("button", "Mask region", self.act_mask_rect, "Adds a masked rectangle to existing mask"),
             ("menu", "Freehand mask region", [
-                ("Mask outside selected", lambda: self.act_mask_polygon(mode="mask outside"), "With exising mask, masks all pixels outside of selected region"),
-                ("Mask inside selected", lambda: self.act_mask_polygon(mode="mask inside"), "With exising mask, masks all pixels inside of selected region")
+                ("Mask inside selected", lambda: self.act_mask_polygon(mode="mask inside"), "With existing mask, masks all pixels inside of selected region"),
+                ("Mask outside selected", lambda: self.act_mask_polygon(mode="mask outside"), "With existing mask, masks all pixels outside of selected region"),
+                ("Unmask inside selected", lambda: self.act_mask_polygon(mode="unmask inside"), "With existing mask, unmasks all pixels inside of selected region"),
+                ("Unmask outside selected", lambda: self.act_mask_polygon(mode="unmask outside"), "With existing mask, unmasks all pixels outside of selected region"),
+                
             ]),
             ("button", "Despeckle", self.despeck_mask, "Remove speckles from mask"),
             ("button", "Improve", self.act_mask_improve, "Heuristically improves the mask"),
