@@ -4,6 +4,7 @@ Used by UI pages to manipulate RawObject and ProcessedObject datasets.
 """
 from pathlib import Path
 import re
+import logging
 
 from matplotlib.path import Path as mpl_path
 import numpy as np
@@ -17,6 +18,8 @@ from ..spectral_ops import analysis as sa
 from ..spectral_ops import masking as sm
 from ..spectral_ops import remap_legend as rl
 from ..spectral_ops import band_maths as bm
+
+logger = logging.getLogger(__name__)
 
 #======Getting and setting app configs ========================================
 
@@ -94,7 +97,6 @@ def discover_lumo_directories(root_dir: Path) -> list[Path]:
 
 
 def crop(obj, y_min, y_max, x_min, x_max):
-
     """
     Generic, window-agnostic spatial crop.
 
@@ -106,7 +108,6 @@ def crop(obj, y_min, y_max, x_min, x_max):
             obj.get_reflectance()
         if hasattr(obj, "temp_reflectance") and obj.temp_reflectance is not None:
             arr = obj.temp_reflectance
-
         else:
             arr = obj.reflectance
 
@@ -116,24 +117,25 @@ def crop(obj, y_min, y_max, x_min, x_max):
     elif isinstance(obj, ProcessedObject):
         # union of base + temps
         keys = set(obj.datasets.keys()) | set(obj.temp_datasets.keys())
-
-        for key in keys:
+        
+        # Ensure mask is processed first for thumbnail generation
+        ordered_keys = ['mask'] if 'mask' in keys else []
+        ordered_keys.extend([k for k in keys if k != 'mask'])
+        
+        for key in ordered_keys:
+            logger.info(f"cropping {obj.basename} {key} dataset")
+            
             # choose source: prefer temp if present
-            if obj.has_temp(key):
-                src = obj.temp_datasets[key].data
-            else:
-                ds = obj.datasets.get(key)
-                src = getattr(ds, "data", None) if ds else None
-
+            src = obj.temp_datasets[key].data if obj.has_temp(key) else obj.datasets[key].data
+            
             if isinstance(src, np.ndarray) and src.ndim > 1:
-                cropped = src[y_min:y_max, x_min:x_max, ...]
-                cropped_copy = np.array(cropped)
+                cropped_copy = np.array(src[y_min:y_max, x_min:x_max, ...])
+                
                 if obj.has_temp(key):
-                    # keep the same wrapper; just update data
                     obj.temp_datasets[key].data = cropped_copy
                 else:
-                    # first temp for this key
                     obj.add_temp_dataset(key, cropped_copy)
+        
         return obj
 
     else:
