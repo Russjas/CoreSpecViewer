@@ -3,7 +3,7 @@ PDF Booklet Export for HoleObject.
  
 Creates an A4 PDF booklet with:
 - Title page with hole metadata (portrait)
-- One page per box per selected dataset key (landscape)
+- TWO boxes per landscape page per selected dataset key (stacked vertically)
 - Overview pages at the end showing concatenated images for each feature (portrait)
  
 Uses reportlab for PDF generation.
@@ -20,6 +20,7 @@ from reportlab.lib.units import inch, cm
 from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.lib.utils import ImageReader
 import matplotlib
+from matplotlib.figure import Figure
 
 from ..spectral_ops.visualisation import mk_thumb, DISPLAY_RANGE
 from ..models.hole_object import HoleObject
@@ -62,6 +63,9 @@ def create_hole_pdf_booklet(
     hole: HoleObject,
     selected_keys: list[str],
     output_path: Path | str,
+    boxes_per_page = 3,
+    include_downhole_plots: bool = True,  # NEW
+    selected_product_keys: list[str] = None  # NEW
 ) -> Path:
     """
     Create a PDF booklet for a drill hole with selected dataset visualizations.
@@ -89,8 +93,9 @@ def create_hole_pdf_booklet(
     -----
     PDF structure:
     1. Title page with hole metadata (portrait)
-    2. One page per box per selected key (landscape)
+    2. TWO boxes per page per selected key (landscape, stacked vertically)
     3. Overview pages showing all boxes concatenated for each key (portrait)
+    4. Downhole plots (NEW - optional)
     """
     output_path = Path(output_path)
     
@@ -109,27 +114,61 @@ def create_hole_pdf_booklet(
     # ========================================================================
     _build_title_page(c, hole, selected_keys)
     c.showPage()
-    
     # ========================================================================
-    # 2. BOX PAGES (Landscape)
-    # ========================================================================
-    logger.info(f"Generating {hole.num_box * len(selected_keys)} box pages...")
-    for key in selected_keys:
-        for po in hole:
-        
-            c.setPageSize(landscape(A4))
-            _build_box_page(c, po, key)
-            c.showPage()
-    
-    # ========================================================================
-    # 3. OVERVIEW PAGES (Portrait)
+    # 2. OVERVIEW PAGES (Portrait)
     # ========================================================================
     logger.info(f"Generating {len(selected_keys)} overview pages...")
     for key in selected_keys:
         c.setPageSize(A4)
         _build_overview_page(c, hole, key)
         c.showPage()
-    
+    # ========================================================================
+    # 4. Hole plots (Portrait - 2 or 3 boxes per page)
+    # ========================================================================
+
+    if include_downhole_plots and selected_product_keys:
+        _build_downhole_plots_section(c, hole, selected_product_keys)
+    # ========================================================================
+    # 3. BOX PAGES (Landscape - 2 or 3 boxes per page)
+    # ========================================================================
+    num_pages = (hole.num_box * len(selected_keys) + 1) // 3  # Ceiling division
+    logger.info(f"Generating {num_pages} box pages (3 boxes per page)...")
+    if boxes_per_page not in [2, 3]:
+        boxes_per_page = 2
+    if boxes_per_page ==2:  
+        for key in selected_keys:
+            boxes_list = list(hole)
+
+            # Process boxes in pairs
+            for i in range(0, len(boxes_list), 2):
+                c.setPageSize(landscape(A4))
+                
+                # Get first box (top half)
+                po1 = boxes_list[i]
+                
+                # Get second box if it exists (bottom half)
+                po2 = boxes_list[i + 1] if i + 1 < len(boxes_list) else None
+                
+                _build_double_box_page(c, po1, po2, key)
+                c.showPage()
+    else:    
+        for key in selected_keys:
+            boxes_list = list(hole)
+            
+            # Process boxes in pairs
+            for i in range(0, len(boxes_list), 3):
+                c.setPageSize(landscape(A4))
+                
+                # Get first box
+                po1 = boxes_list[i]
+                
+                # Get second box if it exists
+                po2 = boxes_list[i + 1] if i + 1 < len(boxes_list) else None
+                # Get third box if it exists
+                po3 = boxes_list[i + 2] if i + 2 < len(boxes_list) else None
+                _build_triple_box_page(c, po1, po2, po3, key)
+                c.showPage()
+
     # Save PDF
     c.save()
     logger.info(f"PDF booklet created successfully: {output_path}")
@@ -226,24 +265,105 @@ def _build_title_page(c, hole, selected_keys):
         y -= 15
 
 
-def _build_box_page(c, po, key):
-    """Build box page on canvas (landscape)."""
+def _build_double_box_page(c, po1, po2, key):
+    """Build a landscape page with two boxes stacked vertically."""
     width, height = landscape(A4)
-    margin = 1.5 * cm
+    margin = 1.0 * cm  # Slightly smaller margin for more space
+    
+    # Calculate available space for each half
+    divider_y = height / 2
+    legend_space = 50  # Space reserved for legend at bottom of each half
+    
+    # ========================================================================
+    # TOP HALF - First Box
+    # ========================================================================
+    _build_single_box_segment(c, po1, key, 
+                          x_margin=margin, 
+                          y_top=height - margin, 
+                          y_bottom=divider_y + 5,  # Small gap between halves
+                          width=width,
+                          legend_space=legend_space)
+    
+    # ========================================================================
+    # BOTTOM HALF - Second Box (if exists)
+    # ========================================================================
+    if po2 is not None:
+        _build_single_box_segment(c, po2, key, 
+                              x_margin=margin, 
+                              y_top=divider_y - 5,  # Small gap between halves
+                              y_bottom=margin,
+                              width=width,
+                              legend_space=legend_space)
+    else:
+        # If odd number of boxes, leave bottom half empty or add a note
+        c.setFont("Helvetica-Oblique", 10)
+        c.drawString(margin, divider_y / 2, "(Last page - no additional box)")
+
+def _build_triple_box_page(c, po1, po2, po3, key):
+    """Build a landscape page with three boxes stacked vertically."""
+    width, height = landscape(A4)
+    margin = 1.0 * cm
+    
+    # Calculate available space and dividers
+    in_margin_height = height - (2 * margin)
+    third = in_margin_height / 3
+    gap = 3  # Small gap between segments
+    
+    div_1 = height - margin - third  # Bottom of top third
+    div_2 = div_1 - third  # Bottom of middle third
+    
+    legend_space = 50  # Space reserved for legend at bottom of each segment
+    
+    # ========================================================================
+    # TOP THIRD - First Box
+    # ========================================================================
+    _build_single_box_segment(c, po1, key, 
+                          x_margin=margin, 
+                          y_top=height - margin, 
+                          y_bottom=div_1 + gap,
+                          width=width,
+                          legend_space=legend_space)
+    
+    # ========================================================================
+    # MIDDLE THIRD - Second Box (if exists)
+    # ========================================================================
+    if po2 is not None:
+        _build_single_box_segment(c, po2, key, 
+                              x_margin=margin, 
+                              y_top=div_1 - gap,
+                              y_bottom=div_2 + gap,
+                              width=width,
+                              legend_space=legend_space)
+    
+    # ========================================================================
+    # BOTTOM THIRD - Third Box (if exists)
+    # ========================================================================
+    if po3 is not None:
+        _build_single_box_segment(c, po3, key, 
+                              x_margin=margin, 
+                              y_top=div_2 - gap,
+                              y_bottom=margin,
+                              width=width,
+                              legend_space=legend_space)
+
+
+
+def _build_single_box_segment(c, po, key, x_margin, y_top, y_bottom, width, legend_space):
+    """Build a single box visualization in a designated vertical region."""
     
     box_num = po.metadata.get('box number', 'Unknown')
     box_depth_start = po.metadata.get('core depth start', 'N/A')
     box_depth_stop = po.metadata.get('core depth stop', 'N/A')
     
-    # Heading
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(margin, height - margin - 20, f"Box {box_num} - {gen_display_text(key)}")
+    # Heading at top of this section
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(x_margin, y_top - 15, f"Box {box_num} - {gen_display_text(key)}")
     
     # Metadata
-    c.setFont("Helvetica", 11)
-    c.drawString(margin, height - margin - 40, f"Depth: {box_depth_start}m to {box_depth_stop}m")
+    c.setFont("Helvetica", 8)
+    c.drawString(x_margin, y_top - 28, f"Depth: {box_depth_start}m to {box_depth_stop}m")
     
-    # Image
+    # Image area
     try:
         img_pil = _generate_box_image(po, key)
         
@@ -251,8 +371,9 @@ def _build_box_page(c, po, key):
         img_pil.save(img_buffer, format='PNG')
         img_buffer.seek(0)
         
-        available_width = width - 2 * margin
-        available_height = height - 2 * margin - 0.8*inch
+        # Available space for image (leave room for heading, metadata, and legend)
+        available_width = width - 2 * x_margin
+        available_height = (y_top - y_bottom) - 35 - legend_space  # 35 for heading/metadata
         
         img_width, img_height = img_pil.size
         scale = min(available_width / img_width, available_height / img_height, 1.0)
@@ -260,25 +381,29 @@ def _build_box_page(c, po, key):
         display_width = img_width * scale
         display_height = img_height * scale
         
-        # Center the image
+        # Center the image horizontally
         x = (width - display_width) / 2
-        y = height - margin - 0.8*inch - display_height
+        y = y_top - 35 - display_height  # y represents bottom left corner of image?
+        legend_top_y = y - 2
         c.drawImage(ImageReader(img_buffer), x, y, width=display_width, height=display_height)
+        
+        # Draw legend or colorbar below the image
         if key.endswith("INDEX"):
             legend_key = key.replace("INDEX", "LEGEND")
             legend_ds = po.temp_datasets.get(legend_key) or po.datasets.get(legend_key)
             if legend_ds and legend_ds.data:
-                _draw_legend(c, legend_ds.data, img_pil, x + display_width + 10, y, display_height)
-        logger.debug(f"Added image for Box {box_num}, key={key}")
-        if not key.endswith("INDEX"):
+                _draw_legend_compact(c, legend_ds.data, x, legend_top_y, display_width)
+        else:
             ds = po.temp_datasets.get(key) or po.datasets.get(key)
-            if ds and ds.data is not None:
-                _draw_colorbar(c, ds.data, po.mask, x + display_width + 10, y, display_height)
+            if ds and ds.data is not None and ds.data.ndim==2:
+                _draw_colorbar_compact(c, ds.data, po.mask, x, legend_top_y, display_width)
+        
+        logger.debug(f"Added image for Box {box_num}, key={key}")
         
     except Exception as e:
         logger.error(f"Failed to generate image for Box {box_num}, key={key}: {e}", exc_info=True)
-        c.setFont("Helvetica-Oblique", 11)
-        c.drawString(margin, height/2, f"Error generating image: {e}")
+        c.setFont("Helvetica-Oblique", 9)
+        c.drawString(x_margin, (y_top + y_bottom) / 2, f"Error generating image: {e}")
 
 
 def _build_overview_page(c, hole, key):
@@ -388,6 +513,120 @@ def _generate_concatenated_overview(hole: HoleObject, key: str) -> Image.Image:
     
     return concatenated
 
+
+def _draw_legend_compact(c, legend: list[dict], x_start, y_bottom, width):
+    """Draw compact horizontal legend for INDEX datasets below image in tight space."""
+       
+    # Get colors from tab20
+    cmap = matplotlib.colormaps.get("tab20") or matplotlib.colormaps["tab10"]
+    
+    # Build index to label mapping
+    idx_to_label = {}
+    for row in legend or []:
+        try:
+            idx = int(row.get("index"))
+            lab = str(row.get("label", f"class {idx}"))
+            idx_to_label[idx] = lab
+        except:
+            continue
+    
+    if not idx_to_label:
+        return
+    
+    # Compact layout parameters for half-page
+    box_size = 8  # Smaller boxes
+    text_gap = 2
+    
+    # Calculate item width based on longest label
+    c.setFont("Helvetica", 6)  # Smaller font
+    max_text_width = max([c.stringWidth(label, "Helvetica", 6) for label in idx_to_label.values()])
+    item_width = box_size + text_gap + max_text_width + 8
+    items_per_row = max(1, int(width / item_width))
+    row_height = 12  # Tighter vertical spacing
+    
+    x_start_pos = x_start
+    y_start_pos = y_bottom-15
+    
+    row = 0
+    col = 0
+    
+    for idx in sorted(idx_to_label.keys()):
+        # Calculate position
+        x = x_start_pos + (col * item_width)
+        y = y_start_pos - (row * row_height)
+        
+        # Draw color box
+        color = cmap(idx % 20)[:3]
+        c.setFillColorRGB(color[0], color[1], color[2])
+        c.rect(x, y, box_size, box_size, fill=1, stroke=1)
+        
+        # Draw label
+        c.setFillColorRGB(0, 0, 0)
+        label = idx_to_label[idx]
+        c.drawString(x + box_size + text_gap, y + 1, label)
+        
+        # Move to next position
+        col += 1
+        if col >= items_per_row:
+            col = 0
+            row += 1
+
+
+def _draw_colorbar_compact(c, data, mask, x_start, y_bottom, width):
+    """Draw compact horizontal colorbar for continuous data below image in tight space."""
+    # Determine stretch range (same logic as mk_thumb)
+    if mask is not None:
+        a = np.ma.masked_array(data, mask=mask).astype(float)
+    else:
+        a = np.ma.array(data, dtype=float)
+    
+    
+    data_min = np.nanmin(a)
+    data_max = np.nanmax(a)
+    
+    # Detect range type
+    if data_min >= 0 and np.sum((a.compressed() >= 0) & (a.compressed() <= 1)) >= 0.95 * a.compressed().size:
+        amin, amax = 0.0, 1.0
+    else:
+        in_range = False
+        compressed = a.compressed()
+        for range_min, range_max in DISPLAY_RANGE.values():
+            valid_data = compressed[(compressed >= range_min) & (compressed <= range_max)]
+            if valid_data.size > 0.7 * compressed.size:
+                amin, amax = range_min, range_max
+                in_range = True
+                break
+        if not in_range:
+            amin, amax = data_min, data_max
+    
+    # Draw compact horizontal colorbar
+    my_map = matplotlib.colormaps['viridis']
+    bar_height = 10  # Smaller height
+    bar_width = min(width * 0.6, 250)  # Scale with image width, max 250
+    
+    x_bar = x_start
+    y_pos = y_bottom - 25
+    num_steps = 100
+    step_width = bar_width / num_steps
+    
+    for i in range(num_steps):
+        val = i / num_steps
+        color = my_map(val)[:3]
+        c.setFillColorRGB(color[0], color[1], color[2])
+        c.rect(x_bar + i * step_width, y_pos, step_width, bar_height, fill=1, stroke=0)
+    
+    # Draw border
+    c.setStrokeColorRGB(0, 0, 0)
+    c.rect(x_bar, y_pos, bar_width, bar_height, fill=0, stroke=1)
+    
+    # Draw labels below the colorbar
+    c.setFont("Helvetica", 6)  # Smaller font
+    c.setFillColorRGB(0, 0, 0)
+    c.drawString(x_bar, y_pos - 10, f"{amin:.0f}")
+    c.drawRightString(x_bar + bar_width, y_pos - 10, f"{amax:.0f}")
+
+
+# Keep original legend/colorbar functions for overview pages
 def _draw_legend(c, legend: list[dict], img_data, x_start, y_bottom, width):
     """Draw horizontal legend for INDEX datasets below image, wrapping to multiple rows."""
        
@@ -408,21 +647,17 @@ def _draw_legend(c, legend: list[dict], img_data, x_start, y_bottom, width):
         return
     
     # Layout parameters
-    page_width, _ = landscape(A4)
-    margin = 1.5 * cm
-    available_width = page_width - (2 * margin)
-    
     box_size = 12
     text_gap = 3
     
     # Calculate item width based on longest label
     c.setFont("Helvetica", 7)
     max_text_width = max([c.stringWidth(label, "Helvetica", 7) for label in idx_to_label.values()])
-    item_width = box_size + text_gap + max_text_width + 10  # box + gap + text + padding
-    items_per_row = max(1, int(available_width / item_width))
-    row_height = 18  # Vertical spacing between rows
+    item_width = box_size + text_gap + max_text_width + 10
+    items_per_row = max(1, int(width / item_width))
+    row_height = 18
     
-    x_start_pos = margin
+    x_start_pos = x_start
     y_start_pos = y_bottom - 30
     
     row = 0
@@ -481,8 +716,7 @@ def _draw_colorbar(c, data, mask, x_start, y_bottom, width):
     bar_height = 15
     bar_width = 300
     
-    margin = 1.5 * cm
-    x_bar = margin + 20  # Start in from left margin
+    x_bar = x_start + 20
     y_pos = y_bottom - 35
     num_steps = 100
     step_width = bar_width / num_steps
@@ -502,3 +736,231 @@ def _draw_colorbar(c, data, mask, x_start, y_bottom, width):
     c.setFillColorRGB(0, 0, 0)
     c.drawString(x_bar, y_pos - 12, f"{amin:.0f}")
     c.drawRightString(x_bar + bar_width, y_pos - 12, f"{amax:.0f}")
+
+
+def _render_downhole_plot_to_buffer(
+    depths: np.ndarray,
+    values: np.ndarray,
+    plot_type: str,
+    legend: list[dict] = None,
+    title: str = "",
+    figsize: tuple = (8, 10)
+) -> BytesIO:
+    """
+    Render downhole plot to PNG buffer.
+    
+    Uses Figure directly without backend manipulation - works with
+    whatever backend is already loaded (Qt5Agg in this application).
+    """
+    # Create figure - uses current backend's renderer automatically
+    fig = Figure(figsize=figsize, dpi=150)
+    ax = fig.add_subplot(111)
+    
+    # Ensure depth is ascending
+    if depths[0] > depths[-1]:
+        depths = depths[::-1]
+        if values.ndim == 1:
+            values = values[::-1]
+        else:
+            values = values[::-1, :]
+    
+    if plot_type == 'continuous':
+        ax.plot(values, depths, 'o-', markersize=3)
+        ax.set_xlabel(title)
+        ax.set_ylabel("Depth (m)")
+        ax.grid(True, alpha=0.3)
+        ax.invert_yaxis()
+    
+    elif plot_type == 'discrete':
+        cmap = matplotlib.colormaps.get("tab20") or matplotlib.colormaps["tab10"]
+        
+        index_to_color = {}
+        legend_handles = []
+        legend_labels = []
+        
+        for i, entry in enumerate(legend):
+            mineral_id = int(entry["index"])
+            color = cmap(mineral_id % 20)
+            index_to_color[i] = color
+            
+            from matplotlib.patches import Patch
+            legend_handles.append(Patch(facecolor=color))
+            legend_labels.append(entry["label"])
+        
+        # No data color
+        index_to_color[-1] = (1.0, 1.0, 1.0, 1.0)
+        legend_handles.append(Patch(facecolor=(1.0, 1.0, 1.0, 1.0)))
+        legend_labels.append("No Dominant / Gap")
+        
+        # Draw bars
+        width = 0.1
+        H = values.shape[0]
+        for i in range(H):
+            idx = values[i]
+            z_top = depths[i]
+            z_bottom = depths[i+1] if i + 1 < H else depths[-1] + (depths[-1] - depths[-2])
+            color = index_to_color.get(idx, (0.5, 0.5, 0.5, 1.0))
+            
+            ax.barh(
+                y=z_top,
+                width=width,
+                height=z_bottom - z_top,
+                left=0,
+                align='edge',
+                color=color,
+                edgecolor='none'
+            )
+        
+        ax.set_ylim(depths.min(), depths.max())
+        ax.invert_yaxis()
+        ax.set_ylabel("Depth (m)")
+        ax.set_xlabel(title)
+        ax.set_xlim(0.0, width)
+        ax.set_xticks([])
+        
+        ax.legend(
+            handles=legend_handles,
+            labels=legend_labels,
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1.0),
+            borderaxespad=0.0,
+            fontsize=8
+        )
+    
+    elif plot_type == 'fractions':
+        H, C = values.shape
+        K = C - 1
+        
+        col_sums = np.sum(values, axis=0)
+        cols_to_plot = [i for i in range(C) if col_sums[i] > 0]
+        
+        frac_use = values[:, cols_to_plot]
+        cum = np.cumsum(frac_use, axis=1)
+        left = np.hstack([np.zeros((H, 1)), cum[:, :-1]])
+        right = cum
+        
+        cmap = matplotlib.colormaps.get("tab20") or matplotlib.colormaps["tab10"]
+        
+        for band_idx, col_idx in enumerate(cols_to_plot):
+            if col_idx < K:
+                cid = int(legend[col_idx]["index"])
+                name = str(legend[col_idx]["label"])
+                color = cmap(cid % 20)
+            else:
+                name = "Unclassified"
+                color = (0.7, 0.7, 0.7, 1.0)
+            
+            ax.fill_betweenx(
+                depths,
+                left[:, band_idx],
+                right[:, band_idx],
+                step="pre",
+                facecolor=color,
+                edgecolor="none",
+                label=name
+            )
+        
+        ax.set_ylim(depths.min(), depths.max())
+        ax.invert_yaxis()
+        ax.set_xlim(0.0, 1.0)
+        ax.set_xlabel("Fraction of row width")
+        ax.set_ylabel("Depth (m)")
+        ax.grid(True, axis="x", alpha=0.2)
+        
+        ax.legend(
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1.0),
+            borderaxespad=0.0,
+            fontsize=8
+        )
+    
+    ax.set_title(title, fontsize=12, fontweight='bold')
+    fig.tight_layout()
+    
+    # Save to buffer - Figure.savefig() works with current backend
+    buf = BytesIO()
+    fig.savefig(buf, format='png', dpi=300, bbox_inches='tight', facecolor='white')
+    buf.seek(0)
+    
+    # Clean up
+    fig.clear()
+    del fig
+    
+    return buf
+
+
+def _build_downhole_plots_section(c, hole, selected_product_keys):
+    """
+    Add downhole plot pages for selected product datasets.
+    
+    Uses HoleObject.step_product_dataset() to get resampled data,
+    then renders plots using the same logic as ImageCanvas2D.
+    """
+    from reportlab.lib.utils import ImageReader
+    
+    for key in selected_product_keys:
+        try:
+            # Use existing resampling logic
+            depths, values, dominant = hole.step_product_dataset(key)
+        except ValueError as e:
+            logger.warning(f"Cannot plot {key}: {e}")
+            continue
+        
+        # Determine plot type from suffix (same as hole_page.show_downhole)
+        if key.endswith("FRACTIONS"):
+            plot_type = 'fractions'
+            legend_key = key.replace("FRACTIONS", "LEGEND")
+            legend = hole.product_datasets[legend_key].data
+            
+        elif key.endswith("DOM-MIN"):
+            plot_type = 'discrete'
+            legend_key = key.replace("DOM-MIN", "LEGEND")
+            legend = hole.product_datasets[legend_key].data
+            values = dominant  # Use dominant indices, not fractions
+            
+        elif key.endswith("INDEX"):
+            plot_type = 'discrete'
+            legend_key = key.replace("INDEX", "LEGEND")
+            legend = hole.product_datasets[legend_key].data
+            
+        else:
+            plot_type = 'continuous'
+            legend = None
+        
+        # Render plot
+        img_buffer = _render_downhole_plot_to_buffer(
+            depths=depths,
+            values=values,
+            plot_type=plot_type,
+            legend=legend,
+            title=gen_display_text(key),
+            figsize=(8, 11) if plot_type == 'discrete' else (7, 10)
+        )
+        
+        # Add page
+        c.setPageSize(A4)  # Portrait
+        width, height = A4
+        
+        # Draw title
+        c.setFont("Helvetica-Bold", 14)
+        c.drawCentredString(width/2, height - 30, f"Downhole Plot: {hole.hole_id}")
+        
+        # Draw plot image
+        img_reader = ImageReader(img_buffer)
+        
+        # Calculate dimensions to fit page with margins
+        margin = 40
+        available_width = width - 2*margin
+        available_height = height - 80  # Space for title
+        
+        c.drawImage(
+            img_reader,
+            margin,
+            margin,
+            width=available_width,
+            height=available_height,
+            preserveAspectRatio=True,
+            anchor='c'
+        )
+        
+        c.showPage()
