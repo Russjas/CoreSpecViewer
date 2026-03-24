@@ -12,6 +12,7 @@ from .base_actions import BaseActions
 from . import busy_cursor, LibMetadataDialog, WavelengthRangeDialog, LibMetadataDialog
 from .band_math_dialogue import BandMathsDialog
 from ..config import feature_keys as FEATURE_KEYS
+from ..create_report.pdf_booklet import create_po_pdf_booklet
 
 class VisActions(BaseActions):
     """Raw data operations"""
@@ -44,6 +45,7 @@ class VisActions(BaseActions):
         ("Add region average", self.act_lib_region, "Add the average spectra of a region to the current library\n WARNING: This will modify the library on disk, use a back up"),
     ]),
     ("button", "Generate Images", self.box_ops.gen_images, "Generates full size images of all products and base datasets in an outputs folder"),
+    ("button", "Generate box report", self.create_report, "Generates full size images of all products and base datasets in an outputs folder")
 ])
         
     # -------- VISUALISE actions --------
@@ -228,3 +230,27 @@ class VisActions(BaseActions):
         p.dispatcher.set_rect(_on_rect)
         p.left_canvas.start_rect_select()
         
+    def create_report(self):
+        logger.info(f"Button clicked: Create box report")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Add to Library", msg)
+            return
+        path = QFileDialog.getExistingDirectory(
+            self.controller,
+            "Select save folder",
+            )
+        if not path:
+            return  # user cancelled — do nothing safely
+        with busy_cursor("Creating report") as progress:
+
+            try:
+                out = create_po_pdf_booklet(self.cxt.po, path)
+                logger.info(f"Box report save to {out}")
+            except (ValueError, PermissionError) as e:
+                logger.error(f"Failed to create box report", exc_info=True)
+                self._show_error(
+                        "Export Box Report", 
+                        f"Failed to create box report: {e}"
+                    )

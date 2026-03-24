@@ -964,3 +964,191 @@ def _build_downhole_plots_section(c, hole, selected_product_keys):
         )
         
         c.showPage()
+
+
+def create_po_pdf_booklet(
+    po,
+    output_path: Path | str,
+    include_metadata: bool = True
+) -> Path:
+    """
+    Create a PDF booklet for a single ProcessedObject with selected dataset visualizations.
+    
+    Parameters
+    ----------
+    po : ProcessedObject
+        The ProcessedObject containing the datasets
+    output_path : Path | str
+        Path where the PDF should be saved
+    include_metadata : bool, default=True
+        Whether to include a title page with metadata
+        
+    Returns
+    -------
+    Path
+        Path to the created PDF file
+        
+    Notes
+    -----
+    PDF structure:
+    1. Optional title page with metadata (portrait)
+    2. Landscape pages with 2 datasets per page (stacked vertically)
+    """
+    output_path = Path(output_path) / f"{po.basename}.pdf"
+    exclude_keys = ["savgol", "cropped", "savgol_cr", "metadata", "stats", "bands", "display"]
+    selected_keys = [key for key in po.datasets.keys() if key not in exclude_keys
+                     and not key.endswith("LEGEND")
+                     and not key.endswith("CLUSTERS")]
+    
+    logger.info(f"Creating PDF booklet for {po.basename} with {len(selected_keys)} keys")
+    
+    # Create canvas
+    c = pdf_canvas.Canvas(str(output_path), pagesize=A4)
+    
+    # ========================================================================
+    # 1. TITLE PAGE (Portrait) - Optional
+    # ========================================================================
+    if include_metadata:
+        _build_po_title_page(c, po, selected_keys)
+        c.showPage()
+    
+    # ========================================================================
+    # 2. DATASET PAGES (Landscape - 2 datasets per page, stacked vertically)
+    # ========================================================================
+    logger.info(f"Generating dataset pages (2 per page)...")
+    
+    width_landscape, height_landscape = landscape(A4)
+    margin = 1.0 * cm
+    divider_y = height_landscape / 2
+    legend_space = 50
+    
+    # Process datasets in pairs
+    for i in range(0, len(selected_keys), 2):
+        c.setPageSize(landscape(A4))
+        
+        key1 = selected_keys[i]
+        key2 = selected_keys[i + 1] if i + 1 < len(selected_keys) else None
+        
+        # Top half - use existing function with key1
+        _build_single_box_segment(c, po, key1, 
+                                 x_margin=margin, 
+                                 y_top=height_landscape - margin, 
+                                 y_bottom=divider_y + 5,
+                                 width=width_landscape,
+                                 legend_space=legend_space)
+        
+        # Bottom half - use existing function with key2
+        if key2 is not None:
+            _build_single_box_segment(c, po, key2, 
+                                     x_margin=margin, 
+                                     y_top=divider_y - 5,
+                                     y_bottom=margin,
+                                     width=width_landscape,
+                                     legend_space=legend_space)
+        
+        c.showPage()
+    
+    # Save PDF
+    c.save()
+    logger.info(f"PDF booklet created successfully: {output_path}")
+    return output_path
+
+def _build_po_title_page(c, po, selected_keys):
+    """Build title page for a single ProcessedObject (portrait)."""
+    width, height = A4
+    margin = 1.5 * cm
+    
+    # Title
+    c.setFont("Helvetica-Bold", 12)
+    c.drawCentredString(width/2, height - 2*inch, f"Core Box Report: {po.basename}")
+    
+    # Metadata
+    y = height - 2.8*inch
+    
+    # Get metadata if available
+    metadata = po.metadata if hasattr(po, 'metadata') else {}
+    
+    # Basename
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, y, "Box ID:")
+    c.setFont("Helvetica", 11)
+    c.drawString(margin + 100, y, str(po.basename))
+    y -= 20
+    
+    # Core depth information if available
+    if metadata:
+        depth_start = metadata.get("core depth start", "N/A")
+        depth_stop = metadata.get("core depth stop", "N/A")
+        
+        if depth_start != "N/A" and depth_stop != "N/A":
+            try:
+                ds = float(depth_start)
+                de = float(depth_stop)
+                
+                c.setFont("Helvetica-Bold", 11)
+                c.drawString(margin, y, "Depth Range:")
+                c.setFont("Helvetica", 11)
+                c.drawString(margin + 100, y, f"{ds:.2f}m to {de:.2f}m")
+                y -= 20
+                
+                c.setFont("Helvetica-Bold", 11)
+                c.drawString(margin, y, "Box Length:")
+                c.setFont("Helvetica", 11)
+                c.drawString(margin + 100, y, f"{de - ds:.2f}m")
+                y -= 20
+            except (ValueError, TypeError):
+                pass
+        
+        # Sample date if available
+        sample_date = metadata.get("sample date", None)
+        if sample_date:
+            c.setFont("Helvetica-Bold", 11)
+            c.drawString(margin, y, "Sample Date:")
+            c.setFont("Helvetica", 11)
+            c.drawString(margin + 100, y, str(sample_date))
+            y -= 20
+    
+    # Number of datasets
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, y, "Available Datasets:")
+    c.setFont("Helvetica", 11)
+    c.drawString(margin + 100, y, str(len(po.datasets) + len(po.temp_datasets)))
+    y -= 20
+    
+    # Report generation time
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, y, "Report Generated:")
+    c.setFont("Helvetica", 11)
+    c.drawString(margin + 100, y, datetime.now().strftime('%Y-%m-%d %H:%M'))
+    y -= 30
+    
+    # Selected datasets list with wrapping
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(margin, y, "Included Datasets:")
+    y -= 20
+    
+    c.setFont("Helvetica", 10)
+    max_width = width - 2 * margin - 20  # Available width for text
+    
+    for i, key in enumerate(selected_keys, 1):
+        display_name = gen_display_text(key)
+        full_text = f"{i}. {display_name}"
+        
+        # Check if text fits on one line
+        text_width = c.stringWidth(full_text, "Helvetica", 10)
+        
+        if text_width <= max_width:
+            # Fits on one line
+            c.drawString(margin + 20, y, full_text)
+            y -= 15
+        else:
+            # Need to wrap - split at reasonable point
+            # Simple approach: just truncate with ellipsis
+            while c.stringWidth(full_text + "...", "Helvetica", 10) > max_width and len(full_text) > 10:
+                full_text = full_text[:-1]
+            c.drawString(margin + 20, y, full_text + "...")
+            y -= 15
+        
+        if y < margin + 50:  # Avoid going off page
+            c.drawString(margin + 20, y, "... (additional datasets not shown)")
+            break
