@@ -191,6 +191,7 @@ class ProcessedObject:
         if bands is None:
             logger.error("Cannot identify band names from the header file")
             raise ValueError("Cannot identify band names from the header file")
+       
         if smoothed:
             savgol = data
             cropped = np.zeros_like(savgol)
@@ -199,6 +200,7 @@ class ProcessedObject:
         else:
             cropped = data
             savgol, savgol_cr, mask = process(cropped)
+        mask[np.all(savgol == 0, axis=2)] = 1
         po = cls.new(root, name)
         po.add_dataset('metadata', metadata, ext='.json')
         po.add_dataset('cropped', cropped, ext='.npy')

@@ -68,7 +68,11 @@ class HoleActions(BaseActions):
                 self.cxt.current = self.cxt.ho[box_num+1]
                 checkpoint_3 = time.perf_counter()
                 logger.debug(f"PROFILE: Set current context: {checkpoint_3 - checkpoint_2:.4f}s")
-            
+                active_page = self.controller.active_page()
+                if hasattr(active_page, "teardown"):
+                    active_page.teardown()
+                if hasattr(active_page, "activate"):
+                    active_page.activate()
                 
                 self.controller.refresh()
                 checkpoint_4 = time.perf_counter()
@@ -91,6 +95,11 @@ class HoleActions(BaseActions):
         if box_num is not None:
             try:
                 self.cxt.current = self.cxt.ho[box_num-1]
+                active_page = self.controller.active_page()
+                if hasattr(active_page, "teardown"):
+                    active_page.teardown()
+                if hasattr(active_page, "activate"):
+                    active_page.activate()
                 self.controller.refresh()
             except KeyError:
                 return

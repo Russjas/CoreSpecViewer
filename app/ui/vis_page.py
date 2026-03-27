@@ -37,15 +37,16 @@ class VisualisePage(BasePage):
             popoutable=False, closeable=False
         )
         
-        self._right = ImageCanvas2D(self)
+        mask_canvas = ImageCanvas2D(self)
         self._add_closable_widget(
-            self._right,
-            title="Mask",
-            popoutable=False, closeable=False
+        mask_canvas,
+        title="Mask",
+        popoutable=False, closeable=True
         )
         
+        
         # Track all canvases for synchronization (including closable ones)
-        self._sync_canvases = [self.left_canvas, self.right_canvas]
+        self._sync_canvases = [self.left_canvas, mask_canvas]
         
         tbl = RightClick_TableWidget(0, 1, self)
         tbl.setHorizontalHeaderLabels(["Cached Products"])
@@ -94,9 +95,28 @@ class VisualisePage(BasePage):
                 except Exception:
                     pass
             self._mpl_cids.clear()
+        # Remove all closable widgets (except left canvas and table)
+        widgets_to_remove = []
+        for i in range(self._splitter.count()):
+            widget = self._splitter.widget(i)
+            if isinstance(widget, ClosableWidgetWrapper):
+                # Keep the left canvas wrapper
+                if getattr(widget, 'wrapped_widget', None) is not self.left_canvas:
+                    widgets_to_remove.append(widget)
         
-        # Clear sync canvases but keep the main two
-        self._sync_canvases = [self.left_canvas, self.right_canvas]
+        for widget in widgets_to_remove:
+            self.remove_widget(widget)
+            
+        # Recreate the mask canvas fresh
+        mask_canvas = ImageCanvas2D(self)
+        self._add_closable_widget(
+            mask_canvas,
+            title="Mask",
+            popoutable=False, closeable=True, 
+            index=self._splitter.count() -1
+            )
+    
+        self._sync_canvases = [self.left_canvas, mask_canvas]
         
         self.cache.clear()
         self.table.setRowCount(0)
@@ -186,7 +206,9 @@ class VisualisePage(BasePage):
         self.refresh_cache_table()
         checkpoint_2 = time.perf_counter()
         logger.debug(f"PROFILE UPDATE DISPLAY: cache table refreshed: {checkpoint_2 - checkpoint_1:.4f}s")
-        self._display_product_in_canvas(self.right_canvas, 'mask')
+        if len(self._sync_canvases) == 2:
+            self._display_product_in_canvas(self._sync_canvases[1], "mask")
+        
         checkpoint_3 = time.perf_counter()
         logger.debug(f"PROFILE UPDATE DISPLAY: right canvas displayed: {checkpoint_3 - checkpoint_1:.4f}s")
         logger.debug(f"PROFILE UPDATE DISPLAY: TOTAL update display : {checkpoint_3 - start:.4f}s")

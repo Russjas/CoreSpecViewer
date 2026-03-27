@@ -19,10 +19,9 @@ class MaskActions(BaseActions):
         """Define and register ribbon buttons"""
         
         self._register_group('Masking', [
-            ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)"),
+            
             ("button", "New mask", lambda: self.act_mask_point('new'), "Creates a blank mask,\n then masks by correlation with selected pixel.", "Ctrl+W"),
             ("button", "Enhance mask", lambda: self.act_mask_point('enhance'), "Adds to existing mask by correlation with selected pixel", "Ctrl+E"),
-            ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
             ("button", "Mask region", self.act_mask_rect, "Adds a masked rectangle to existing mask", "Ctrl+R"),
             ("menu", "Freehand mask region", [
                 ("Mask inside selected", lambda: self.act_mask_polygon(mode="mask inside"), "With existing mask, masks all pixels inside of selected region", "Ctrl+F"),
@@ -33,9 +32,11 @@ class MaskActions(BaseActions):
             ]),
             ("button", "Despeckle", self.despeck_mask, "Remove speckles from mask"),
             ("button", "Improve", self.act_mask_improve, "Heuristically improves the mask"),
-            ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),
-            ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping"),
+            ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
+            ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom'),
+            ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)"),
+            ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),
             ("button", "re-generate thumbs (slow)", self.re_thumb, 'Regenerates all thumbnail images. Slow process, but shouldnt be needed often')
         ])
     

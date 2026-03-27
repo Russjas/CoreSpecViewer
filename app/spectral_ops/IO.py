@@ -145,6 +145,7 @@ def load_envi(head_path, data_path):
     try:
         box = envi.open(head_path, image=data_path)
         data = np.array(box.load())
+       
     except Exception:
         # Workaround for hylite matchHeader Windows path separator bug
         # Bug will be fixed in next hylite release
@@ -157,8 +158,9 @@ def load_envi(head_path, data_path):
         box = loadWithNumpy(hylite_path)
         box = np.array(box.data)  
         data = np.transpose(box, (1, 0, 2))
+        
     metadata = read_envi_header(head_path)
-   
+    data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
     return data, metadata
 
 def reflect_correct(data, white, dark):
