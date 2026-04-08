@@ -5,6 +5,7 @@ Used by UI pages to manipulate RawObject and ProcessedObject datasets.
 from pathlib import Path
 import re
 import logging
+import time
 
 from matplotlib.path import Path as mpl_path
 import numpy as np
@@ -96,6 +97,8 @@ def discover_lumo_directories(root_dir: Path) -> list[Path]:
 #======= Cropping and reset functions for RO or PO data =======================
 
 
+
+
 def crop(obj, y_min, y_max, x_min, x_max):
     """
     Generic, window-agnostic spatial crop.
@@ -103,15 +106,24 @@ def crop(obj, y_min, y_max, x_min, x_max):
     - For RawObject → create temp_reflectance (preview).
     - For ProcessedObject → create temp datasets for all 2D/3D arrays.
     """
+    start_time = time.perf_counter()
+    
     if isinstance(obj, RawObject):
         if not hasattr(obj, "reflectance") or obj.reflectance is None:
+            refl_start = time.perf_counter()
             obj.get_reflectance()
+            logger.debug(f"get_reflectance took {time.perf_counter() - refl_start:.3f}s")
+            
         if hasattr(obj, "temp_reflectance") and obj.temp_reflectance is not None:
             arr = obj.temp_reflectance
         else:
             arr = obj.reflectance
 
+        crop_start = time.perf_counter()
         obj.temp_reflectance = arr[y_min:y_max, x_min:x_max]
+        logger.debug(f"RawObject crop took {time.perf_counter() - crop_start:.3f}s")
+        
+        logger.debug(f"crop(RawObject) total: {time.perf_counter() - start_time:.3f}s")
         return obj
 
     elif isinstance(obj, ProcessedObject):
@@ -122,20 +134,32 @@ def crop(obj, y_min, y_max, x_min, x_max):
         ordered_keys = ['mask'] if 'mask' in keys else []
         ordered_keys.extend([k for k in keys if k != 'mask'])
         
+        total_crop_time = 0
         for key in ordered_keys:
+            key_start = time.perf_counter()
             logger.info(f"cropping {obj.basename} {key} dataset")
             
             # choose source: prefer temp if present
             src = obj.temp_datasets[key].data if obj.has_temp(key) else obj.datasets[key].data
             
             if isinstance(src, np.ndarray) and src.ndim > 1:
+                array_copy_start = time.perf_counter()
                 cropped_copy = np.array(src[y_min:y_max, x_min:x_max, ...])
+                copy_time = time.perf_counter() - array_copy_start
                 
                 if obj.has_temp(key):
                     obj.temp_datasets[key].data = cropped_copy
                 else:
+                    add_start = time.perf_counter()
                     obj.add_temp_dataset(key, cropped_copy)
+                    add_time = time.perf_counter() - add_start
+                    logger.debug(f"  add_temp_dataset({key}) took {add_time:.3f}s")
+                
+                key_time = time.perf_counter() - key_start
+                total_crop_time += key_time
+                logger.debug(f"  {key}: copy={copy_time:.3f}s, total={key_time:.3f}s, shape={cropped_copy.shape}")
         
+        logger.debug(f"crop(ProcessedObject) total: {time.perf_counter() - start_time:.3f}s ({len(ordered_keys)} datasets)")
         return obj
 
     else:
