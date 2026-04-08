@@ -408,10 +408,23 @@ def run_feature_extraction(obj, key):
     Estimate minimum wavelength (MWL) position and corresponding absorption depth
     for a specified short-wave infrared absorption feature using multiple
     possible fitting techniques.
+    
+    Parameters
+    ----------
+    key : str or dict
+        Either a string key from the standard features (e.g., '2200W')
+        OR a dict in format {feature_name: [wav_min, wav_max, cr_min, cr_max]}
     """
-    pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'POLY')
-    obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
-    obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
+    if isinstance(key, dict):
+        # Custom feature - extract the name for dataset keys
+        feature_name = list(key.keys())[0]
+        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique='POLY')
+        obj.add_temp_dataset(f'{feature_name}POS', np.ma.masked_array(pos, mask=feat_mask), '.npz')
+        obj.add_temp_dataset(f'{feature_name}DEP', np.ma.masked_array(dep, mask=feat_mask), '.npz')
+    else:
+        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'POLY')
+        obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
+        obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
 
 

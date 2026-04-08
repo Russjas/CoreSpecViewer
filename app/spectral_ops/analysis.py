@@ -569,7 +569,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
     '2320W':  (2300, 2340, 2295, 2355),
     '2350W':  (2320, 2366, 2310, 2370),
     '2390W':  (2377, 2406, 2375, 2435),
-    '2830W':  (2677, 2890, 2650, 2920),  
+    '2830W':  (2790, 2890, 2790, 2920),  
     '2950W':  (2920, 2980, 2900, 3000),
     '2950AW': (2900, 2960, 2900, 3000),
     '2950BW': (2920, 2990, 2790, 3200),
@@ -642,14 +642,34 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
         "width_min_nm":  8.0,
         "width_max_nm":  80.0,
     }}
-    cr_crop_min = feats[feature][2]
-    cr_crop_max = feats[feature][3]
-    cr_crop_min_index = np.argmin(np.abs(np.array(bands)-(feats[feature][2])))
-    cr_crop_max_index = np.argmin(np.abs(np.array(bands)-(feats[feature][3])))
-    wav_min = feats[feature][0]
-    wav_max = feats[feature][1]
-    wav_min_index = np.argmin(np.abs(np.array(bands)-(feats[feature][0])))
-    wav_max_index = np.argmin(np.abs(np.array(bands)-(feats[feature][1])))
+    if isinstance(feature, dict):
+        # Extract the single key-value pair
+        if len(feature) != 1:
+            raise ValueError("Feature dict must contain exactly one key-value pair")
+        
+        feature_name, bounds = next(iter(feature.items()))
+        
+        if len(bounds) != 4:
+            raise ValueError("Feature bounds must be [wav_min, wav_max, cr_crop_min, cr_crop_max]")
+        
+        wav_min, wav_max, cr_crop_min, cr_crop_max = bounds
+        
+    elif isinstance(feature, str):
+        # Existing path - look up in feats dictionary
+        feature_name = feature
+        cr_crop_min = feats[feature][2]
+        cr_crop_max = feats[feature][3]
+        wav_min = feats[feature][0]
+        wav_max = feats[feature][1]
+    else:
+        raise TypeError("Feature must be either a string or a dictionary")
+    
+    # Common code for both paths
+    cr_crop_min_index = np.argmin(np.abs(np.array(bands) - cr_crop_min))
+    cr_crop_max_index = np.argmin(np.abs(np.array(bands) - cr_crop_max))
+    wav_min_index = np.argmin(np.abs(np.array(bands) - wav_min))
+    wav_max_index = np.argmin(np.abs(np.array(bands) - wav_max))
+    
 
     #check_response =  est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min, wav_max))
     check_response =  est_peaks_cube_scipy_thresh(savgol_cr, bands, wavrange=(wav_min, wav_max), thresh = thresh)

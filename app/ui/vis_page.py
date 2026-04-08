@@ -37,7 +37,7 @@ class VisualisePage(BasePage):
             popoutable=False, closeable=False
         )
         
-        mask_canvas = ImageCanvas2D(self)
+        mask_canvas = self._create_flagged_canvas("mask")
         self._add_closable_widget(
         mask_canvas,
         title="Mask",
@@ -106,16 +106,16 @@ class VisualisePage(BasePage):
         
         for widget in widgets_to_remove:
             self.remove_widget(widget)
-            
+
         # Recreate the mask canvas fresh
-        mask_canvas = ImageCanvas2D(self)
+        mask_canvas = self._create_flagged_canvas("mask")
         self._add_closable_widget(
             mask_canvas,
             title="Mask",
             popoutable=False, closeable=True, 
             index=self._splitter.count() -1
             )
-    
+        mask_canvas.mask_flag = True
         self._sync_canvases = [self.left_canvas, mask_canvas]
         
         self.cache.clear()
@@ -206,9 +206,10 @@ class VisualisePage(BasePage):
         self.refresh_cache_table()
         checkpoint_2 = time.perf_counter()
         logger.debug(f"PROFILE UPDATE DISPLAY: cache table refreshed: {checkpoint_2 - checkpoint_1:.4f}s")
-        if len(self._sync_canvases) == 2:
-            self._display_product_in_canvas(self._sync_canvases[1], "mask")
-        
+        for canvas in self._sync_canvases:
+            if hasattr(canvas, "product_flag"):
+                self._display_product_in_canvas(canvas, canvas.product_flag)
+            
         checkpoint_3 = time.perf_counter()
         logger.debug(f"PROFILE UPDATE DISPLAY: right canvas displayed: {checkpoint_3 - checkpoint_1:.4f}s")
         logger.debug(f"PROFILE UPDATE DISPLAY: TOTAL update display : {checkpoint_3 - start:.4f}s")
@@ -231,7 +232,7 @@ class VisualisePage(BasePage):
             return
         disp = gen_display_text(key)
         # Create a new closable canvas
-        canvas = ImageCanvas2D(self)
+        canvas = self._create_flagged_canvas(key)
         wrapper = self._add_closable_widget(
             canvas,
             title=f"Product: {disp}",
@@ -270,6 +271,14 @@ class VisualisePage(BasePage):
         except KeyError:
             return
         canvas.show_rgb(disp_data)
+
+
+    def _create_flagged_canvas(self, product_key):
+        """Create a canvas tagged with its product key for auto-refresh."""
+        canvas = ImageCanvas2D(self)
+        canvas.product_flag = product_key
+        return canvas
+    
 
     def remove_product(self, key: str):
         if key in self.cache:
