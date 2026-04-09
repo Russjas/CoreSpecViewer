@@ -224,6 +224,38 @@ def improve_mask_from_graph(mask):
     return new_mask
 
 
+def hough_line_connection(mask):
+    """
+    Detect lines and connect them based on proximity and angle
+    
+    Parameters:
+    -----------
+    mask : numpy.ndarray
+        Binary mask where lines are white (1) on black (0)
+    
+    Returns:
+    --------
+    numpy.ndarray : result as [0,1] binary mask
+    """
+    # Detect lines using probabilistic Hough transform
+    lines = cv2.HoughLinesP(mask.astype(np.uint8),  # Just ensure uint8
+                            rho=1, 
+                            theta=np.pi/180, 
+                            threshold=50,
+                            minLineLength=100,
+                            maxLineGap=30)
+    
+    # Create output image
+    result = np.zeros_like(mask)
+    
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv2.line(result, (x1, y1), (x2, y2), 1, 2)  # Draw with value 1, not 255
+    
+    return result
+
+
 def despeckle_mask(mask):
     """
     Remove small speckles by operating on the inverted mask.

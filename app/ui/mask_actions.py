@@ -27,11 +27,13 @@ class MaskActions(BaseActions):
                 ("Mask inside selected", lambda: self.act_mask_polygon(mode="mask inside"), "With existing mask, masks all pixels inside of selected region", "Ctrl+F"),
                 ("Mask outside selected", lambda: self.act_mask_polygon(mode="mask outside"), "With existing mask, masks all pixels outside of selected region", "Ctrl+Shift+F"),
                 ("Unmask inside selected", lambda: self.act_mask_polygon(mode="unmask inside"), "With existing mask, unmasks all pixels inside of selected region", "Ctrl+A"),
-                ("Unmask outside selected", lambda: self.act_mask_polygon(mode="unmask outside"), "With existing mask, unmasks all pixels outside of selected region", "Ctrl+Shift+A"),
-                
+                ("Unmask outside selected", lambda: self.act_mask_polygon(mode="unmask outside"), "With existing mask, unmasks all pixels outside of selected region", "Ctrl+Shift+A"), 
             ]),
             ("button", "Despeckle", self.despeck_mask, "Remove speckles from mask"),
-            ("button", "Improve", self.act_mask_improve, "Heuristically improves the mask"),
+            ("menu", "Improve", [
+                ("Vertical", self.act_mask_improve, "Heuristically improves the mask, only on true-vertical boxes"),
+                ("Connect Lines", lambda: self.act_mask_improve(mode="hough"), "Heuristically connect the lines using hough line connection")
+            ]),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom'),
@@ -85,14 +87,14 @@ class MaskActions(BaseActions):
         p.dispatcher.set_single_click(handle_point_click)
 
 
-    def act_mask_improve(self):
+    def act_mask_improve(self, mode = "vertical"):
         logger.info(f"Button clicked: Improve Mask")
         valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
         if not valid_state:
             logger.warning(msg)
             self._show_error("Masking", msg)
             return
-        self.cxt.current = t.improve_mask(self.cxt.current)
+        self.cxt.current = t.improve_mask(self.cxt.current, mode = mode)
         logger.info(f"{self.cxt.current.basename} Mask improved heuristically")
         self.controller.refresh()
 

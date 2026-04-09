@@ -347,12 +347,15 @@ def mask_polygon(obj, vertices_rc, mode = "mask outside"):
     return obj
 
 
-def improve_mask(obj):
+def improve_mask(obj, mode="vertical"):
     """
     Heuristically thicken a mask column-wise using simple occupancy.
     Mask values follow the convention 0 = valid, 1 = masked.
     """
-    msk = sm.improve_mask_from_graph(obj.mask)
+    if mode=="vertical":
+        msk = sm.improve_mask_from_graph(obj.mask) 
+    else:
+        msk = sm.hough_line_connection(obj.mask)
     obj.add_temp_dataset('mask', data = msk)
     return obj
 
