@@ -808,12 +808,28 @@ class ImageCanvas2D(QWidget):
         self.ax.clear()
         self.canvas.draw_idle()
 
+
+class CustomNavigationToolbar(NavigationTool):
+    def __init__(self, canvas, parent):
+        super().__init__(canvas, parent)
+        
+        self.addSeparator()
+        
+        # Contrast adjustment button
+        contrast_btn = QPushButton("Contrast+", self)
+        contrast_btn.setToolTip("Increase image contrast")
+        contrast_btn.clicked.connect(parent.increase_contrast)
+        self.addWidget(contrast_btn)
+
+
 class SpectralImageCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.spec_win = None
         self.cube = None
         self.bands = None
+        self._current_rgb = None
+        
 
         # --- rectangle selection state / API ---
         self.rect_selector = None
@@ -835,7 +851,7 @@ class SpectralImageCanvas(QWidget):
         self.canvas = FigureCanvas(self.fig)
         layout.addWidget(self.canvas)
 
-        self.toolbar = NavigationTool(self.canvas, self)
+        self.toolbar = CustomNavigationToolbar(self.canvas, self)
         layout.addWidget(self.toolbar)
 
         self.canvas.mpl_connect("button_press_event", self.on_image_click)
@@ -845,6 +861,7 @@ class SpectralImageCanvas(QWidget):
         self.cube = cube
         self.bands = bands
         rgb = get_false_colour(cube)
+        self._current_rgb = rgb
         logger.debug(f"nans in rgb: {(np.isnan(rgb).any())}")
         logger.debug(f"shape of false colour {rgb.shape}")
         self.ax.clear()
@@ -857,6 +874,7 @@ class SpectralImageCanvas(QWidget):
         self._last_rect = None  # reset any previous ROI
         self.cube = cube
         self.bands = bands
+        self._current_rgb = rgb_array
         self.ax.clear()
         self.ax.imshow(rgb_array, origin="upper")
         self.ax.set_axis_off()
@@ -997,6 +1015,23 @@ class SpectralImageCanvas(QWidget):
         self.bands = None
         self.ax.clear()  # Also clear matplotlib artists
         self.canvas.draw_idle()
+    
+
+    def increase_contrast(self):
+        """Increase contrast of the displayed RGB image"""
+        if self._current_rgb is None:
+            return
+        rgb = self._current_rgb
+        # Apply contrast stretch (simple percentile method)
+        p_low, p_high = np.percentile(rgb, (2, 98))
+        rgb_contrast = np.clip((rgb - p_low) / (p_high - p_low), 0, 1)
+        
+        # Redisplay
+        self.ax.clear()
+        self.ax.imshow(rgb_contrast, origin="upper")
+        self.ax.set_axis_off()
+        self.canvas.draw()
+        
 
 class ClosableWidgetWrapper(QWidget):
     """

@@ -31,7 +31,7 @@ class MaskActions(BaseActions):
             ]),
             ("button", "Despeckle", self.despeck_mask, "Remove speckles from mask"),
             ("menu", "Improve", [
-                ("Vertical", self.act_mask_improve, "Heuristically improves the mask, only on true-vertical boxes"),
+                ("Vertical", lambda: self.act_mask_improve(mode="vertical"), "Heuristically improves the mask, only on true-vertical boxes"),
                 ("Connect Lines", lambda: self.act_mask_improve(mode="hough"), "Heuristically connect the lines using hough line connection")
             ]),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
@@ -88,12 +88,13 @@ class MaskActions(BaseActions):
 
 
     def act_mask_improve(self, mode = "vertical"):
-        logger.info(f"Button clicked: Improve Mask")
+        logger.info(f"Button clicked: Improve Mask with mode={mode}")  # ADD THIS
         valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
         if not valid_state:
             logger.warning(msg)
             self._show_error("Masking", msg)
             return
+        logger.info(f"Calling improve_mask with mode={mode}")  # ADD THIS
         self.cxt.current = t.improve_mask(self.cxt.current, mode = mode)
         logger.info(f"{self.cxt.current.basename} Mask improved heuristically")
         self.controller.refresh()

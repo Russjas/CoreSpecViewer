@@ -237,6 +237,7 @@ def hough_line_connection(mask):
     --------
     numpy.ndarray : result as [0,1] binary mask
     """
+    mask = np.ascontiguousarray(mask, dtype=np.uint8)
     # Detect lines using probabilistic Hough transform
     lines = cv2.HoughLinesP(mask.astype(np.uint8),  # Just ensure uint8
                             rho=1, 
@@ -246,7 +247,7 @@ def hough_line_connection(mask):
                             maxLineGap=30)
     
     # Create output image
-    result = np.zeros_like(mask)
+    result = mask.copy()
     
     if lines is not None:
         for line in lines:

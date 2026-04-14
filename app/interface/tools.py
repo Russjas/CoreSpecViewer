@@ -352,9 +352,12 @@ def improve_mask(obj, mode="vertical"):
     Heuristically thicken a mask column-wise using simple occupancy.
     Mask values follow the convention 0 = valid, 1 = masked.
     """
+    logger.info(f"improve_mask called with mode={mode}")  # ADD THIS
     if mode=="vertical":
+        logger.info("Running improve_mask_from_graph")  # ADD THIS
         msk = sm.improve_mask_from_graph(obj.mask) 
     else:
+        logger.info("Running hough_line_connection")  # ADD THIS
         msk = sm.hough_line_connection(obj.mask)
     obj.add_temp_dataset('mask', data = msk)
     return obj
