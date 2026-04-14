@@ -817,9 +817,21 @@ class CustomNavigationToolbar(NavigationTool):
         
         # Contrast adjustment button
         contrast_btn = QPushButton("Contrast+", self)
-        contrast_btn.setToolTip("Increase image contrast")
+        contrast_btn.setToolTip("Increase image contrast (2-98 percentile stretch)")
         contrast_btn.clicked.connect(parent.increase_contrast)
         self.addWidget(contrast_btn)
+             
+        # Histogram equalization button
+        hist_btn = QPushButton("Equalize", self)
+        hist_btn.setToolTip("Histogram equalization (enhance detail)")
+        hist_btn.clicked.connect(parent.equalize_histogram)
+        self.addWidget(hist_btn)
+        
+        # Reset button
+        reset_btn = QPushButton("Reset", self)
+        reset_btn.setToolTip("Reset to original image")
+        reset_btn.clicked.connect(parent.reset_display)
+        self.addWidget(reset_btn)
 
 
 class SpectralImageCanvas(QWidget):
@@ -1016,7 +1028,7 @@ class SpectralImageCanvas(QWidget):
         self.ax.clear()  # Also clear matplotlib artists
         self.canvas.draw_idle()
     
-
+    # Image display manipulaton
     def increase_contrast(self):
         """Increase contrast of the displayed RGB image"""
         if self._current_rgb is None:
@@ -1029,6 +1041,46 @@ class SpectralImageCanvas(QWidget):
         # Redisplay
         self.ax.clear()
         self.ax.imshow(rgb_contrast, origin="upper")
+        self.ax.set_axis_off()
+        self.canvas.draw()
+
+    
+    def equalize_histogram(self):
+        """Apply histogram equalization for better detail"""
+        if self._current_rgb is None:
+            return
+        
+        rgb = self._current_rgb.astype(np.float32) / 255.0  # Convert uint8 to float [0, 1]
+        rgb_eq = np.zeros_like(rgb)
+        
+        for i in range(3):  # For each RGB channel
+            channel = rgb[:, :, i]
+            
+            # Compute histogram
+            hist, bins = np.histogram(channel.flatten(), bins=256, range=(0, 1))
+            
+            # Compute cumulative distribution function (CDF)
+            cdf = hist.cumsum()
+            cdf = cdf / cdf[-1]  # Normalize to [0, 1]
+            
+            # Use linear interpolation to map old values to new values
+            channel_eq = np.interp(channel.flatten(), bins[:-1], cdf)
+            rgb_eq[:, :, i] = channel_eq.reshape(channel.shape)
+        
+        # Display
+        self.ax.clear()
+        self.ax.imshow(rgb_eq, origin="upper")
+        self.ax.set_axis_off()
+        self.canvas.draw()
+    
+    def reset_display(self):
+        """Reset to original RGB without any adjustments"""
+        if self._current_rgb is None:
+            return
+        
+        # Display original
+        self.ax.clear()
+        self.ax.imshow(self._current_rgb, origin="upper")
         self.ax.set_axis_off()
         self.canvas.draw()
         
