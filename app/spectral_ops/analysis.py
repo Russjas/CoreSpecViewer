@@ -468,7 +468,8 @@ def kmeans_spectral_wrapper(data, clusters, iters):
 
 # ==== minimim wavelenth mapping =============================================
 
-def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', use_width=False):
+def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', use_width=False,
+                 cached_arrays = None):
     """
     Estimate minimum wavelength (MWL) position and corresponding absorption depth
     for a specified short-wave infrared absorption feature using multiple
@@ -670,9 +671,24 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
     wav_min_index = np.argmin(np.abs(np.array(bands) - wav_min))
     wav_max_index = np.argmin(np.abs(np.array(bands) - wav_max))
     
-
-    #check_response =  est_peaks_cube_scipy(savgol_cr, bands, wavrange=(wav_min, wav_max))
-    check_response =  est_peaks_cube_scipy_thresh(savgol_cr, bands, wavrange=(wav_min, wav_max), thresh = thresh)
+    if cached_arrays is not None:
+        # Fast query from cached feature map
+        feature_indices, feature_heights = cached_arrays
+        check_response = query_feature_map(
+            feature_indices, 
+            feature_heights, 
+            bands, 
+            wavrange=(wav_min, wav_max),
+            thresh=config.feature_detection_threshold
+        )
+    else:
+        # Compute fresh using slow scipy loop
+        check_response = est_peaks_cube_scipy_thresh(
+            savgol_cr, bands,
+            wavrange=(wav_min, wav_max),
+            thresh=thresh
+        )
+    
 
     if technique.upper() == 'QND':
         logger.info(f"Using fit type {technique} for MWL")
@@ -796,3 +812,111 @@ def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3
                 else:
                     arr[i,j] = -999
     return arr
+
+def compute_feature_map(savgol_cr, max_feats=20):
+    """
+    Compute feature map storing N deepest peaks per pixel.
+    
+    Features are stored in DEPTH ORDER (strongest first) to ensure
+    most geologically significant features are prioritized.
+
+    Parameters
+    ----------
+    savgol_cr : np.ndarray, shape (H, W, B)
+        Continuum-removed reflectance array.
+        The last axis corresponds to spectral bands.
+
+    max_peaks : int
+        maximum number of features to store.
+    
+    Returns
+    -------
+    feature_indices : np.ndarray, shape (H, W, max_peaks)
+        Indices of detected features.
+    
+    feature_heights : np.ndarray, shape (H, W, max_peaks)
+        Heights/depths of detected features.
+
+    feature_counts : np.ndarray, shape (H, W)
+        Number of detected features, may be greater or lesser than max_feats.
+    Notes
+    -----
+    - Peaks are detected on ``1 - data[i, j]`` (i.e., treating absorption dips
+      as positive peaks).
+    """
+       
+    h, w, b = savgol_cr.shape
+    
+    feature_indices = np.full((h, w, max_feats), -1, dtype=np.int16)
+    feature_heights = np.full((h, w, max_feats), np.nan, dtype=np.float32)
+    feature_counts = np.zeros((h, w), dtype=np.uint16)
+    
+    for i in range(h):
+        for j in range(w):
+            spectrum_inverted = 1 - savgol_cr[i, j, :]
+            
+            found_indices, found_dict = sc.signal.find_peaks(
+                spectrum_inverted,
+                height=(None, None)
+            )
+            
+            n_found = len(found_indices)
+            if n_found == 0:
+                continue
+            
+            heights = found_dict['peak_heights']
+            
+            # Sort by height (CRITICAL - deepest first)
+            if n_found > 1:
+                sort_order = np.argsort(heights)[::-1]  # Descending
+                sorted_indices = found_indices[sort_order]
+                sorted_heights = heights[sort_order]
+            else:
+                sorted_indices = found_indices
+                sorted_heights = heights
+            
+            # Store top N
+            n_store = min(n_found, max_feats)
+            feature_indices[i, j, :n_store] = sorted_indices[:n_store]
+            feature_heights[i, j, :n_store] = sorted_heights[:n_store]
+            feature_counts[i, j] = n_found
+    
+    return feature_indices, feature_heights, feature_counts
+        
+    
+
+
+def query_feature_map(feature_indices, feature_heights, bands, wavrange,thresh = None):
+    """
+    Query feature map for strongest peak in wavelength range.
+    
+    Returns wavelength of DEEPEST peak within range, or -999 if none found.
+    """
+    
+    
+    indices = feature_indices
+    heights = feature_heights
+    if thresh is None:
+        thresh = config.feature_detection_threshold
+    
+    h, w, n = indices.shape
+    result = np.full((h, w), -999.0)
+    
+    for i in range(h):
+        for j in range(w):
+                   
+            # Peaks are stored in depth order (strongest first)
+            # Return first peak found in range = strongest peak in range
+            for k in range(n):
+                idx = indices[i, j, k]
+                if idx < 0:  # Padding
+                    break
+                
+                wl = bands[idx]
+                if wavrange[0] <= wl <= wavrange[1]:
+                    if heights[i,j,k] < thresh:
+                        continue
+                    result[i, j] = wl
+                    break  # Return strongest
+    
+    return result

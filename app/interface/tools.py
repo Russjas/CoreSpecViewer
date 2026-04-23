@@ -445,17 +445,49 @@ def run_feature_extraction(obj, key):
         Either a string key from the standard features (e.g., '2200W')
         OR a dict in format {feature_name: [wav_min, wav_max, cr_min, cr_max]}
     """
+    cache_available = ('feature_indices' in obj.datasets and 
+            'feature_heights' in obj.datasets)
+    if cache_available:
+        cached_arrays = (
+            obj.datasets['feature_indices'].data,
+            obj.datasets['feature_heights'].data
+        )
+    else:
+        cached_arrays = None
     if isinstance(key, dict):
         # Custom feature - extract the name for dataset keys
         feature_name = list(key.keys())[0]
-        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique='POLY')
+        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique='POLY', cached_arrays=cached_arrays)
         obj.add_temp_dataset(f'{feature_name}POS', np.ma.masked_array(pos, mask=feat_mask), '.npz')
         obj.add_temp_dataset(f'{feature_name}DEP', np.ma.masked_array(dep, mask=feat_mask), '.npz')
     else:
-        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'POLY')
+        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'POLY', cached_arrays=cached_arrays)
         obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
         obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
     return obj
+
+
+def cache_feature_map(obj, max_feats=20):
+    """
+    Compute and cache default features for a ProcessedObject.
+    
+    This is called once per box to enable fast feature extraction.
+    """
+    
+    
+    logger.info(f"Computing feature map for {obj.basename}...")
+    
+    feature_indices, feature_heights, feature_counts = sa.compute_feature_map(
+        obj.savgol_cr, max_feats=max_feats
+    )
+    
+    # Store as datasets on the object
+    obj.add_temp_dataset('feature_indices', feature_indices, ext='.npy')
+    obj.add_temp_dataset('feature_heights', feature_heights, ext='.npy')
+    obj.add_temp_dataset('feature_counts', feature_counts, ext='.npy')
+    return obj
+    
+    
 
 
 def quick_corr(obj, x, y, key):
