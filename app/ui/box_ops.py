@@ -391,13 +391,13 @@ class BoxOperations:
             logger.info(f"Band Maths started using {expr} mutlti box")
             with busy_cursor('clustering...', self.controller) as progress:
                 for po in self.cxt.ho:
-                    progress.set(f"Band maths operation using {expr} for {self.cxt.current.basename} evaluating on CR = {cr}")
+                    progress.set(f"Band maths operation using {expr} for {po.basename} evaluating on CR = {cr}")
                     t.band_math_interface(po, name, expr, cr=cr) 
                     po.commit_temps()
                     po.save_all()
                     po.reload_all()
                     po.load_thumbs()
-                    logger.info(f"Band maths operation using {expr} for {self.cxt.current.basename} is done for {po.basename}. Evaluated on CR = {cr}")
+                    logger.info(f"Band maths operation using {expr} is done for {po.basename}. Evaluated on CR = {cr}")
             self.controller.refresh(view_key="hol")
             return
         with busy_cursor('Calculating...', self.controller):
