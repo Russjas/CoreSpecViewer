@@ -85,6 +85,38 @@ class BoxOperations:
         logger.info(f"Extract custom feature {feature_name} for {self.cxt.current.basename} done")
         self.controller.refresh(view_key="vis")
 
+    def cache_features(self, multi = False):
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Checking features", msg)
+            return
+        if multi:
+            with busy_cursor(f'feature checking....', self.controller) as progress:
+                for po in self.cxt.ho:
+                    try:
+                        progress.set(f"Caching features for {po.basename}")
+                        t.cache_feature_map(po)
+                        po.commit_temps()
+                        po.save_all()
+                        po.reload_all()
+                        po.load_thumbs()
+                    except AssertionError as e:
+                        logger.error(f"Cache features for {po.basename} failed", exc_info = True)
+                        continue
+                    logger.info(f"cached features for {po.basename} done")
+                
+                self.controller.refresh()
+            return
+        with busy_cursor(f'Caching ...', self.controller):
+            try:
+                self.cxt.current = t.cache_feature_map(self.cxt.current)
+            except AssertionError as e:
+                logger.error(f"cache features for {self.cxt.current.basename} failed", exc_info = True)
+                self._show_error("cache features", "Could not find required bands, try different features or adjust ranges")
+                return
+        logger.info(f"Cache Features for {self.cxt.current.basename} done")
+        self.controller.refresh(view_key="vis")
 
     def run_feature_extraction(self, key, multi = False):
         logger.info(f"Button clicked: Extract feature {key}, Multi-mode = {multi}")
@@ -104,7 +136,7 @@ class BoxOperations:
                         po.reload_all()
                         po.load_thumbs()
                     except AssertionError as e:
-                        logger.error(f"Extract feature {key} for {self.cxt.current.basename} failed", exc_info = True)
+                        logger.error(f"Extract feature {key} for {po.basename} failed", exc_info = True)
                         continue
                     logger.info(f"Extract feature {key} for {po.basename} done")
                 

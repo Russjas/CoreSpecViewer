@@ -25,6 +25,7 @@ class HoleActions(BaseActions):
         for key in FEATURE_KEYS:
             self.extract_feature_list_multi.append((key, lambda _, k=key: self.box_ops.run_feature_extraction(k, multi=True)))
         self.extract_feature_list_multi.append(("Custom Feature...", lambda: self.box_ops.custom_feature_act(multi=True))) 
+        self.extract_feature_list_multi.append(("Cache Features...", lambda: self.box_ops.cache_features(multi=True))) 
         self._register_group('Hole operations', [
             ("button", "Previous", self.hole_prev_box, "View previous box in hole"),
             ("button", "Next", self.hole_next_box, "View next box in hole"),

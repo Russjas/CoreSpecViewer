@@ -28,6 +28,7 @@ class VisActions(BaseActions):
         for key in FEATURE_KEYS:
             self.extract_feature_list.append((key, lambda _, k=key: self.box_ops.run_feature_extraction(k)))
         self.extract_feature_list.append(("Custom Feature...", self.box_ops.custom_feature_act))
+        self.extract_feature_list.append(("Cache features", self.box_ops.cache_features))
         self._register_group('Visualise', [
     ("button", "Quick Cluster", self.box_ops.act_kmeans, "Performs unsupervised k-means clustering"),
     ("menu", "Correlation", [
