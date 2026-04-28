@@ -196,15 +196,18 @@ def crop_auto(obj):
         return obj
 
     elif isinstance(obj, ProcessedObject):
-        # Detect crop region using savgol
         base = getattr(obj, "savgol", None)
         if not isinstance(base, np.ndarray) or base.ndim < 2 or 0 in base.shape:
-            return obj
-        img = get_false_colour(base)
-        img = np.asarray(img)
-        if img.ndim < 2 or 0 in img.shape:
-            return obj
-        img = (img * 255).astype(np.uint8, copy=False)
+                return obj
+        # Use pre-computed display dataset if available, fall back to get_false_colour on savgol
+        if obj.has('display'):
+            img = obj.display  # already uint8 [0, 255], (H, W, 3)
+        else:
+            img = get_false_colour(base)
+            img = np.asarray(img)
+            if img.ndim < 2 or 0 in img.shape:
+                return obj
+            img = (img * 255).astype(np.uint8, copy=False)
 
         cropped, slicer = sm.detect_slice_rectangles_robust(img)
         if slicer is None:

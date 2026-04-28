@@ -22,6 +22,7 @@ import numpy as np
 import logging
 
 
+from PyQt5.QtGui import QKeySequence
 from PyQt5.QtCore import (
         QSortFilterProxyModel, 
         Qt, 
@@ -49,7 +50,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QComboBox,
-    QDoubleSpinBox
+    QDoubleSpinBox,
+    QShortcut
     
 )
 
@@ -867,6 +869,14 @@ class SpectralImageCanvas(QWidget):
         layout.addWidget(self.toolbar)
 
         self.canvas.mpl_connect("button_press_event", self.on_image_click)
+
+        QShortcut(QKeySequence("Alt+E"), self,
+          activated=self.equalize_histogram,
+          context=Qt.ApplicationShortcut)
+
+        QShortcut(QKeySequence("Alt+C"), self,
+                activated=self.increase_contrast,
+                context=Qt.ApplicationShortcut)
 
     def show_rgb(self, cube, bands):
         self._last_rect = None  # reset any previous ROI

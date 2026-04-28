@@ -31,7 +31,6 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-
 def detect_slice_rectangles_robust(
     image,                  #numpy array uint8, 3-channel (H, W, 3)
     min_area_frac=0.0005,     # min polygon area as a fraction of image area
@@ -104,12 +103,18 @@ def detect_slice_rectangles_robust(
     - Bilateral filtering is used to preserve edge structure while reducing
       noise for more stable polygon detection.
     """
-    img = image
+    p_low, p_high = np.percentile(image, (4, 96))
+    img_eq = np.clip((image - p_low) / (p_high - p_low), 0, 1)
+    img_eq = (img_eq*255).astype(np.uint8)
+    #img_eq = np.zeros_like(image)
+    #for i in range(3):
+    #    img_eq[:, :, i] = cv2.equalizeHist(image[:, :, i])
 
-    H, W = img.shape[:2]
+    
+    H, W = img_eq.shape[:2]
     min_area = H * W * min_area_frac
 
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(img_eq, cv2.COLOR_BGR2GRAY)
     gray = cv2.bilateralFilter(gray, d=7, sigmaColor=50, sigmaSpace=50)
 
     src = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1] if use_otsu else gray
@@ -163,7 +168,8 @@ def detect_slice_rectangles_robust(
 
     rects_xywh = [rects_xywh[i] for i in keep]
     rects_poly = [rects_poly[i] for i in keep]
-
+    if not rects_xywh:
+        return image, None
     areas = np.array([cv2.contourArea(p) for p in rects_poly])
     index = np.argmax(areas)
     x, y, w, h = rects_xywh[index]

@@ -626,6 +626,44 @@ class MainRibbonController(QMainWindow):
         except ValueError:
             pass
         
+#============Check for unsaved data on close=====================
+
+    def closeEvent(self, event):
+        lines = []
+
+        # Check po for temp datasets
+        if self.cxt.po is not None and self.cxt.po.has_temps:
+            keys = ", ".join(self.cxt.po.temp_datasets.keys())
+            lines.append(f"  {self.cxt.po.basename}: {keys}")
+
+        # Check ho: any box with temps, or any unsaved hole product datasets
+        if self.cxt.ho is not None:
+            for po in self.cxt.ho:
+                if po.has_temps:
+                    keys = ", ".join(po.temp_datasets.keys())
+                    lines.append(f"  {po.basename}: {keys}")
+            unsaved_hole = [
+                k for k, ds in self.cxt.ho.product_datasets.items()
+                if not ds.path.exists()
+            ]
+            if unsaved_hole:
+                lines.append(f"  Hole products: {', '.join(unsaved_hole)}")
+
+        if lines:
+            detail = "\n".join(lines)
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Data",
+                f"The following unsaved data will be lost:\n\n{detail}\n\nClose anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply == QMessageBox.No:
+                event.ignore()
+                return
+
+        self._clear_all_canvas_refs()
+        super().closeEvent(event)
 
 def main():
     logger.info("CoreSpecViewer starting...")
