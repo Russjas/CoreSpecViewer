@@ -484,7 +484,7 @@ def cache_feature_map(obj, max_feats=20):
     # Store as datasets on the object
     obj.add_temp_dataset('feature_indices', feature_indices, ext='.npy')
     obj.add_temp_dataset('feature_heights', feature_heights, ext='.npy')
-    obj.add_temp_dataset('feature_counts', feature_counts, ext='.npy')
+    obj.add_temp_dataset('feature_counts', np.ma.masked_array(feature_counts, mask=obj.mask), ext='.npz')
     return obj
     
     
@@ -896,6 +896,5 @@ def band_math_interface(obj, name, expr, cr = False):
     clean_key = re.sub(r'[\\/:*?"<>|_]', '-', name)
     obj.add_temp_dataset(clean_key, np.ma.masked_array(out, obj.mask), '.npz')
     return obj
-    
-    
+
     

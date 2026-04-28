@@ -431,3 +431,5 @@ def mk_thumb(
     logger.debug(f"[{time.perf_counter() - t0:.4f}s] ===== TOTAL mk_thumb time (shape={arr.shape}, index_mode={index_mode}, resize={resize}) =====")
     
     return im
+
+

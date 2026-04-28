@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 from typing import Union
 import logging
+from PIL import Image
 
 import numpy as np
 
@@ -69,8 +70,11 @@ class HoleObject:
                 continue  # not fullhole dataset
             
             ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
-
-            ds = Dataset(base=self.hole_id, key=key, path=fp, suffix=key, ext=ext)
+            try:
+                ds = Dataset(base=self.hole_id, key=key, path=fp, suffix=key, ext=ext)
+            except ValueError:
+                logger.info(f"Skipping unsupported file type {ext}")
+                continue
             base_keys = ["depths", "AvSpectra"]
             if key in base_keys:
                 self.base_datasets[key] = ds
@@ -320,7 +324,51 @@ class HoleObject:
     def save_product_datasets(self):
         for key in self.product_datasets.keys():
             self.product_datasets[key].save_dataset()
+    
+
+    def _generate_concatenated_overview(self, key: str) -> Image.Image:
+        """
+        Generate a concatenated overview image for a specific key across all boxes.
         
+        All boxes are concatenated vertically in box number order using cached thumbnails.
+        """
+        images = []
+        
+        # Get thumbnail for each box
+        for po in self:
+            ds = po.temp_datasets.get(key) or po.datasets.get(key)
+            if ds is None or ds.thumb is None:
+                logger.warning(f"Skipping box {po.basename} - no thumbnail for key '{key}'")
+                continue
+            images.append(ds.thumb)
+        
+        if not images:
+            raise ValueError(f"No thumbnails available for key '{key}'. Run 'Generate Images' first.")
+        
+        # Concatenate vertically
+        widths = [img.width for img in images]
+        heights = [img.height for img in images]
+        max_width = max(widths)
+        total_height = sum(heights)
+        
+        concatenated = Image.new('RGB', (max_width, total_height))
+        
+        y_offset = 0
+        for img in images:
+            x_offset = (max_width - img.width) // 2
+            concatenated.paste(img, (x_offset, y_offset))
+            y_offset += img.height
+        
+        return concatenated
+
+    def export_concatenated_image(self, key):
+        try:
+            concat = self._generate_concatenated_overview(key)
+        except ValueError:
+            raise ValueError(f"No thumbnails available for key '{key}'")
+            
+        path = self.root_dir / f"{self.hole_id}_{key}.jpg"
+        concat.save(path)
 #================box level functions ==========================================
     
     

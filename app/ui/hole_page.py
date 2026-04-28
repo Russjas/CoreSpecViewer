@@ -574,6 +574,10 @@ class HoleControlPanel(QWidget):
         btn_export_pdf.clicked.connect(self.export_pdf_booklet)
         export_layout.addWidget(btn_export_pdf)
 
+        btn_export_overview = QPushButton("Export Overview Image")
+        btn_export_overview.clicked.connect(self.export_overview_image)
+        export_layout.addWidget(btn_export_overview)
+
         self.layout.addWidget(export_block)
         # END NEW
         
@@ -761,6 +765,48 @@ class HoleControlPanel(QWidget):
         dialog = PDFExportDialog(self.cxt, parent=self)
         dialog.exec_()
 
+    def export_overview_image(self):
+        "Export a concatenated jpg of all boxes"
+        logger.info(f"Button clicked: Export Overview Image button")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
+            return
+        keys = set()
+        try:
+            if self.cxt.ho.boxes:
+                for box in self.cxt.ho:
+                    keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+        except Exception:
+            logger.info(f"Key selection failed for {self.cxt.ho.hole_id}")
+            return
+        if not keys:
+            logger.info(f"Key selection failed for {self.cxt.ho.hole_id}")
+            return
+        unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
+        non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands", 'metadata',"savgol", "savgol_cr" , "cropped", "feature_indices", "feature_heights"}
+        chooseable_keys = []
+        for k in sorted(keys):  # stable order
+            if any(k.startswith(pfx) for pfx in unwrap_prefixes):
+                continue
+            elif any(k.endswith(sfx) for sfx in non_vis_suff):
+                continue
+            else:
+                chooseable_keys.append(k)
+        if not chooseable_keys:
+            logger.info(f"No displayable dataset keys {self.cxt.ho.hole_id}")
+            return
+        display_to_key = {gen_display_text(k): k for k in chooseable_keys}
+        display_text, ok = QInputDialog.getItem(
+        self, "Select Product", "Products:", list(display_to_key.keys()), 0, False
+            )
+        if ok:
+            with busy_cursor("Exporting oveview image...", self):
+                self.cxt.ho.export_concatenated_image(display_to_key[display_text])
+                logger.info(f"Successfully exported {display_text} for {self.cxt.ho.hole_id}")
+                QMessageBox.information(self, "Exported", f"Successfully exported {display_text} for {self.cxt.ho.hole_id}")
+                
+        return
 # ---------downhole data control handlers---------------------------------------------------------
     def _on_display_btn_clicked(self):
         """
@@ -923,7 +969,7 @@ class HoleControlPanel(QWidget):
             0,
             False
         )
-        if not choice:
+        if not ok:
             logger.info(f"Generate downhole features cancelled in dialogue")
             return
         try:

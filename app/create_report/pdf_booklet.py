@@ -417,7 +417,7 @@ def _build_overview_page(c, hole, key):
     
     # Concatenated image
     try:
-        concat_img = _generate_concatenated_overview(hole, key)
+        concat_img = hole._generate_concatenated_overview(key)
         
         img_buffer = BytesIO()
         concat_img.save(img_buffer, format='PNG')
@@ -478,40 +478,7 @@ def _generate_box_image(po, key: str) -> Image.Image:
         raise ValueError(f"Cannot generate image for dataset type {ds.ext}")
     
 
-def _generate_concatenated_overview(hole: HoleObject, key: str) -> Image.Image:
-    """
-    Generate a concatenated overview image for a specific key across all boxes.
-    
-    All boxes are concatenated vertically in box number order using cached thumbnails.
-    """
-    images = []
-    
-    # Get thumbnail for each box
-    for po in hole:
-        ds = po.temp_datasets.get(key) or po.datasets.get(key)
-        if ds is None or ds.thumb is None:
-            logger.warning(f"Skipping box {po.basename} - no thumbnail for key '{key}'")
-            continue
-        images.append(ds.thumb)
-    
-    if not images:
-        raise ValueError(f"No thumbnails available for key '{key}'. Run 'Generate Images' first.")
-    
-    # Concatenate vertically
-    widths = [img.width for img in images]
-    heights = [img.height for img in images]
-    max_width = max(widths)
-    total_height = sum(heights)
-    
-    concatenated = Image.new('RGB', (max_width, total_height))
-    
-    y_offset = 0
-    for img in images:
-        x_offset = (max_width - img.width) // 2
-        concatenated.paste(img, (x_offset, y_offset))
-        y_offset += img.height
-    
-    return concatenated
+
 
 
 def _draw_legend_compact(c, legend: list[dict], x_start, y_bottom, width):

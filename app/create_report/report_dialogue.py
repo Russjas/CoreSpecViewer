@@ -212,7 +212,7 @@ class PDFExportDialog(QDialog):
             all_keys &= box_keys
         
         # Filter out un-needed keys
-        excluded_keys = {'metadata', 'bands', 'savgol', 'stats', 'cropped', 'savgol_cr'}
+        excluded_keys = {'metadata', 'bands', 'savgol', 'stats', 'cropped', 'savgol_cr', 'feature_indices', 'feature_heights'}
         visualizable_keys = [
             k for k in all_keys 
             if k not in excluded_keys 
