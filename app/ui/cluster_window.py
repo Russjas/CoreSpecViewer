@@ -441,7 +441,7 @@ class ClusterWindow(BasePage):
         if self.spec_win is None:
             self.spec_win = SpectrumWindow(self)
     
-        self.spec_win.plot_spectrum(self.bands, t.get_cr(display_spectra), title)
+        self.spec_win.plot_spectrum(self.bands, t.get_cr(display_spectra), title, label = f"{sample_name}")
         self.spec_win.ax.set_ylabel("CR Reflectance (Unitless)")
         logger.info(f"Button clicked: Double click display library match {sample_name}")
 
@@ -468,7 +468,7 @@ class ClusterWindow(BasePage):
             self.spec_win = SpectrumWindow(self)
 
         title = f"Cluster {class_id} centre"
-        self.spec_win.plot_spectrum(x, y, title)
+        self.spec_win.plot_spectrum(x, y, title, label = f"Cluster {class_id}")
         self.spec_win.ax.set_ylabel("CR Reflectance (Unitless)")
         self.spec_win.ax.set_xlabel(x_label)
         

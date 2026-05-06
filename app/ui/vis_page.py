@@ -81,7 +81,7 @@ class VisualisePage(BasePage):
                 if not hasattr(self, "spec_win"):
                     self.spec_win = SpectrumWindow(self)
                 title = "CR Spectrum Viewer"
-                self.spec_win.plot_spectrum(self.current_obj.bands, spec, title=title)
+                self.spec_win.plot_spectrum(self.current_obj.bands, spec, title=title, label=f"({y}, {x})")
             self.dispatcher.set_right_click(_right_click, temporary=False)
             self.refresh_cache_table()
 

@@ -287,14 +287,14 @@ class LibraryPage(BasePage):
             if self.spec_win_cr is None:
                 self.spec_win_cr = SpectrumWindow(self)
 
-            self.spec_win_cr.plot_spectrum(x_nm, t.get_cr(y), title)
+            self.spec_win_cr.plot_spectrum(x_nm, t.get_cr(y), title, label=item_name)
             self.spec_win_cr.ax.set_ylabel("CR Reflectance (Unitless)")
         else:
             title = f"Spectra for: {item_name} (ID: {sample_id})"
             if self.spec_win is None:
                 self.spec_win = SpectrumWindow(self)
     
-            self.spec_win.plot_spectrum(x_nm*1000, y, title)
+            self.spec_win.plot_spectrum(x_nm*1000, y, title, label=item_name)
             
             
     def _selected_sample_ids(self):

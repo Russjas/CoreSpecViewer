@@ -32,7 +32,7 @@ class MaskActions(BaseActions):
             ("button", "Despeckle", self.despeck_mask, "Remove speckles from mask"),
             ("menu", "Improve", [
                 ("Vertical", lambda: self.act_mask_improve(mode="vertical"), "Heuristically improves the mask, only on true-vertical boxes"),
-                ("Connect Lines", lambda: self.act_mask_improve(mode="hough"), "Heuristically connect the lines using hough line connection")
+                ("Connect Lines", lambda: self.act_mask_improve(mode="hough"), "Heuristically connect the lines using hough line connection", "Alt+S")
             ]),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),

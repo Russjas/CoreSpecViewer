@@ -448,12 +448,12 @@ def run_feature_extraction(obj, key):
         Either a string key from the standard features (e.g., '2200W')
         OR a dict in format {feature_name: [wav_min, wav_max, cr_min, cr_max]}
     """
-    cache_available = ('feature_indices' in obj.datasets and 
-            'feature_heights' in obj.datasets)
+    cache_available = ('feature-indices' in obj.datasets and 
+            'feature-heights' in obj.datasets)
     if cache_available:
         cached_arrays = (
-            obj.datasets['feature_indices'].data,
-            obj.datasets['feature_heights'].data
+            obj.datasets['feature-indices'].data,
+            obj.datasets['feature-heights'].data
         )
     else:
         cached_arrays = None
@@ -476,18 +476,38 @@ def cache_feature_map(obj, max_feats=20):
     
     This is called once per box to enable fast feature extraction.
     """
-    
-    
     logger.info(f"Computing feature map for {obj.basename}...")
     
     feature_indices, feature_heights, feature_counts = sa.compute_feature_map(
         obj.savgol_cr, max_feats=max_feats
     )
     
-    # Store as datasets on the object
-    obj.add_temp_dataset('feature_indices', feature_indices, ext='.npy')
-    obj.add_temp_dataset('feature_heights', feature_heights, ext='.npy')
-    obj.add_temp_dataset('feature_counts', np.ma.masked_array(feature_counts, mask=obj.mask), ext='.npz')
+    bands = np.asarray(obj.bands)
+
+    # Store raw cache arrays
+    obj.add_temp_dataset('feature-indices', feature_indices, ext='.npy')
+    obj.add_temp_dataset('feature-heights', feature_heights, ext='.npy')
+    obj.add_temp_dataset('feature-counts', np.ma.masked_array(feature_counts, mask=obj.mask), ext='.npz')
+
+    # Store position and depth for top 3 features as displayable datasets
+    for k, label in enumerate(['deepest', 'second-deepest', 'third-deepest']):
+        idx_slice = feature_indices[:, :, k].astype(float)
+        idx_slice[idx_slice < 0] = 0  # avoid invalid index into bands
+        pos = bands[idx_slice.astype(int)]
+        pos[feature_indices[:, :, k] < 0] = np.nan
+        dep = feature_heights[:, :, k].copy()
+
+        obj.add_temp_dataset(
+            f'{label}-featurePOS',
+            np.ma.masked_array(pos, mask=obj.mask),
+            ext='.npz'
+        )
+        obj.add_temp_dataset(
+            f'{label}-featureDEP',
+            np.ma.masked_array(dep, mask=obj.mask),
+            ext='.npz'
+        )
+
     return obj
     
     

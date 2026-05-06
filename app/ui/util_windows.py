@@ -924,7 +924,7 @@ class SpectralImageCanvas(QWidget):
             if self.spec_win is None:
                 self.spec_win = SpectrumWindow(self)
             title = "Spectrum Viewer"
-            self.spec_win.plot_spectrum(self.bands, spec, title=title)
+            self.spec_win.plot_spectrum(self.bands, spec, title=title, label=f"({r}, {c})")
             return
         # hardwire_
         if event.button == 3 and callable(self.on_right_click):
@@ -1164,21 +1164,31 @@ class SpectrumWindow(QMainWindow):
 
 
         self.setCentralWidget(central)
+        self._series_count = 0 
 
     def clear_all(self):
         self.ax.clear()
         self._series_count = 0
         self.canvas.draw()
 
-    def plot_spectrum(self, x, y, title=""):
+    def plot_spectrum(self, x, y, title="", label=None):
+        lbl = label if label else (title if title else f"Series {self._series_count + 1}")
         if x is not None:
-            self.ax.plot(x, y)
+            self.ax.plot(x, y, label=lbl)
         else:
-            self.ax.plot(y)
+            self.ax.plot(y, label=lbl)
+        self._series_count += 1 
         self.ax.set_xlabel("Wavelength (nm)" if x is not None else "Band")
         self.ax.set_ylabel("Reflectance")
         if title:
             self.ax.set_title(title)
+        if self._series_count > 1:                                     
+            self.ax.legend(loc="best", framealpha=0.9,                
+                           fontsize=9, draggable=True)             
+        else:                                                         
+            legend = self.ax.get_legend()                              
+            if legend:                                                 
+                legend.remove()                                       
         self.ax.grid(True, alpha=0.3)
         self.canvas.draw()
         self.show()

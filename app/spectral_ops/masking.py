@@ -103,7 +103,7 @@ def detect_slice_rectangles_robust(
     - Bilateral filtering is used to preserve edge structure while reducing
       noise for more stable polygon detection.
     """
-    p_low, p_high = np.percentile(image, (4, 96))
+    p_low, p_high = np.percentile(image, (15, 85))
     img_eq = np.clip((image - p_low) / (p_high - p_low), 0, 1)
     img_eq = (img_eq*255).astype(np.uint8)
     #img_eq = np.zeros_like(image)

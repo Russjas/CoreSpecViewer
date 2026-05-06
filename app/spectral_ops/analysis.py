@@ -826,61 +826,54 @@ def compute_feature_map(savgol_cr, max_feats=20):
         Continuum-removed reflectance array.
         The last axis corresponds to spectral bands.
 
-    max_peaks : int
-        maximum number of features to store.
-    
+    max_feats : int
+        Maximum number of features to store.
+
     Returns
     -------
-    feature_indices : np.ndarray, shape (H, W, max_peaks)
-        Indices of detected features.
-    
-    feature_heights : np.ndarray, shape (H, W, max_peaks)
-        Heights/depths of detected features.
-
-    feature_counts : np.ndarray, shape (H, W)
-        Number of detected features, may be greater or lesser than max_feats.
-    Notes
-    -----
-    - Peaks are detected on ``1 - data[i, j]`` (i.e., treating absorption dips
-      as positive peaks).
+    feature_indices : np.ndarray, shape (H, W, max_feats)
+    feature_heights : np.ndarray, shape (H, W, max_feats)
+    feature_counts  : np.ndarray, shape (H, W)
+        Number of detected features above threshold.
     """
-       
+    thresh = config.feature_detection_threshold
+
     h, w, b = savgol_cr.shape
-    
+
     feature_indices = np.full((h, w, max_feats), -1, dtype=np.int16)
     feature_heights = np.full((h, w, max_feats), np.nan, dtype=np.float32)
-    feature_counts = np.zeros((h, w), dtype=np.uint16)
-    
+    feature_counts  = np.zeros((h, w), dtype=np.uint16)
+
     for i in range(h):
         for j in range(w):
             spectrum_inverted = 1 - savgol_cr[i, j, :]
-            
+
             found_indices, found_dict = sc.signal.find_peaks(
-                spectrum_inverted,
-                height=(None, None)
-            )
-            
+                        spectrum_inverted,
+                        height=thresh,
+                        
+                    )
+
             n_found = len(found_indices)
             if n_found == 0:
                 continue
-            
+
             heights = found_dict['peak_heights']
-            
-            # Sort by height (CRITICAL - deepest first)
+
+            # Sort by height (deepest first)
             if n_found > 1:
-                sort_order = np.argsort(heights)[::-1]  # Descending
+                sort_order = np.argsort(heights)[::-1]
                 sorted_indices = found_indices[sort_order]
                 sorted_heights = heights[sort_order]
             else:
                 sorted_indices = found_indices
                 sorted_heights = heights
-            
-            # Store top N
+
             n_store = min(n_found, max_feats)
             feature_indices[i, j, :n_store] = sorted_indices[:n_store]
             feature_heights[i, j, :n_store] = sorted_heights[:n_store]
             feature_counts[i, j] = n_found
-    
+
     return feature_indices, feature_heights, feature_counts
         
     

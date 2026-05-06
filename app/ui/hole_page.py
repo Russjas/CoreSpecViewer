@@ -784,7 +784,7 @@ class HoleControlPanel(QWidget):
             logger.info(f"Key selection failed for {self.cxt.ho.hole_id}")
             return
         unwrap_prefixes = ("Dhole",)  # DholeAverage, DholeMask, DholeDepths
-        non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands", 'metadata',"savgol", "savgol_cr" , "cropped", "feature_indices", "feature_heights"}
+        non_vis_suff = {'LEGEND', 'CLUSTERS', "stats", "bands", 'metadata',"savgol", "savgol_cr" , "cropped", "feature-indices", "feature-heights"}
         chooseable_keys = []
         for k in sorted(keys):  # stable order
             if any(k.startswith(pfx) for pfx in unwrap_prefixes):
