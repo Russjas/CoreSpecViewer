@@ -815,6 +815,24 @@ class CustomNavigationToolbar(NavigationTool):
     def __init__(self, canvas, parent):
         super().__init__(canvas, parent)
         
+        self._ann_btn = QPushButton("Annotations", self)
+        self._ann_btn.setToolTip("Toggle annotation overlay")
+        self._ann_btn.setCheckable(True)
+        self._ann_btn.setStyleSheet("""
+            QPushButton:checked {
+                background-color: #4a90d9;
+                color: white;
+                border: 1px solid #2a70b9;
+                border-radius: 3px;
+            }
+            QPushButton:!checked {
+                background-color: none;
+            }
+        """)
+        self._ann_btn.clicked.connect(parent._toggle_annotations)
+        self.addWidget(self._ann_btn)
+
+
         self.addSeparator()
         
         # Contrast adjustment button
@@ -858,6 +876,11 @@ class SpectralImageCanvas(QWidget):
         self._poly_selector = None
         self.on_polygon_finished = None
 
+        # Annotation state
+        self._last_annotations = {}     # render cache, refreshed from PO on every update_display
+        self._show_annotations = False  # user toggle, never touched by page
+        self._annotation_artists = []   # matplotlib handles for cleanup only
+
         # UI elements
         layout = QVBoxLayout(self)
         self.fig = Figure(figsize=(8, 4))
@@ -879,6 +902,10 @@ class SpectralImageCanvas(QWidget):
                 context=Qt.ApplicationShortcut)
 
     def show_rgb(self, cube, bands):
+        """legacy method that directly gets false colour, a slow process.
+        This method is still used on the raw page, where there is no alternative.
+        Annotation logic should be dead here, but is a useful guard
+        """
         self._last_rect = None  # reset any previous ROI
         self.cube = cube
         self.bands = bands
@@ -889,18 +916,77 @@ class SpectralImageCanvas(QWidget):
         self.ax.clear()
         self.ax.imshow(rgb, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        if self._show_annotations:
+            self.draw_annotations(self._last_annotations)
+        else:
+            self.canvas.draw()
         
-    def show_rgb_direct(self, rgb_array, cube, bands):
-        """Display pre-computed RGB"""
-        self._last_rect = None  # reset any previous ROI
+        
+    def show_rgb_direct(self, rgb_array, cube, bands, annotations=None):
+        self._last_rect = None
         self.cube = cube
         self.bands = bands
         self._current_rgb = rgb_array
+        self._last_annotations = annotations if annotations is not None else {}
         self.ax.clear()
         self.ax.imshow(rgb_array, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        if self._show_annotations:
+            self.draw_annotations(self._last_annotations)
+        else:
+            self.canvas.draw()
+
+    
+    def draw_annotations(self, annotations: dict):
+        """
+        Render annotation labels onto the current axes.
+        Clears any existing annotation artists first.
+        """
+        for artist in self._annotation_artists:
+            try:
+                artist.remove()
+            except Exception:
+                pass
+        self._annotation_artists = []
+
+        for entry in annotations.values():
+            x = entry["x"]
+            y = entry["y"]
+            label = entry["label"]
+            dot = self.ax.plot(
+                x, y, 'o',
+                color='red', markersize=6,
+                markeredgecolor='black', markeredgewidth=0.5,
+                zorder=5
+            )[0]
+            txt = self.ax.annotate(
+                label,
+                xy=(x, y),
+                xytext=(8, -8), textcoords="offset points",
+                color='yellow', fontsize=8, fontweight='bold',
+                bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.6),
+                zorder=6
+            )
+            self._annotation_artists.extend([dot, txt])
+
+        self.canvas.draw_idle()
+
+    def clear_annotations(self):
+        """Remove annotation artists from axes. Does not touch _show_annotations."""
+        for artist in self._annotation_artists:
+            try:
+                artist.remove()
+            except Exception:
+                pass
+        self._annotation_artists = []
+        self.canvas.draw_idle()
+
+    def _toggle_annotations(self, checked):
+        self._show_annotations = checked
+        if checked:
+            self.draw_annotations(self._last_annotations)
+        else:
+            self.clear_annotations()
 
     # -------- Double-click → spectrum (per-canvas window) --------
     def on_image_click(self, event):
@@ -1031,13 +1117,7 @@ class SpectralImageCanvas(QWidget):
             return None
         y0, y1, x0, x1 = self._last_rect
         return slice(y0, y1), slice(x0, x1)
-    def clear_memmap_refs(self):
-        """Release any memmap references held by this canvas."""
-        self.cube = None
-        self.bands = None
-        self.ax.clear()  # Also clear matplotlib artists
-        self.canvas.draw_idle()
-    
+       
     # Image display manipulaton
     def increase_contrast(self):
         """Increase contrast of the displayed RGB image"""
@@ -1052,7 +1132,10 @@ class SpectralImageCanvas(QWidget):
         self.ax.clear()
         self.ax.imshow(rgb_contrast, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        if self._show_annotations:
+            self.draw_annotations(self._last_annotations)
+        else:
+            self.canvas.draw()
 
     
     def equalize_histogram(self):
@@ -1081,7 +1164,10 @@ class SpectralImageCanvas(QWidget):
         self.ax.clear()
         self.ax.imshow(rgb_eq, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        if self._show_annotations:
+            self.draw_annotations(self._last_annotations)
+        else:
+            self.canvas.draw()
     
     def reset_display(self):
         """Reset to original RGB without any adjustments"""
@@ -1092,8 +1178,20 @@ class SpectralImageCanvas(QWidget):
         self.ax.clear()
         self.ax.imshow(self._current_rgb, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        if self._show_annotations:
+            self.draw_annotations(self._last_annotations)
+        else:
+            self.canvas.draw()
         
+    def clear_memmap_refs(self):
+        """Release any memmap references held by this canvas."""
+        self.cube = None
+        self.bands = None
+        self._last_annotations = {}
+        self.ax.clear()  # Also clear matplotlib artists
+        self.clear_annotations()
+        self.canvas.draw_idle()
+
 
 class ClosableWidgetWrapper(QWidget):
     """

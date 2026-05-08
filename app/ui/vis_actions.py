@@ -30,6 +30,7 @@ class VisActions(BaseActions):
         self.extract_feature_list.append(("Custom Feature...", self.box_ops.custom_feature_act))
         self.extract_feature_list.append(("Cache features", self.box_ops.cache_features))
         self._register_group('Visualise', [
+
     ("button", "Quick Cluster", self.box_ops.act_kmeans, "Performs unsupervised k-means clustering"),
     ("menu", "Correlation", [
         ("MineralMap Pearson (Winner-takes-all)", self.box_ops.act_vis_correlation, "Performs Pearson correlation against selected collection from the library"),
@@ -41,6 +42,7 @@ class VisActions(BaseActions):
     ]),
     ("menu", "Features", self.extract_feature_list, "Performs Minimum Wavelength Mapping"),
     ("button", "Band Maths", self.box_ops.act_band_maths, "Open the band maths expression window"),
+    ("button", "Annotate", self.act_annotate, "Click a point on the image to add a text annotation"),
     ("menu", "Library building", [
         ("Add spectra", self.act_lib_pix, "Add a single pixel spectra to the current library\n WARNING: This will modify the library on disk, use a back up"),
         ("Add region average", self.act_lib_region, "Add the average spectra of a region to the current library\n WARNING: This will modify the library on disk, use a back up"),
@@ -255,3 +257,48 @@ class VisActions(BaseActions):
                         "Export Box Report", 
                         f"Failed to create box report: {e}"
                     )
+                
+    def act_annotate(self):
+        """Add a point annotation to the current processed object."""
+        logger.info(f"Button clicked: Add annotation")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Annotate", msg)
+            return
+
+        p = self.controller.active_page()
+        if not p or not p.dispatcher or not p.left_canvas:
+            logger.warning("Annotation cancelled, due to absence of either page, dispatcher or canvas")
+            return
+
+        def handle_point_click(y, x):
+            try:
+                label, ok = QInputDialog.getText(
+                    self.controller,
+                    "Add Annotation",
+                    "Label:"
+                )
+                if not ok or not label.strip():
+                    logger.warning("Annotation cancelled, no label provided")
+                    return
+
+                import uuid
+                key = f"ann_{uuid.uuid4().hex[:8]}"
+
+                # Get existing annotations or start fresh
+                ann = dict(self.cxt.current['annotations'].data) if self.cxt.current.has('annotations') else {}
+
+                ann[key] = {"label": label.strip(), "x": int(x), "y": int(y)}
+
+                self.cxt.current.add_temp_dataset('annotations', ann, ext='.json')
+                logger.info(f"Annotation '{label}' added at ({x}, {y})")
+                self.controller.refresh()
+
+            except Exception as e:
+                logger.error("Failed to add annotation", exc_info=True)
+                self._show_error("Annotate", f"Failed to add annotation: {e}")
+            finally:
+                p.dispatcher.clear_all_temp()
+
+        p.dispatcher.set_single_click(handle_point_click)

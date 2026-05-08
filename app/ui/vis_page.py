@@ -200,7 +200,11 @@ class VisualisePage(BasePage):
         import time
         start = time.perf_counter()
         logger.debug(f"PROFILE VIS PAGE UPDATE DISPLAY: Start : {start:.4f}s")
-        self.left_canvas.show_rgb_direct(self.current_obj.display, self.current_obj.savgol, self.current_obj.bands)
+        ann = self.current_obj['annotations'].data if self.current_obj.has('annotations') else {}
+        self.left_canvas.show_rgb_direct(self.current_obj.display, 
+                                         self.current_obj.savgol, 
+                                         self.current_obj.bands, 
+                                         annotations=ann)
         checkpoint_1 = time.perf_counter()
         logger.debug(f"PROFILE UPDATE DISPLAY: Left canvas displayed: {checkpoint_1 - start:.4f}s")
         self.refresh_cache_table()
@@ -294,7 +298,7 @@ class VisualisePage(BasePage):
         """
         base_whitelist = {"savgol", "savgol_cr", "mask", "segments", "cropped"}
         unwrap_prefixes = ("Dhole",)
-        non_vis_suff = {'LEGEND', "stats", "bands", "metadata", "MAPPING", "display"}
+        non_vis_suff = {'LEGEND', "stats", "bands", "metadata", "MAPPING", "display", "annotations"}
         base = []
         unwrapped = []
         products = []

@@ -962,7 +962,7 @@ def create_po_pdf_booklet(
     2. Landscape pages with 2 datasets per page (stacked vertically)
     """
     output_path = Path(output_path) / f"{po.basename}.pdf"
-    exclude_keys = ["savgol", "cropped", "savgol_cr", "metadata", "stats", "bands", "display"]
+    exclude_keys = ["savgol", "cropped", "savgol_cr", "metadata", "stats", "bands", "display", "annotations"]
     selected_keys = [key for key in po.datasets.keys() if key not in exclude_keys
                      and not key.endswith("LEGEND")
                      and not key.endswith("CLUSTERS")]
