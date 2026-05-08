@@ -42,7 +42,13 @@ class VisActions(BaseActions):
     ]),
     ("menu", "Features", self.extract_feature_list, "Performs Minimum Wavelength Mapping"),
     ("button", "Band Maths", self.box_ops.act_band_maths, "Open the band maths expression window"),
-    ("button", "Annotate", self.act_annotate, "Click a point on the image to add a text annotation"),
+    ("menu", "Annotate", [
+    ("Point",   lambda: self.act_annotate('point'),   "Click a point to annotate"),
+    ("Line",    lambda: self.act_annotate('line'),    "Drag to draw an annotation line"),
+    ("Rect",    lambda: self.act_annotate('rect'),    "Drag to draw an annotation rectangle"),
+    ("Polygon", lambda: self.act_annotate('polygon'), "Draw a freehand annotation polygon"),
+    ("Circle",  lambda: self.act_annotate('circle'),  "Drag to draw an annotation circle"),
+    ]),
     ("menu", "Library building", [
         ("Add spectra", self.act_lib_pix, "Add a single pixel spectra to the current library\n WARNING: This will modify the library on disk, use a back up"),
         ("Add region average", self.act_lib_region, "Add the average spectra of a region to the current library\n WARNING: This will modify the library on disk, use a back up"),
@@ -152,9 +158,7 @@ class VisActions(BaseActions):
         
         p.dispatcher.set_single_click(handle_point_click)
         
-        
-
-        
+                
     def act_lib_region(self):
         """Add the average spectrum of a region to the current library."""
         logger.info(f"Button clicked: Add region average to library")
@@ -258,9 +262,10 @@ class VisActions(BaseActions):
                         f"Failed to create box report: {e}"
                     )
                 
-    def act_annotate(self):
-        """Add a point annotation to the current processed object."""
-        logger.info(f"Button clicked: Add annotation")
+    
+    def act_annotate(self, shape='point'):
+        """Add an annotation to the current processed object."""
+        logger.info(f"Button clicked: Add annotation ({shape})")
         valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
         if not valid_state:
             logger.warning(msg)
@@ -272,33 +277,52 @@ class VisActions(BaseActions):
             logger.warning("Annotation cancelled, due to absence of either page, dispatcher or canvas")
             return
 
-        def handle_point_click(y, x):
+        def _save_annotation(entry: dict):
+            """Common save path for all shapes."""
+            import uuid
             try:
                 label, ok = QInputDialog.getText(
-                    self.controller,
-                    "Add Annotation",
-                    "Label:"
+                    self.controller, "Add Annotation", "Label:"
                 )
                 if not ok or not label.strip():
                     logger.warning("Annotation cancelled, no label provided")
                     return
-
-                import uuid
-                key = f"ann_{uuid.uuid4().hex[:8]}"
-
-                # Get existing annotations or start fresh
+                entry["label"] = label.strip()
                 ann = dict(self.cxt.current['annotations'].data) if self.cxt.current.has('annotations') else {}
-
-                ann[key] = {"label": label.strip(), "x": int(x), "y": int(y)}
-
+                ann[f"ann_{uuid.uuid4().hex[:8]}"] = entry
                 self.cxt.current.add_temp_dataset('annotations', ann, ext='.json')
-                logger.info(f"Annotation '{label}' added at ({x}, {y})")
+                logger.info(f"Annotation '{label.strip()}' ({shape}) added")
                 self.controller.refresh()
-
             except Exception as e:
                 logger.error("Failed to add annotation", exc_info=True)
                 self._show_error("Annotate", f"Failed to add annotation: {e}")
             finally:
                 p.dispatcher.clear_all_temp()
 
-        p.dispatcher.set_single_click(handle_point_click)
+        if shape == 'point':
+            def handle_click(y, x):
+                _save_annotation({"shape": "point", "x": int(x), "y": int(y)})
+            p.dispatcher.set_single_click(handle_click)
+
+        elif shape == 'rect':
+            def handle_rect(y0, y1, x0, x1):
+                _save_annotation({"shape": "rect", "x0": int(x0), "y0": int(y0), "x1": int(x1), "y1": int(y1)})
+            p.dispatcher.set_rect(handle_rect)
+            p.left_canvas.start_rect_select(interactive=False, useblit=True)
+
+        elif shape == 'line':
+            def handle_line(y0, x0, y1, x1):
+                _save_annotation({"shape": "line", "x0": x0, "y0": y0, "x1": x1, "y1": y1})
+            p.dispatcher.set_line(handle_line)
+            p.left_canvas.start_line_select()
+        elif shape == 'polygon':
+            def handle_polygon(vertices):
+                _save_annotation({"shape": "polygon", "vertices": [[int(y), int(x)] for y, x in vertices]})
+            p.dispatcher.set_polygon(handle_polygon)
+            p.left_canvas.start_polygon_select()
+
+        elif shape == 'circle':
+            def handle_circle(cy, cx, r):
+                _save_annotation({"shape": "circle", "cx": int(cx), "cy": int(cy), "r": int(r)})
+            p.dispatcher.set_circle(handle_circle)
+            p.left_canvas.start_circle_select()

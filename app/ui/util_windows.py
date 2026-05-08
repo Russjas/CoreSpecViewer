@@ -867,14 +867,26 @@ class SpectralImageCanvas(QWidget):
         self.rect_selector = None
         self.on_rectangle_selected = None   # assign a callable(y0, y1, x0, x1) from parent
         self._last_rect = None              # pollable: (y0, y1, x0, x1)
-
         # Single and right click wiring
         self.on_single_click = None         # callable(y, x) -> None
         self.on_right_click  = None         # callable(y, x) -> None
-
         # polygon selector
         self._poly_selector = None
         self.on_polygon_finished = None
+        # Circle selector
+        self._circle_centre = None
+        self._circle_preview = None
+        self._circle_press_cid = None
+        self._circle_motion_cid = None
+        self._circle_release_cid = None
+        self.on_circle_selected = None   # callable(cy, cx, r)
+        # Line selector
+        self._line_start = None
+        self._line_preview = None
+        self._line_press_cid = None
+        self._line_motion_cid = None
+        self._line_release_cid = None
+        self.on_line_selected = None    # callable(y0, x0, y1, x1)
 
         # Annotation state
         self._last_annotations = {}     # render cache, refreshed from PO on every update_display
@@ -939,8 +951,15 @@ class SpectralImageCanvas(QWidget):
     
     def draw_annotations(self, annotations: dict):
         """
-        Render annotation labels onto the current axes.
+        Render annotation overlays onto the current axes.
         Clears any existing annotation artists first.
+        annotations: {
+            "ann_<uuid>": {
+                "shape": "point"|"line"|"rect"|"polygon"|"circle",
+                "label": str,
+                ... geometry keys ...
+            }
+        }
         """
         for artist in self._annotation_artists:
             try:
@@ -950,24 +969,108 @@ class SpectralImageCanvas(QWidget):
         self._annotation_artists = []
 
         for entry in annotations.values():
-            x = entry["x"]
-            y = entry["y"]
-            label = entry["label"]
-            dot = self.ax.plot(
-                x, y, 'o',
-                color='red', markersize=6,
-                markeredgecolor='black', markeredgewidth=0.5,
-                zorder=5
-            )[0]
-            txt = self.ax.annotate(
-                label,
-                xy=(x, y),
-                xytext=(8, -8), textcoords="offset points",
-                color='yellow', fontsize=8, fontweight='bold',
-                bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.6),
-                zorder=6
-            )
-            self._annotation_artists.extend([dot, txt])
+            shape = entry.get("shape", "point")
+            label = entry.get("label", "")
+            txt = None
+
+            try:
+                if shape == "point":
+                    dot = self.ax.plot(
+                        entry["x"], entry["y"], 'o',
+                        color='red', markersize=6,
+                        markeredgecolor='black', markeredgewidth=0.5,
+                        zorder=5
+                    )[0]
+                    txt = self.ax.annotate(
+                        label,
+                        xy=(entry["x"], entry["y"]),
+                        xytext=(8, -8), textcoords="offset points",
+                        color='white', fontsize=8, fontweight='bold',
+                        bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.6),
+                        zorder=6
+                    )
+                    self._annotation_artists.extend([dot, txt])
+
+                elif shape == "line":
+                    line = self.ax.plot(
+                        [entry["x0"], entry["x1"]],
+                        [entry["y0"], entry["y1"]],
+                        color='blue', linewidth=1.5, zorder=5
+                    )[0]
+                    mx = (entry["x0"] + entry["x1"]) / 2
+                    my = (entry["y0"] + entry["y1"]) / 2
+                    txt = self.ax.annotate(
+                        label,
+                        xy=(mx, my),
+                        xytext=(4, -8), textcoords="offset points",
+                        color='white', fontsize=8, fontweight='bold',
+                        bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.6),
+                        zorder=6
+                    )
+                    self._annotation_artists.extend([line, txt])
+
+                elif shape == "rect":
+                    patch = matplotlib.patches.Rectangle(
+                        (entry["x0"], entry["y0"]),
+                        entry["x1"] - entry["x0"],
+                        entry["y1"] - entry["y0"],
+                        fill=False, edgecolor='green',
+                        linewidth=1.5, zorder=5
+                    )
+                    self.ax.add_patch(patch)
+                    txt = self.ax.annotate(
+                        label,
+                        xy=(entry["x0"], entry["y0"]),
+                        xytext=(4, -8), textcoords="offset points",
+                        color='white', fontsize=8, fontweight='bold',
+                        bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.6),
+                        zorder=6
+                    )
+                    self._annotation_artists.extend([patch, txt])
+
+                elif shape == "polygon":
+                    verts = entry["vertices"]   # [[y, x], ...]
+                    xy = [(v[1], v[0]) for v in verts]
+                    patch = matplotlib.patches.Polygon(
+                        xy, closed=True, fill=False,
+                        edgecolor='yellow', linewidth=1.5, zorder=5
+                    )
+                    self.ax.add_patch(patch)
+                    cx = sum(v[1] for v in verts) / len(verts)
+                    cy = sum(v[0] for v in verts) / len(verts)
+                    txt = self.ax.annotate(
+                        label,
+                        xy=(cx, cy),
+                        xytext=(4, -8), textcoords="offset points",
+                        color='white', fontsize=8, fontweight='bold',
+                        bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.6),
+                        zorder=6
+                    )
+                    self._annotation_artists.extend([patch, txt])
+
+                elif shape == "circle":
+                    patch = matplotlib.patches.Circle(
+                        (entry["cx"], entry["cy"]), entry["r"],
+                        fill=False, edgecolor='orange',
+                        linewidth=1.5, zorder=5
+                    )
+                    self.ax.add_patch(patch)
+                    txt = self.ax.annotate(
+                        label,
+                        xy=(entry["cx"], entry["cy"] - entry["r"]),
+                        xytext=(4, -8), textcoords="offset points",
+                        color='white', fontsize=8, fontweight='bold',
+                        bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.6),
+                        zorder=6
+                    )
+                    self._annotation_artists.extend([patch, txt])
+
+                else:
+                    logger.warning(f"Unknown annotation shape: {shape}")
+
+            except (KeyError, TypeError) as e:
+                logger.warning(f"Failed to draw annotation entry {entry}: {e}")
+                continue
 
         self.canvas.draw_idle()
 
@@ -1065,17 +1168,15 @@ class SpectralImageCanvas(QWidget):
             except Exception:
                 self._poly_selector = None
 
-
-
     # -------- Rectangle selection: start/cancel, callback, polling --------
-    def start_rect_select(self, minspan=(5, 5), interactive=True):
+    def start_rect_select(self, minspan=(5, 5), interactive=True, useblit = True):
         # avoid conflicts with pan/zoom from toolbar
         if getattr(self.toolbar, "mode", ""):
             return
         self.cancel_rect_select()
         self.rect_selector = RectangleSelector(
             self.ax, self._on_rect_select,
-            useblit=True, button=[1],
+            useblit=useblit, button=[1],
             minspanx=minspan[0], minspany=minspan[1],
             spancoords='pixels', interactive=interactive
         )
@@ -1117,7 +1218,151 @@ class SpectralImageCanvas(QWidget):
             return None
         y0, y1, x0, x1 = self._last_rect
         return slice(y0, y1), slice(x0, x1)
-       
+    
+    # circle selection methods
+    def start_circle_select(self):
+        self._circle_centre = None
+        self._circle_preview = None
+        self._circle_motion_cid = None
+        self._remove_circle_preview()
+        
+        self._circle_press_cid = self.canvas.mpl_connect(
+            'button_press_event', self._on_circle_press
+        )
+        self._circle_motion_cid = self.canvas.mpl_connect(
+            'motion_notify_event', self._on_circle_motion
+        )
+        self._circle_release_cid = self.canvas.mpl_connect(
+            'button_release_event', self._on_circle_release
+        )
+
+    def _on_circle_press(self, event):
+        if event.inaxes is not self.ax or event.button != 1:
+            return
+        self._circle_centre = (event.xdata, event.ydata)
+
+    def _on_circle_motion(self, event):
+        if self._circle_centre is None:
+            return
+        if event.inaxes is not self.ax or event.xdata is None:
+            return
+        cx, cy = self._circle_centre
+        r = ((event.xdata - cx)**2 + (event.ydata - cy)**2) ** 0.5
+        self._remove_circle_preview()
+        self._circle_preview = matplotlib.patches.Circle(
+            (cx, cy), r,
+            fill=False, edgecolor='yellow', linewidth=1.5, linestyle='--', zorder=7
+        )
+        self.ax.add_patch(self._circle_preview)
+        self.canvas.draw_idle()
+
+    def _on_circle_release(self, event):
+        if self._circle_centre is None or event.button != 1:
+            return
+        if event.inaxes is not self.ax or event.xdata is None:
+            return
+        cx, cy = self._circle_centre
+        r = ((event.xdata - cx)**2 + (event.ydata - cy)**2) ** 0.5
+        self._remove_circle_preview()
+        self._disconnect_circle_events()
+        
+        # Fire the callback with centre and radius
+        if callable(self.on_circle_selected):
+            self.on_circle_selected(int(cy), int(cx), int(r))
+
+    def _remove_circle_preview(self):
+        if self._circle_preview is not None:
+            try:
+                self._circle_preview.remove()
+            except Exception:
+                pass
+            self._circle_preview = None
+
+    def _disconnect_circle_events(self):
+        for cid in ('_circle_press_cid', '_circle_motion_cid', '_circle_release_cid'):
+            val = getattr(self, cid, None)
+            if val is not None:
+                try:
+                    self.canvas.mpl_disconnect(val)
+                except Exception:
+                    pass
+                setattr(self, cid, None)
+        self._circle_centre = None
+
+    def cancel_circle_select(self):
+        self._remove_circle_preview()
+        self._disconnect_circle_events()
+        self.canvas.draw_idle()
+
+
+        #Line selection methods
+    def start_line_select(self):
+        self._line_start = None
+        self._remove_line_preview()
+        self._line_press_cid = self.canvas.mpl_connect(
+            'button_press_event', self._on_line_press
+        )
+        self._line_motion_cid = self.canvas.mpl_connect(
+            'motion_notify_event', self._on_line_motion
+        )
+        self._line_release_cid = self.canvas.mpl_connect(
+            'button_release_event', self._on_line_release
+        )
+
+    def _on_line_press(self, event):
+        if event.inaxes is not self.ax or event.button != 1:
+            return
+        self._line_start = (event.xdata, event.ydata)
+
+    def _on_line_motion(self, event):
+        if self._line_start is None:
+            return
+        if event.inaxes is not self.ax or event.xdata is None:
+            return
+        x0, y0 = self._line_start
+        self._remove_line_preview()
+        self._line_preview = self.ax.plot(
+            [x0, event.xdata], [y0, event.ydata],
+            color='yellow', linewidth=1.5, linestyle='--', zorder=7
+        )[0]
+        self.canvas.draw_idle()
+
+    def _on_line_release(self, event):
+        if self._line_start is None or event.button != 1:
+            return
+        if event.inaxes is not self.ax or event.xdata is None:
+            return
+        x0, y0 = self._line_start
+        self._remove_line_preview()
+        self._disconnect_line_events()
+        if callable(self.on_line_selected):
+            self.on_line_selected(int(y0), int(x0), int(event.ydata), int(event.xdata))
+
+    def _remove_line_preview(self):
+        if self._line_preview is not None:
+            try:
+                self._line_preview.remove()
+            except Exception:
+                pass
+            self._line_preview = None
+
+    def _disconnect_line_events(self):
+        for cid in ('_line_press_cid', '_line_motion_cid', '_line_release_cid'):
+            val = getattr(self, cid, None)
+            if val is not None:
+                try:
+                    self.canvas.mpl_disconnect(val)
+                except Exception:
+                    pass
+                setattr(self, cid, None)
+        self._line_start = None
+
+    def cancel_line_select(self):
+        self._remove_line_preview()
+        self._disconnect_line_events()
+        self.canvas.draw_idle()
+
+
     # Image display manipulaton
     def increase_contrast(self):
         """Increase contrast of the displayed RGB image"""
