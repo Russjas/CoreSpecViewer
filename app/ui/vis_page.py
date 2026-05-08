@@ -209,7 +209,7 @@ class VisualisePage(BasePage):
         self.refresh_cache_table()
         checkpoint_2 = time.perf_counter()
         logger.debug(f"PROFILE UPDATE DISPLAY: cache table refreshed: {checkpoint_2 - checkpoint_1:.4f}s")
-        for canvas in self._sync_canvases:
+        for canvas in list(self._sync_canvases):
             if hasattr(canvas, "product_flag"):
                 self._display_product_in_canvas(canvas, canvas.product_flag)
             
@@ -258,21 +258,30 @@ class VisualisePage(BasePage):
         ann = self.current_obj['annotations'].data if self.current_obj.has('annotations') else {}
         # Mineral map branch
         if key.endswith("INDEX"):
-            legend_key = key[:-5] + "LEGEND"
-            index = self.current_obj.get_data(key)
-            legend = None
-            if self.current_obj.has(legend_key):
-                legend = self.current_obj[legend_key].data
+            try:
+                legend_key = key[:-5] + "LEGEND"
+                index = self.current_obj.get_data(key)
+                legend = None
+                if self.current_obj.has(legend_key):
+                    legend = self.current_obj[legend_key].data
 
-            if index is not None and getattr(index, "ndim", 0) == 2:
-                canvas.set_annotations(ann)
-                canvas._show_index_with_legend(index, self.current_obj.mask, legend)
+                if index is not None and getattr(index, "ndim", 0) == 2:
+                    canvas.set_annotations(ann)
+                    canvas._show_index_with_legend(index, self.current_obj.mask, legend)
+                    return
+            except KeyError:
+                wrapper = canvas.parent()
+                if isinstance(wrapper, ClosableWidgetWrapper):
+                    wrapper.close()
                 return
 
         # Fallback for everything else
         try:
             disp_data = self.current_obj.get_data(key)
         except KeyError:
+            wrapper = canvas.parent()
+            if isinstance(wrapper, ClosableWidgetWrapper):
+                wrapper.close()
             return
         canvas.set_annotations(ann)
         canvas.show_rgb(disp_data)

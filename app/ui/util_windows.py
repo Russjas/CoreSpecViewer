@@ -455,6 +455,10 @@ class ClosableWidgetWrapper(QWidget):
     def _emit_popout(self):
         """Emits the signal that the parent should handle to undock the widget."""
         self.popout_requested.emit(self)
+    
+    def closeEvent(self, event):
+        self._emit_closed()
+        event.accept()
 
 class SpectrumWindow(QMainWindow):
     def __init__(self, parent=None):

@@ -26,6 +26,7 @@ class BasePage(QWidget):
         self._right = None    # ImageCanvas2D
         self._third = None    # InfoTable or other QWidget
         self._dispatcher = None
+        self._popouts = []
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -85,6 +86,9 @@ class BasePage(QWidget):
             # Clear any temporary tool callbacks
             if self._dispatcher:
                 self._dispatcher.clear()
+        for w in list(self._popouts):
+            w.close()   # fires closeEvent → _emit_closed → remove_widget
+        self._popouts.clear()
 
         # Nothing to explicitly disconnect on ImageCanvas2D/InfoTable by default
     def _add_closable_widget(self, raw_widget: QWidget, title: str, closeable=True, popoutable=False,
@@ -115,9 +119,13 @@ class BasePage(QWidget):
     def remove_widget(self, w: QWidget):
         """
         Safely remove a widget (which might be the ClosableWidgetWrapper) 
-        from the QSplitter and clean up its memory. (Same as previous version)
+        from the QSplitter and clean up its memory.
         """
-        
+        if w in self._popouts:
+            self._popouts.remove(w)
+            w.setParent(None)
+            w.deleteLater()
+            return
         # 1. Find the widget in the splitter (it might be a wrapped item)
         idx = self._splitter.indexOf(w)
         if idx == -1:
@@ -135,25 +143,20 @@ class BasePage(QWidget):
         elif w is self._third:
             self._third = None
 
+        
+
+    
     def _handle_popout_request(self, wrapper: ClosableWidgetWrapper):
         """
         Handles the signal from a ClosableWidgetWrapper to pop its content out 
         into a new, independent QMainWindow. This is a generic handler 
-        for all pages.
+        for all pages. Canvas remains registered on page, only de-registered on close
         """
-        content_widget = wrapper.wrapped_widget
-        content_title = wrapper.label.text()
-
-        self.remove_widget(wrapper) 
-
-        popout_win = PopoutWindow(
-            content_widget=content_widget,
-            title=f"Popped Out: {content_title}",
-            parent=self 
-        )
-
-        popout_win.show()
-
+        wrapper.setParent(None)
+        wrapper.setWindowFlags(Qt.Window)
+        wrapper.setWindowTitle(wrapper.label.text())
+        wrapper.show()
+        self._popouts.append(wrapper)
 
 
 
