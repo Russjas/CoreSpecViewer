@@ -44,7 +44,9 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QVBoxLayout,
     QWidget,
+    QShortcut
 )
+from PyQt5.QtGui import QKeySequence
 
 from ..spectral_ops.visualisation import get_false_colour
 from .util_windows import SpectrumWindow
@@ -142,12 +144,12 @@ class SpectralCanvasToolbar(BaseCanvasToolbar):
         self.addSeparator()
 
         contrast_btn = QPushButton("Contrast+", self)
-        contrast_btn.setToolTip("Increase image contrast (2-98 percentile stretch)")
+        contrast_btn.setToolTip("Increase image contrast (2-98 percentile stretch) (Alt+C)")
         contrast_btn.clicked.connect(lambda: parent.increase_contrast())
         self.addWidget(contrast_btn)
 
         hist_btn = QPushButton("Equalize", self)
-        hist_btn.setToolTip("Histogram equalization (enhance detail)")
+        hist_btn.setToolTip("Histogram equalization (enhance detail) (Alt+E)")
         hist_btn.clicked.connect(lambda: parent.equalize_histogram())
         self.addWidget(hist_btn)
 
@@ -978,6 +980,15 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
 
         # Wire click handler
         self.canvas.mpl_connect("button_press_event", self.on_image_click)
+
+        #Shortcuts for visual display changes
+        QShortcut(QKeySequence("Alt+E"), self,
+          activated=self.equalize_histogram,
+          context=Qt.ApplicationShortcut)
+
+        QShortcut(QKeySequence("Alt+C"), self,
+                activated=self.increase_contrast,
+                context=Qt.ApplicationShortcut)
 
     # ------------------------------------------------------------------
     # Display methods
