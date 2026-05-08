@@ -12,11 +12,10 @@ from PyQt5.QtWidgets import QTableWidgetItem, QMenu
 
 from .base_page import BasePage
 from ..interface import ToolDispatcher
-from .util_windows import (ImageCanvas2D, 
-                           SpectralImageCanvas, 
-                           SpectrumWindow, 
+from .util_windows import (SpectrumWindow, 
                            RightClick_TableWidget,
                            ClosableWidgetWrapper)
+from .display_canvases import ImageCanvas2D, SpectralImageCanvas
 from .display_text import gen_display_text
 
 logger = logging.getLogger(__name__)
@@ -256,7 +255,7 @@ class VisualisePage(BasePage):
         """
         if self.current_obj is None or self.current_obj.is_raw:
             return
-
+        ann = self.current_obj['annotations'].data if self.current_obj.has('annotations') else {}
         # Mineral map branch
         if key.endswith("INDEX"):
             legend_key = key[:-5] + "LEGEND"
@@ -266,6 +265,7 @@ class VisualisePage(BasePage):
                 legend = self.current_obj[legend_key].data
 
             if index is not None and getattr(index, "ndim", 0) == 2:
+                canvas.set_annotations(ann)
                 canvas._show_index_with_legend(index, self.current_obj.mask, legend)
                 return
 
@@ -274,6 +274,7 @@ class VisualisePage(BasePage):
             disp_data = self.current_obj.get_data(key)
         except KeyError:
             return
+        canvas.set_annotations(ann)
         canvas.show_rgb(disp_data)
 
 

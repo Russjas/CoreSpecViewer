@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from .base_page import BasePage
-from .util_windows import SpectralImageCanvas
+from .display_canvases import SpectralImageCanvas
 
 
 class RawPage(BasePage):

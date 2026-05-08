@@ -11,10 +11,8 @@ from PyQt5.QtWidgets import QSplitter, QVBoxLayout, QWidget
 from ..interface import ToolDispatcher
 from ..models import CurrentContext
 from .util_windows import (ClosableWidgetWrapper, 
-                           ImageCanvas2D, 
-                           SpectralImageCanvas,
-                           PopoutWindow)
-
+                            PopoutWindow)
+from .display_canvases import ImageCanvas2D, SpectralImageCanvas
 
 class BasePage(QWidget):
     """

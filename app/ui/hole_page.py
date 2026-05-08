@@ -38,10 +38,10 @@ from .band_math_dialogue import BandMathsDialog
 from .display_text import gen_display_text
 from .util_windows import (ClosableWidgetWrapper, 
                            busy_cursor, 
-                           ImageCanvas2D, 
                            WavelengthRangeDialog, 
                            ProfileExportDialog
                            )
+from .display_canvases import ImageCanvas2D
 
 
 logger = logging.getLogger(__name__)

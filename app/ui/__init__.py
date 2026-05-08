@@ -39,11 +39,9 @@ from .raw_page import RawPage
 from .ribbon import Groups, Ribbon, GroupedRibbon,FlexibleRibbon
 from .util_windows import (
     AutoSettingsDialog,
-    ImageCanvas2D,
     InfoTable,
     MetadataDialog,
     LibMetadataDialog,
-    SpectralImageCanvas,
     SpectrumWindow,
     busy_cursor,
     choice_box,
@@ -51,6 +49,7 @@ from .util_windows import (
     WavelengthRangeDialog,
     ProfileExportDialog
 )
+from .display_canvases import ImageCanvas2D, SpectralImageCanvas
 from .vis_page import VisualisePage
 
 __all__ = [

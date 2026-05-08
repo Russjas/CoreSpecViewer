@@ -15,8 +15,8 @@ from PyQt5.QtWidgets import QComboBox, QFileDialog, QInputDialog, QMessageBox, Q
 
 from ..interface import tools as t
 from .base_page import BasePage
-from .util_windows import IdSetFilterProxy, ImageCanvas2D, SpectrumWindow, busy_cursor, RightClick_Table
-
+from .util_windows import IdSetFilterProxy, SpectrumWindow, busy_cursor, RightClick_Table
+from .display_canvases import ImageCanvas2D
 logger = logging.getLogger(__name__)
 # In the 'samples' table (which is displayed in the QTableView):
 ID_COLUMN_INDEX = 0   # Column containing SampleID (used for the lookup)
@@ -434,7 +434,8 @@ class LibraryPage(BasePage):
             _, key = t.quick_corr(self.current_obj, x_nm, y, key = key)
             logger.info(f"Correlated id {mineral_name} against {self.current_obj.basename}")
             
-            
+            ann = self.current_obj['annotations'].data if self.current_obj.has('annotations') else {}
+            corr_canvas.set_annotations(ann)
             corr_canvas.show_rgb(self.current_obj.get_data(key))
             corr_canvas.ax.set_title(f"{mineral_name} (ID: {sample_id})", fontsize=11)
 
