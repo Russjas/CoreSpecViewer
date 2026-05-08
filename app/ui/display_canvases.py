@@ -143,17 +143,17 @@ class SpectralCanvasToolbar(BaseCanvasToolbar):
 
         contrast_btn = QPushButton("Contrast+", self)
         contrast_btn.setToolTip("Increase image contrast (2-98 percentile stretch)")
-        contrast_btn.clicked.connect(parent.increase_contrast)
+        contrast_btn.clicked.connect(lambda: parent.increase_contrast())
         self.addWidget(contrast_btn)
 
         hist_btn = QPushButton("Equalize", self)
         hist_btn.setToolTip("Histogram equalization (enhance detail)")
-        hist_btn.clicked.connect(parent.equalize_histogram)
+        hist_btn.clicked.connect(lambda: parent.equalize_histogram())
         self.addWidget(hist_btn)
 
         reset_btn = QPushButton("Reset", self)
         reset_btn.setToolTip("Reset to original image")
-        reset_btn.clicked.connect(parent.reset_display)
+        reset_btn.clicked.connect(lambda: parent.reset_display())
         self.addWidget(reset_btn)
 
 
