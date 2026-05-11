@@ -48,6 +48,7 @@ class VisActions(BaseActions):
     ("Rect",    lambda: self.act_annotate('rect'),    "Drag to draw an annotation rectangle"),
     ("Polygon", lambda: self.act_annotate('polygon'), "Draw a freehand annotation polygon"),
     ("Circle",  lambda: self.act_annotate('circle'),  "Drag to draw an annotation circle"),
+    ("Clear all annotations", self.act_clear_annotations),
     ]),
     ("menu", "Library building", [
         ("Add spectra", self.act_lib_pix, "Add a single pixel spectra to the current library\n WARNING: This will modify the library on disk, use a back up"),
@@ -326,3 +327,23 @@ class VisActions(BaseActions):
                 _save_annotation({"shape": "circle", "cx": int(cx), "cy": int(cy), "r": int(r)})
             p.dispatcher.set_circle(handle_circle)
             p.left_canvas.start_circle_select()
+    
+    def act_clear_annotations(self):
+        """Delete annotation dataset from current PO."""
+        logger.info("Button clicked: Clear annotations")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Clear Annotations", msg)
+            return
+
+        if not self.cxt.current.has('annotations'):
+            return
+
+        try:
+            self.cxt.current.delete_dataset('annotations')
+            logger.info(f"Annotations cleared for {self.cxt.current.basename}")
+            self.controller.refresh()
+        except Exception as e:
+            logger.error("Failed to clear annotations", exc_info=True)
+            self._show_error("Clear Annotations", f"Failed to clear annotations: {e}")
