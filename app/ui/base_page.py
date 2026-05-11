@@ -12,7 +12,7 @@ from ..interface import ToolDispatcher
 from ..models import CurrentContext
 from .util_windows import (ClosableWidgetWrapper, 
                             PopoutWindow)
-from .display_canvases import ImageCanvas2D, SpectralImageCanvas
+from .display_canvases import ImageCanvas2D, SpectralImageCanvas, BaseMatplotlibCanvas
 
 class BasePage(QWidget):
     """
@@ -70,7 +70,7 @@ class BasePage(QWidget):
         Recreate dispatcher so tools can (re)bind safely.
         """
         self._dispatcher = ToolDispatcher()
-        if self._left is not None:
+        if self._left is not None and isinstance(self._left, BaseMatplotlibCanvas):
             self._dispatcher.add_canvas(self._left)
     def teardown(self):
         """
