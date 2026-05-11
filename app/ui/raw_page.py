@@ -9,14 +9,14 @@ logger = logging.getLogger(__name__)
 
 from .base_page import BasePage
 from .display_canvases import SpectralImageCanvas
+from .util_windows import SpectrumWindow
 
 
 class RawPage(BasePage):
     """
     
       left  = SpectralImageCanvas  (reflectance cube view, dbl-click spectra)
-      right = ImageCanvas2D        (product/preview)
-      third = InfoTable            (cache/status)
+      
     Use ribbon actions to call methods on the active page via the controller.
     """
     def __init__(self, parent=None):
@@ -33,7 +33,19 @@ class RawPage(BasePage):
             logger.warning(f"Current object is not raw")
             return
         logger.debug(f"shape of display reflectance {self.current_obj.get_display_reflectance().shape}")
-        self.left_canvas.show_rgb(self.current_obj.get_display_reflectance(), self.current_obj.bands)
+        self.left_canvas.show_rgb(self.current_obj.get_display_reflectance())
+
+    def activate(self):
+        super().activate()
+        if self.dispatcher:
+            def _double_click(y, x):
+                if self.current_obj is None:
+                    return
+                spec = self.current_obj.get_display_reflectance()[y, x, :]
+                if not hasattr(self, "spec_win"):
+                    self.spec_win = SpectrumWindow(self)
+                self.spec_win.plot_spectrum(self.current_obj.bands, spec, title="Spectrum Viewer", label=f"({y}, {x})")
+            self.dispatcher.set_double_click(_double_click, temporary=False)
 
 
 

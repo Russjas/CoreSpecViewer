@@ -196,8 +196,7 @@ class BaseMatplotlibCanvas(QWidget):
         # Rectangle
         self.rect_selector = None
         self.on_rectangle_selected = None   # callable(y0, y1, x0, x1)
-        self._last_rect = None
-
+        
         # Polygon
         self._poly_selector = None
         self.on_polygon_finished = None     # callable(vertices_rc)
@@ -217,6 +216,11 @@ class BaseMatplotlibCanvas(QWidget):
         self._line_motion_cid = None
         self._line_release_cid = None
         self.on_line_selected = None        # callable(y0, x0, y1, x1)
+        
+        # Click wiring — assigned by ToolDispatcher
+        self.on_single_click = None     # callable(y, x)
+        self.on_right_click = None      # callable(y, x)
+        self.on_double_click = None     # callable(y, x)
 
         # ---- matplotlib figure ----
         layout = QVBoxLayout(self)
@@ -229,20 +233,22 @@ class BaseMatplotlibCanvas(QWidget):
         self.toolbar = self.toolbar_class(self.canvas, self)
         layout.addWidget(self.toolbar)
 
+        # Wire click handler
+        self.canvas.mpl_connect("button_press_event", self.on_image_click)
+
     # ------------------------------------------------------------------
     # Utility
     # ------------------------------------------------------------------
 
-
     def clear_memmap_refs(self):
-        """
-        Release any held data references and wipe the axes.
-        Subclasses that hold cube/bands refs should override and call super().
-        """
-        self._last_annotations = {}   # data gone; flag preserved
+        """Release memmap references, clear axes and annotations."""
+        self._last_annotations = {}
         self.ax.clear()
-        self.clear_annotations()      # removes artists, draw_idle
-
+        self.cancel_rect_select()
+        self.cancel_polygon_select()
+        self.cancel_circle_select()
+        self.cancel_line_select()
+        self.clear_annotations()
     # ------------------------------------------------------------------
     # Annotation overlay
     # ------------------------------------------------------------------
@@ -428,28 +434,11 @@ class BaseMatplotlibCanvas(QWidget):
         x2, y2 = int(erelease.xdata), int(erelease.ydata)
         x0, x1 = sorted((x1, x2))
         y0, y1 = sorted((y1, y2))
-        # Clamp to cube bounds if available
-        cube = getattr(self, "cube", None)
-        if cube is not None:
-            h, w = cube.shape[:2]
-            x0 = max(0, min(x0, w - 1)); x1 = max(1, min(x1, w))
-            y0 = max(0, min(y0, h - 1)); y1 = max(1, min(y1, h))
-        self._last_rect = (y0, y1, x0, x1)
         cb = self.on_rectangle_selected
         self.cancel_rect_select()
         if callable(cb):
             cb(y0, y1, x0, x1)
 
-    def rect_props(self):
-        """Return (y0, y1, x0, x1) or None."""
-        return self._last_rect
-
-    def rect_slices(self):
-        """Return (rows_slice, cols_slice) or None."""
-        if self._last_rect is None:
-            return None
-        y0, y1, x0, x1 = self._last_rect
-        return slice(y0, y1), slice(x0, x1)
 
     # ------------------------------------------------------------------
     # Polygon selector
@@ -639,6 +628,29 @@ class BaseMatplotlibCanvas(QWidget):
         self._disconnect_line_events()
         self.canvas.draw_idle()
 
+    def on_image_click(self, event):
+        if event.inaxes is not self.ax or event.xdata is None or event.ydata is None:
+            return
+        if getattr(self.toolbar, "mode", "") or self.rect_selector is not None:
+            return
+        if getattr(self, "_poly_selector", None) is not None:
+            return
+        r = int(round(event.ydata))
+        c = int(round(event.xdata))
+        # Double-click → spectrum
+        if event.dblclick and callable(self.on_double_click):          
+            self.on_double_click(r, c)
+            return
+        if event.button == 3 and callable(self.on_right_click):
+            self.on_right_click(r, c)
+            return
+        if event.button == 1 and callable(self.on_single_click):
+            self.on_single_click(r, c)
+
+
+
+    
+
 
 # ============================================================================
 # ImageCanvas2D
@@ -649,7 +661,6 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
     Display-only canvas for products, mineral maps, and downhole plots.
 
     Uses BaseCanvasToolbar — has annotation toggle but no interaction tools.
-    No dispatcher, no click wiring, no cube reference.
     """
 
     toolbar_class = BaseCanvasToolbar
@@ -953,9 +964,6 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
     Interactive canvas for the main hyperspectral image view.
 
     Extends BaseMatplotlibCanvas with:
-    - Hyperspectral cube reference (cube, bands)
-    - Click dispatcher wiring (on_single_click, on_right_click)
-    - Double-click spectrum display
     - Image adjustment: increase_contrast, equalize_histogram, reset_display
     - show_rgb (derives false colour from cube)
     - show_rgb_direct (accepts pre-computed RGB + annotations)
@@ -968,18 +976,8 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # Cube reference
-        self.spec_win = None
-        self.cube = None
-        self.bands = None
+        # current rgb for display enhancements
         self._current_rgb = None
-
-        # Click wiring — assigned by ToolDispatcher
-        self.on_single_click = None     # callable(y, x)
-        self.on_right_click = None      # callable(y, x)
-
-        # Wire click handler
-        self.canvas.mpl_connect("button_press_event", self.on_image_click)
 
         #Shortcuts for visual display changes
         QShortcut(QKeySequence("Alt+E"), self,
@@ -994,11 +992,8 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
     # Display methods
     # ------------------------------------------------------------------
     @spatial_display
-    def show_rgb(self, cube, bands):
+    def show_rgb(self, cube):
         """Derive and display false colour from a hyperspectral cube."""
-        self._last_rect = None
-        self.cube = cube
-        self.bands = bands
         rgb = get_false_colour(cube)
         self._current_rgb = rgb
         self.ax.clear()
@@ -1007,7 +1002,7 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
         self.canvas.draw()
 
     @spatial_display
-    def show_rgb_direct(self, rgb_array, cube, bands, annotations=None):
+    def show_rgb_direct(self, rgb_array, annotations=None):
         """
         Display a pre-computed RGB array and refresh annotation overlay.
 
@@ -1015,9 +1010,6 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
         update_display. If None, falls back to empty dict (safe for RawPage
         which never calls this method).
         """
-        self._last_rect = None
-        self.cube = cube
-        self.bands = bands
         self._current_rgb = rgb_array
         self._last_annotations = annotations if annotations is not None else {}
         self.ax.clear()
@@ -1070,41 +1062,9 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
     # Click handling
     # ------------------------------------------------------------------
 
-    def on_image_click(self, event):
-        if event.inaxes is not self.ax or event.xdata is None or event.ydata is None:
-            return
-        if getattr(self.toolbar, "mode", "") or self.rect_selector is not None:
-            return
-        if getattr(self, "_poly_selector", None) is not None:
-            return
-        r = int(round(event.ydata))
-        c = int(round(event.xdata))
-        if self.cube is None:
-            return
-        # Double-click → spectrum
-        if event.dblclick:
-            
-            spec = self.cube[r, c]
-            if self.spec_win is None:
-                self.spec_win = SpectrumWindow(self)
-            self.spec_win.plot_spectrum(self.bands, spec, title="Spectrum Viewer")
-            return
-        if event.button == 3 and callable(self.on_right_click):
-            self.on_right_click(r, c)
-            return
-        if event.button == 1 and callable(self.on_single_click):
-            self.on_single_click(r, c)
-
+    
     # ------------------------------------------------------------------
     # clear_memmap_refs — override to also drop cube/bands
     # ------------------------------------------------------------------
 
-    def clear_memmap_refs(self):
-        """Release cube/bands memmap references, clear axes and annotations."""
-        self.cube = None
-        self.bands = None
-        self._last_annotations = {}   # data cleared; _show_annotations preserved
-        self.ax.clear()
-        self.cancel_circle_select()
-        self.cancel_line_select()
-        self.clear_annotations()      # removes artists, draw_idle
+    

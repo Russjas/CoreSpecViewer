@@ -236,7 +236,7 @@ class VisActions(BaseActions):
                 p.dispatcher.clear_all_temp()
         
         p.dispatcher.set_rect(_on_rect)
-        p.left_canvas.start_rect_select()
+        p.dispatcher.start_rect_select()
         
     def create_report(self):
         logger.info(f"Button clicked: Create box report")
@@ -309,24 +309,24 @@ class VisActions(BaseActions):
             def handle_rect(y0, y1, x0, x1):
                 _save_annotation({"shape": "rect", "x0": int(x0), "y0": int(y0), "x1": int(x1), "y1": int(y1)})
             p.dispatcher.set_rect(handle_rect)
-            p.left_canvas.start_rect_select(interactive=False, useblit=True)
+            p.dispatcher.start_rect_select(interactive=False, useblit=True)
 
         elif shape == 'line':
             def handle_line(y0, x0, y1, x1):
                 _save_annotation({"shape": "line", "x0": x0, "y0": y0, "x1": x1, "y1": y1})
             p.dispatcher.set_line(handle_line)
-            p.left_canvas.start_line_select()
+            p.dispatcher.start_line_select()
         elif shape == 'polygon':
             def handle_polygon(vertices):
                 _save_annotation({"shape": "polygon", "vertices": [[int(y), int(x)] for y, x in vertices]})
             p.dispatcher.set_polygon(handle_polygon)
-            p.left_canvas.start_polygon_select()
+            p.dispatcher.start_polygon_select()
 
         elif shape == 'circle':
             def handle_circle(cy, cx, r):
                 _save_annotation({"shape": "circle", "cx": int(cx), "cy": int(cy), "r": int(r)})
             p.dispatcher.set_circle(handle_circle)
-            p.left_canvas.start_circle_select()
+            p.dispatcher.start_circle_select()
     
     def act_clear_annotations(self):
         """Delete annotation dataset from current PO."""

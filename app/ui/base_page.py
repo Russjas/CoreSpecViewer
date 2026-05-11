@@ -69,25 +69,18 @@ class BasePage(QWidget):
         Called when the page becomes visible/active.
         Recreate dispatcher so tools can (re)bind safely.
         """
-        if isinstance(self._left, SpectralImageCanvas):
-            self._dispatcher = ToolDispatcher(self._left)
-        else:
-            self._dispatcher = None
-
+        self._dispatcher = ToolDispatcher()
+        if self._left is not None:
+            self._dispatcher.add_canvas(self._left)
     def teardown(self):
         """
         Must be called on tab switch (or when closing the page).
         Cancels any active tools and disconnects temporary bindings.
         """
-        # Rect selector / canvas interactions
-        if isinstance(self._left, SpectralImageCanvas):
-            # Cancel an active RectangleSelector cleanly
-            self._left.cancel_rect_select()
-            # Clear any temporary tool callbacks
-            if self._dispatcher:
-                self._dispatcher.clear()
+        if self._dispatcher:
+            self._dispatcher.clear()
         for w in list(self._popouts):
-            w.close()   # fires closeEvent → _emit_closed → remove_widget
+            w.close()
         self._popouts.clear()
 
         # Nothing to explicitly disconnect on ImageCanvas2D/InfoTable by default

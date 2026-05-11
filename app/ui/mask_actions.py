@@ -52,7 +52,7 @@ class MaskActions(BaseActions):
             self._show_error("Masking", msg)
             return
         p = self.controller.active_page()
-        if not p or not p.dispatcher or not p.left_canvas:
+        if not p or not p.dispatcher:
             return
 
         def _on_rect(y0, y1, x0, x1):
@@ -63,7 +63,7 @@ class MaskActions(BaseActions):
             finally:
                 p.dispatcher.clear_all_temp()
         p.dispatcher.set_rect(_on_rect)
-        p.left_canvas.start_rect_select()
+        p.dispatcher.start_rect_select()
 
     def act_mask_point(self, mode):
         logger.info(f"Button clicked: Mask point {mode}")
@@ -73,7 +73,7 @@ class MaskActions(BaseActions):
             self._show_error("Masking", msg)
             return
         p = self.controller.active_page()
-        if not p or not p.dispatcher or not p.left_canvas:
+        if not p or not p.dispatcher:
             return
 
         def handle_point_click(y, x):
@@ -126,7 +126,7 @@ class MaskActions(BaseActions):
             self.controller.refresh()
             p.dispatcher.clear_all_temp()
         p.dispatcher.set_polygon(_on_finish, temporary=True)
-        p.left_canvas.start_polygon_select()
+        p.dispatcher.start_polygon_select()
 
 
     def act_mask_calc_stats(self):

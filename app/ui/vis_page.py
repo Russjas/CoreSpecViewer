@@ -73,15 +73,28 @@ class VisualisePage(BasePage):
         #Use the centralised logic for binding sync now that we are all closeable
         for canvas in self._sync_canvases:
             self._register_sync_canvas(canvas)
-        #Set the right click cr spectrum up
-        if self.current_obj is not None and not self.current_obj.is_raw and self.dispatcher:
+        #Set the right click and dbl-click cr/reflectance spectrum up
+        if self.dispatcher:
             def _right_click(y, x):
+                if self.current_obj is None or self.current_obj.is_raw:
+                    return
                 spec = self.current_obj.savgol_cr[y, x, :]
+                if not hasattr(self, "cr_spec_win"):
+                    self.cr_spec_win = SpectrumWindow(self)
+                title = "CR Spectrum Viewer"
+                self.cr_spec_win.plot_spectrum(self.current_obj.bands, spec, title=title, label=f"({y}, {x})")
+            self.dispatcher.set_right_click(_right_click, temporary=False)
+            
+            def _double_click(y, x):
+                if self.current_obj is None or self.current_obj.is_raw:
+                    return                                       
+                spec = self.current_obj.savgol[y, x, :]
                 if not hasattr(self, "spec_win"):
                     self.spec_win = SpectrumWindow(self)
-                title = "CR Spectrum Viewer"
+                title = "Spectrum Viewer"
                 self.spec_win.plot_spectrum(self.current_obj.bands, spec, title=title, label=f"({y}, {x})")
-            self.dispatcher.set_right_click(_right_click, temporary=False)
+            self.dispatcher.set_double_click(_double_click, temporary=False) 
+
             self.refresh_cache_table()
 
     def teardown(self):
@@ -135,6 +148,7 @@ class VisualisePage(BasePage):
         if isinstance(inner, (ImageCanvas2D, SpectralImageCanvas)):
             if inner in self._sync_canvases:
                 self._sync_canvases.remove(inner)
+                self.dispatcher.remove_canvas(inner) # de-register from the dispatcher 
                 # Unbind its mpl events
                 self._unbind_mpl_for_canvas(inner)
         
@@ -157,6 +171,9 @@ class VisualisePage(BasePage):
         if canvas not in self._sync_canvases:
             self._sync_canvases.append(canvas)
         
+
+        self.dispatcher.add_canvas(canvas)
+
         # Bind sync events if we're active
         if not hasattr(canvas, 'canvas'):
             return
@@ -200,10 +217,7 @@ class VisualisePage(BasePage):
         start = time.perf_counter()
         logger.debug(f"PROFILE VIS PAGE UPDATE DISPLAY: Start : {start:.4f}s")
         ann = self.current_obj['annotations'].data if self.current_obj.has('annotations') else {}
-        self.left_canvas.show_rgb_direct(self.current_obj.display, 
-                                         self.current_obj.savgol, 
-                                         self.current_obj.bands, 
-                                         annotations=ann)
+        self.left_canvas.show_rgb_direct(self.current_obj.display, annotations=ann)
         checkpoint_1 = time.perf_counter()
         logger.debug(f"PROFILE UPDATE DISPLAY: Left canvas displayed: {checkpoint_1 - start:.4f}s")
         self.refresh_cache_table()

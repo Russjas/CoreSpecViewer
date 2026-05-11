@@ -495,6 +495,8 @@ class RawObject:
         if getattr(self, "reflectance", None) is not None:
             if array.shape[-1] == self.reflectance.shape[-1]:
                 self.temp_reflectance = array
+
+                
     def get_display_reflectance(self):
         """
         Return the temporary reflectance if present, else the base reflectance.

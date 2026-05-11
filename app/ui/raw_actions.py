@@ -47,7 +47,7 @@ class RawActions(BaseActions):
             finally:
                 p.dispatcher.clear_all_temp()
         p.dispatcher.set_rect(_on_rect)
-        p.left_canvas.start_rect_select()
+        p.dispatcher.start_rect_select()
     
     def automatic_crop(self):
         logger.info(f"Button clicked: Auto-Crop")
