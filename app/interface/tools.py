@@ -144,7 +144,8 @@ def crop(obj, y_min, y_max, x_min, x_max):
             
             if isinstance(src, np.ndarray) and src.ndim > 1:
                 array_copy_start = time.perf_counter()
-                cropped_copy = np.array(src[y_min:y_max, x_min:x_max, ...])
+                sliced = src[y_min:y_max, x_min:x_max, ...]
+                cropped_copy = sliced.copy()
                 copy_time = time.perf_counter() - array_copy_start
                 
                 if obj.has_temp(key):
@@ -160,6 +161,7 @@ def crop(obj, y_min, y_max, x_min, x_max):
                 logger.debug(f"  {key}: copy={copy_time:.3f}s, total={key_time:.3f}s, shape={cropped_copy.shape}")
         
         logger.debug(f"crop(ProcessedObject) total: {time.perf_counter() - start_time:.3f}s ({len(ordered_keys)} datasets)")
+        obj.regenerate_display()
         return obj
 
     else:
@@ -246,7 +248,7 @@ def crop_auto(obj):
                 obj.temp_datasets[key].data = cropped_copy
             else:
                 obj.add_temp_dataset(key, cropped_copy)
-        
+        obj.regenerate_display()
         return obj
     
     else:

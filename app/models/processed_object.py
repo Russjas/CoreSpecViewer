@@ -222,7 +222,21 @@ class ProcessedObject:
         self.add_dataset("display", rgb_uint8, ext=".npy") 
         self.build_thumb("display")
 
-
+    def regenerate_display(self):
+        """
+        Regenerate the 'display' dataset from the current savgol (resolves
+        temp-first) and store as a temp dataset. The temp-first resolution
+        means this reflects any active crop without touching permanent data.
+        Thumb is rebuilt immediately so the catalogue stays consistent.
+        """
+        savgol = self.savgol
+        if not isinstance(savgol, np.ndarray) or savgol.ndim < 3:
+            return
+        rgb = get_false_colour(savgol)
+        rgb_uint8 = (rgb * 255).astype(np.uint8)
+        self.add_temp_dataset('display', rgb_uint8, ext='.npy')
+        self.build_thumb('display')
+        logger.debug(f"display regenerated for {self.basename}")
 
     # ---- disk I/O helpers ----
     def save_all(self, new=False):
