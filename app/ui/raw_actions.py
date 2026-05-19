@@ -18,8 +18,10 @@ class RawActions(BaseActions):
     def stage_ribbon(self):
         """Define and register ribbon buttons"""
         self._register_group('Raw', [
-            ("button", "Auto Crop", self.automatic_crop, 
-             "Faster on Raw than Processed data.\nUses image analysis to automatically detect core box - NB. is very flaky"),
+            ("memory_menu", "Auto Crop", [
+                ("Variance",               lambda: self.automatic_crop('variance'),   "Detect crop edges from sliding window variance profiles"),
+                ("Rectangles",             lambda: self.automatic_crop('rectangles'), "Detect largest rectangle using contour detection (fallback)"),
+            ], "Automatically crop the image using a variety of CV techniques", "Ctrl+Alt+C"),
             ("button", "Crop", self.crop_current_image, 
              "Faster on Raw than Processed data.\nManually crop the image"),
             ("button", "Process", self.process_raw, 
@@ -48,20 +50,19 @@ class RawActions(BaseActions):
                 p.dispatcher.clear_all_temp()
         p.dispatcher.set_rect(_on_rect)
         p.dispatcher.start_rect_select()
-    
-    def automatic_crop(self):
-        logger.info(f"Button clicked: Auto-Crop")
+       
+    def automatic_crop(self, mode='references'):
+        logger.info(f"Button clicked: Auto-Crop mode={mode}")
         valid_state, msg = self.cxt.requires(self.cxt.SCAN)
         if not valid_state:
             logger.warning(msg)
-            self._show_error( "Cropping", msg)
+            self._show_error("Cropping", msg)
             return
         with busy_cursor('cropping...', self.controller):
-            self.cxt.current = t.crop_auto(self.cxt.current)
-            logger.info(f"{self.cxt.current.basename} cropped using autocrop")
+            self.cxt.current = t.crop_auto(self.cxt.current, mode=mode)
+            logger.info(f"{self.cxt.current.basename} cropped using autocrop mode={mode}")
         self.controller.refresh()
-    
-    
+
     def process_raw(self):
         logger.info(f"Button clicked: Process")
         valid_state, msg = self.cxt.requires(self.cxt.RAW)

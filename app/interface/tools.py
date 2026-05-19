@@ -168,7 +168,7 @@ def crop(obj, y_min, y_max, x_min, x_max):
         raise TypeError(f"Unsupported object type: {type(obj)}")
 
 
-def crop_auto(obj):
+def crop_auto(obj,mode='references'):
     """
     Window-agnostic auto crop using the detect rectangles method as I have
     nothing better for now.
@@ -185,7 +185,7 @@ def crop_auto(obj):
             arr = obj.reflectance
         img = get_false_colour(arr)
         img = (img*255).astype(np.uint8)
-        cropped, slicer = sm.detect_slice_rectangles_robust(img)
+        cropped, slicer = sm.auto_crop(img, mode=mode)
         if slicer is None:
             return obj
         try:
@@ -211,7 +211,7 @@ def crop_auto(obj):
                 return obj
             img = (img * 255).astype(np.uint8, copy=False)
 
-        cropped, slicer = sm.detect_slice_rectangles_robust(img)
+        cropped, slicer = sm.auto_crop(img, mode=mode)
         if slicer is None:
             return obj
         try:
@@ -242,7 +242,7 @@ def crop_auto(obj):
             if 0 in cropped.shape:
                 continue
 
-            cropped_copy = np.array(cropped)
+            cropped_copy = cropped.copy()
 
             if obj.has_temp(key):
                 obj.temp_datasets[key].data = cropped_copy
@@ -266,6 +266,72 @@ def reset(obj):
     return obj
 
 # =============Masking tools===================================================
+
+#==========Experimental auto-masking tools ====================================
+def mask_clusters(obj):
+    """
+    Perform ephemeral k=2 clustering on the ProcessedObject for use in
+    auto-masking. The cluster map is NOT stored on the object — it is
+    returned directly to the caller for UI-layer coordination.
+
+    Valid pixels are determined by the existing mask and data finiteness.
+    Masked pixels receive label -1 in the returned array.
+
+    Returns
+    -------
+    obj : ProcessedObject
+        Unchanged — returned for call-site consistency.
+    cluster_array : np.ndarray, shape (H, W), dtype int
+        Cluster label map. Values are 0 or 1 for valid pixels, -1 for masked.
+    """
+    H, W, B = obj.savgol.shape
+    data = obj.savgol_cr
+    mask = obj.mask.astype(bool)
+
+    valid_mask = ~mask
+    valid_mask &= np.isfinite(data).all(axis=2)
+    valid_mask &= ~np.isnan(data).any(axis=2)
+
+    flat = data.reshape(-1, B)
+    vm = valid_mask.ravel()
+    idx = np.nonzero(vm)[0]
+    X = flat[idx].reshape(-1, 1, B)
+
+    img, _ = sa.kmeans_spectral_wrapper(X, 2, 50)
+    img = np.squeeze(img)
+
+    labels_full = np.full(flat.shape[0], -1, dtype=int)
+    labels_full[idx] = img
+    cluster_array = labels_full.reshape(H, W)
+
+    return obj, cluster_array
+
+
+
+def mask_by_cluster(obj, cluster_array, index):
+    """
+    Mask all pixels belonging to the given cluster index.
+    ORs with the existing mask — does not clobber prior masking work.
+    Mask convention: 0 = valid, 1 = masked.
+
+    Parameters
+    ----------
+    obj : ProcessedObject
+    cluster_array : np.ndarray, shape (H, W)
+        Label map returned by mask_clusters().
+    index : int
+        Cluster label to mask (0 or 1).
+
+    Returns
+    -------
+    obj : ProcessedObject
+    """
+    msk = np.array(obj.mask)
+    msk[cluster_array == index] = 1
+    obj.add_temp_dataset('mask', data = msk)
+    return obj
+
+# ===========Proven masking tools ============================================
 
 def mask_rect(obj, ymin, ymax, xmin, xmax):
     """

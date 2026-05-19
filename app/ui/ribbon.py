@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QToolBar,
     QVBoxLayout,
     QWidget,
+    QToolButton
 )
 
 class FlexibleRibbon(QTabWidget):
@@ -228,6 +229,99 @@ class FlexibleRibbon(QTabWidget):
                 self._populate_menu(menu, submenu, bar)
                 top.setMenu(menu)
                 bar.addAction(top)
+            
+            elif kind == "memory_menu":
+                label    = entry[1]
+                submenu  = entry[2]
+                tooltip  = entry[3] if len(entry) > 3 else None
+                shortcut = entry[4] if len(entry) > 4 else None
+                self._make_memory_menu_button(bar, label, submenu, tooltip, shortcut)
+
+
+    def _make_memory_menu_button(self, bar: QToolBar, label: str, submenu_spec: list, tooltip=None, shortcut=None):
+        state = {"callback": None, "label": label}
+
+        main_window = self.window()
+        parent = main_window if main_window else self
+
+        default_act = QAction(label, parent)
+
+        if shortcut:
+            default_act.setShortcut(shortcut)
+            if tooltip:
+                default_act.setToolTip(f"{tooltip} ({shortcut})")
+                default_act.setStatusTip(f"{tooltip} ({shortcut})")
+            else:
+                default_act.setToolTip(f"{label} ({shortcut})")
+                default_act.setStatusTip(f"{label} ({shortcut})")
+        elif tooltip:
+            default_act.setToolTip(tooltip)
+            default_act.setStatusTip(tooltip)
+
+        def _fire_default():
+            if state["callback"] is not None:
+                state["callback"]()
+
+        default_act.triggered.connect(_fire_default)
+
+        menu = QMenu(label, bar)
+        first_callback = None
+
+        for item in submenu_spec:
+            if not item:
+                continue
+
+            if item[0] == "menu":
+                sub_label   = item[1]
+                sub_items   = item[2]
+                sub_tooltip = item[3] if len(item) > 3 else None
+                submenu     = QMenu(sub_label, menu)
+                if sub_tooltip:
+                    submenu.setToolTip(sub_tooltip)
+                self._populate_menu(submenu, sub_items, bar)
+                menu.addMenu(submenu)
+
+            else:
+                item_label    = item[0]
+                item_callback = item[1]
+                item_tooltip  = item[2] if len(item) > 2 else None
+                item_shortcut = item[3] if len(item) > 3 else None
+
+                act = QAction(item_label, parent)
+                act.triggered.connect(item_callback)
+
+                if item_shortcut:
+                    act.setShortcut(item_shortcut)
+                    tip = f"{item_tooltip} ({item_shortcut})" if item_tooltip else f"{item_label} ({item_shortcut})"
+                    act.setToolTip(tip)
+                    act.setStatusTip(tip)
+                elif item_tooltip:
+                    act.setToolTip(item_tooltip)
+                    act.setStatusTip(item_tooltip)
+
+                def _make_selector(cb, lbl):
+                    def _select():
+                        state["callback"] = cb
+                        state["label"]    = lbl
+                        
+                    return _select
+
+                act.triggered.connect(_make_selector(item_callback, item_label))
+                menu.addAction(act)
+
+                if first_callback is None:
+                    first_callback    = item_callback
+                    state["callback"] = item_callback
+                    state["label"]    = item_label
+                    
+
+        default_act.setMenu(menu)
+        bar.addAction(default_act)
+
+        btn = bar.widgetForAction(default_act)
+        if isinstance(btn, QToolButton):
+            btn.setPopupMode(QToolButton.MenuButtonPopup)
+
 
     def _populate_menu(self, menu: QMenu, items, bar: QToolBar):
         """

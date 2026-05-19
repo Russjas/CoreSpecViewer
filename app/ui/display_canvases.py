@@ -419,6 +419,8 @@ class BaseMatplotlibCanvas(QWidget):
             useblit=useblit, button=[1],
             minspanx=minspan[0], minspany=minspan[1],
             spancoords="pixels", interactive=interactive,
+            props = dict(fill=False, edgecolor='white', linewidth=1, linestyle='--'),
+            handle_props=dict(marker='s', markersize=5, mfc='white', mec='black', alpha=0.9),
         )
         self.canvas.draw_idle()
 

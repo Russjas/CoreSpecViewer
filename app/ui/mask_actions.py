@@ -5,12 +5,11 @@ Callback handler for Masking Actions.
 import logging
 logger = logging.getLogger(__name__)
 
-
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from .display_canvases import ImageCanvas2D
 from ..interface import tools as t
 from .base_actions import BaseActions
 from . import busy_cursor
-
-
 
 class MaskActions(BaseActions):
     """Raw data operations"""
@@ -19,7 +18,7 @@ class MaskActions(BaseActions):
         """Define and register ribbon buttons"""
         
         self._register_group('Masking', [
-            
+            ("button", "Auto-mask by cluster", self.act_mask_by_cluster, "Clusters image into 2 classes, then masks the selected class. New, and experimental.", "Ctrl+Alt"),
             ("button", "New mask", lambda: self.act_mask_point('new'), "Creates a blank mask,\n then masks by correlation with selected pixel.", "Ctrl+W"),
             ("button", "Enhance mask", lambda: self.act_mask_point('enhance'), "Adds to existing mask by correlation with selected pixel", "Ctrl+E"),
             ("button", "Mask region", self.act_mask_rect, "Adds a masked rectangle to existing mask", "Ctrl+R"),
@@ -187,3 +186,86 @@ class MaskActions(BaseActions):
         with busy_cursor('unwrapping...', self.controller):
             self.cxt.po.build_all_thumbs(force=True)
 
+    # Experimental auto masking
+    def act_mask_by_cluster(self):
+        logger.info("Button clicked: Auto-mask by cluster")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Auto-mask by cluster", msg)
+            return
+
+        with busy_cursor('Clustering (k=2)...', self.controller):
+            po, cluster_array = t.mask_clusters(self.cxt.current)
+
+        logger.info(f"{po.basename} k=2 clustering complete for auto-mask")
+
+        dlg = ClusterMaskDialog(cluster_array, po.mask, parent=self.controller)
+        chosen_idx = dlg.run()
+
+        if chosen_idx is None:
+            logger.info("Auto-mask by cluster cancelled by user")
+            return
+
+        logger.info(f"{po.basename} masking cluster index {chosen_idx}")
+        self.cxt.current = t.mask_by_cluster(po, cluster_array, chosen_idx)
+        logger.info(f"{po.basename} auto-mask by cluster complete, class {chosen_idx} masked")
+        self.controller.refresh()
+
+# ======= Dialogue for experimental auto masking
+class ClusterMaskDialog(QDialog):
+    """
+    Modal dialog displaying a k=2 cluster map and asking the user
+    which class to mask. Returns the chosen class index (0 or 1) via run(),
+    or None if cancelled.
+    """
+
+    def __init__(self, cluster_array, existing_mask, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Auto-mask by cluster")
+        self.setModal(True)
+        self._chosen_idx = None
+
+        legend = [
+            {"index": 0, "label": "Class 1"},
+            {"index": 1, "label": "Class 2"},
+        ]
+
+        layout = QVBoxLayout(self)
+
+        label = QLabel("Which class should be masked?")
+        label.setStyleSheet("font-size: 13px; padding: 6px;")
+        layout.addWidget(label)
+
+        self._canvas = ImageCanvas2D(self)
+        self._canvas.setMinimumSize(600, 400)
+        self._canvas._show_index_with_legend(cluster_array, existing_mask, legend)
+        layout.addWidget(self._canvas)
+
+        btn_row = QHBoxLayout()
+
+        btn_class1 = QPushButton("Mask Class 1")
+        btn_class1.clicked.connect(lambda: self._select(0))
+        btn_row.addWidget(btn_class1)
+
+        btn_class2 = QPushButton("Mask Class 2")
+        btn_class2.clicked.connect(lambda: self._select(1))
+        btn_row.addWidget(btn_class2)
+
+        btn_cancel = QPushButton("Cancel")
+        btn_cancel.clicked.connect(self.reject)
+        btn_row.addWidget(btn_cancel)
+
+        layout.addLayout(btn_row)
+
+    def _select(self, idx):
+        self._chosen_idx = idx
+        self.accept()
+
+    def run(self):
+        """
+        Execute the dialog and return the chosen cluster index (0 or 1),
+        or None if the user cancelled.
+        """
+        self.exec_()
+        return self._chosen_idx
