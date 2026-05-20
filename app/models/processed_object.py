@@ -494,12 +494,14 @@ class ProcessedObject:
     def load_thumbs(self):
         for key, ds in self.datasets.items():
             if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
-                self.datasets[key].thumb = Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg')
+                with Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg') as img:
+                    self.datasets[key].thumb = img.copy()
 
     def load_or_build_thumbs(self):
         for key, ds in self.datasets.items():
             if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
-                self.datasets[key].thumb = Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg')
+                with Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg') as img:
+                    self.datasets[key].thumb = img.copy()
             else:
                 self.build_thumb(key)
     

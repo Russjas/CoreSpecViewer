@@ -106,7 +106,8 @@ class Dataset:
             self.data =json.loads(self.path.read_text(encoding="utf-8"))
 
         elif self.ext == '.jpg':
-            self.data = Image.open(self.path)
+            with Image.open(self.path) as img:
+                self.data = img.copy()
 
         elif self.ext == '.npz':
             with np.load(self.path, allow_pickle=False) as npz:
