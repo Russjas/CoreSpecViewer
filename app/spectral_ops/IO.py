@@ -372,4 +372,190 @@ def get_fenix_reflectance(path, mode='hylite'):
     return reflectance[:,:, band_slice]*100, bands[band_slice], snr
 
 
+# Writing Envi cubes on export
+
+# ---- ENVI header schema (semantic half) -------------------------------------
+
+_ENVI_SEMANTIC_KEYS = (
+    "description",
+    "sensor type",
+    "wavelength units",
+    "z plot titles",
+    "reflectance scale factor",
+    "acquisition date",
+    "acquisition time",
+    "map info",
+    "coordinate system string",
+)
+
+_PER_BAND_KEYS = ("band names", "fwhm", "data gain values")
+
+
+def translate_metadata(po_metadata, bands, smooth_params=None,
+                       include_ignore_value=False, ignore_value=0):
+    """
+    Build the semantic half of an ENVI header from a metadata dict
+
+    Layout fields (samples/lines/bands/data type/interleave/byte order) are NOT
+    set here; they are injected by ``write_envi`` from the array itself.
+
+    Parameters
+    ----------
+    po_metadata : dict
+        ProcessedObject metadata (merged ENVI header + parsed Lumo XML). Only
+        recognised semantic keys survive; everything else is dropped.
+    bands : array-like, shape (B,)
+        Band-centre wavelengths. Authoritative for the 'wavelength' field.
+    smooth_params : dict, optional
+        Smoothing provenance to stamp as custom fields. Recognised keys:
+        'method', 'window', 'polyorder'. Only present keys are written. Pass
+        None (default) for reflectance/unsmoothed exports — no fields emitted.
+    include_ignore_value : bool, optional
+        If True, write 'data ignore value' so ENVI-aware readers treat masked
+        pixels as nodata. Default False.
+    ignore_value : int or float, optional
+        Nodata sentinel to declare. MUST match the value the caller wrote into
+        masked pixels. Default 0 (ENVI-native masked convention).
+
+    Returns
+    -------
+    dict
+        Header dict of semantic fields only, ready to be merged with
+        array-derived layout fields by ``write_envi``.
+
+    Notes
+    -----
+    Key matching against ``po_metadata`` is case-insensitive; canonical
+    lower-case ENVI names are emitted. 'wavelength units' defaults to 'nm'.
+    """
+    # Case-insensitive view of the incoming metadata.
+    lower_index = {str(k).strip().lower(): v for k, v in (po_metadata or {}).items()}
+
+    header = {}
+
+    # 1. Carry through scalar/short semantic fields.
+    for key in _ENVI_SEMANTIC_KEYS:
+        if key in lower_index:
+            header[key] = lower_index[key]
+
+    # 2. Wavelength axis — bands is the source of truth, always overwrite.
+    bands = np.asarray(bands, dtype=float).ravel()
+    nbands = bands.size
+    header["wavelength"] = [float(b) for b in bands]
+    header.setdefault("wavelength units", "nm")
+
+    # 3. Per-band fields: keep only if length still matches the (possibly sliced) axis.
+    for key in _PER_BAND_KEYS:
+        if key not in lower_index:
+            continue
+        val = lower_index[key]
+        try:
+            if len(val) == nbands:
+                header[key] = val
+            else:
+                logger.debug(f"Dropping stale per-band field '{key}' "
+                             f"(len {len(val)} != {nbands} bands)")
+        except TypeError:
+            logger.debug(f"Dropping malformed per-band field '{key}'")
+
+    # 4. 'default bands' (RGB display hint): keep only if indices are in range.
+    if "default bands" in lower_index:
+        db = lower_index["default bands"]
+        try:
+            if all(0 <= int(i) < nbands for i in db):
+                header["default bands"] = db
+            else:
+                logger.debug("Dropping 'default bands' (index out of range after slicing)")
+        except (TypeError, ValueError):
+            logger.debug("Dropping malformed 'default bands'")
+
+    # 5. Smoothing provenance (smoothed exports only).
+    if smooth_params:
+        if "method" in smooth_params:
+            header["smoothing method"] = smooth_params["method"]
+        if "window" in smooth_params:
+            header["smoothing window"] = smooth_params["window"]
+        if "polyorder" in smooth_params:
+            header["smoothing polyorder"] = smooth_params["polyorder"]
+
+    # 6. Nodata declaration (masked exports only).
+    if include_ignore_value:
+        header["data ignore value"] = ignore_value
+
+    logger.debug(
+        f"translate_metadata: {len(header)} fields, {nbands} bands, "
+        f"smoothed={'yes' if smooth_params else 'no'}, "
+        f"ignore_value={'yes' if include_ignore_value else 'no'}"
+    )
+    return header
+
+def write_envi(array, header, path,
+               interleave="bil", byteorder=0, dtype=None, force=False):
+    """
+    Write a numpy cube and a semantic header dict to an ENVI file pair.
+
+    The layout half of the header
+    (samples/lines/bands/data type/byte order/interleave/header offset/file
+    type) is derived by spectral python library from the array and the keyword arguments —
+    only the semantic header (typically from ``translate_metadata``) is passed
+    in. Always writes ``byte order`` explicitly so the malformed-header fallback
+    in ``load_envi`` is never needed for files this tool produces.
+
+    Parameters
+    ----------
+    array : ndarray, shape (H, W, B) or (H, W)
+        The cube to write. A 2-D array is stored as a single band.
+    header : dict
+        Semantic ENVI header fields (e.g. from ``translate_metadata``). Any
+        layout keys are ignored — spectral overwrites them from the array.
+    head_path : str or path-like
+        Output ``.hdr`` path. Must end in ``.hdr``.
+    data_path : str or path-like
+        Output binary path. Must share the same stem as ``head_path`` (ENVI
+        forces the data file to ``<header base> + ext``); its extension sets
+        the data-file extension.
+    interleave : {'bil', 'bip', 'bsq'}, optional
+        Band interleave to write. Default 'bil'.
+    byteorder : int or str, optional
+        Endianness, 0/'little' or 1/'big'. Default 0 (little-endian).
+    dtype : numpy dtype or type string, optional
+        Storage dtype. Default None preserves the array's dtype (pass e.g.
+        ``np.float32`` to downcast a float64 cube and halve the file size).
+    force : bool, optional
+        Overwrite existing files if True; otherwise raise. Default False.
+
+    Returns
+    -------
+    tuple of str
+        ``(head_path, data_path)`` actually written.
+
+    Raises
+    ------
+    ValueError
+        If the array is not 2-D/3-D, if its band count disagrees with the
+        header's 'wavelength' list, or if the header and data paths do not
+        share a stem.
+    """
+    array = np.asarray(array)
+    if array.ndim not in (2, 3):
+        raise ValueError(f"Expected a 2-D or 3-D array, got ndim={array.ndim}")
+
+    # ensure descriptive metadata matches cube shape
+    nbands = array.shape[2] if array.ndim == 3 else 1
+    wl = header.get("wavelength")
+    if wl is not None and len(wl) != nbands:
+        raise ValueError(
+            f"Band-count mismatch: array has {nbands} bands but header "
+            f"'wavelength' lists {len(wl)}. Refusing to write an inconsistent pair."
+        )
+
+    kwargs = dict(metadata=header, interleave=interleave,
+                  byteorder=byteorder, ext="img", force=force)
+    if dtype is not None:
+        kwargs["dtype"] = dtype
+
+    envi.save_image(str(path), array, **kwargs)
+    logger.info(f"Wrote ENVI pair: {path}"
+                f"({array.shape}, {nbands} bands, interleave={interleave})")
+    return str(path)
 

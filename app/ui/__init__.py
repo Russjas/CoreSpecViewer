@@ -38,6 +38,7 @@ from .lib_page import LibraryPage
 from .raw_page import RawPage
 from .ribbon import Groups, Ribbon, GroupedRibbon,FlexibleRibbon
 from .util_windows import (
+    EnviExportDialog,
     AutoSettingsDialog,
     InfoTable,
     MetadataDialog,
@@ -74,5 +75,6 @@ __all__ = [
     "InfoTable",
     "busy_cursor",
     "WavelengthRangeDialog",
-    "ProfileExportDialog"
+    "ProfileExportDialog",
+    EnviExportDialog
 ]

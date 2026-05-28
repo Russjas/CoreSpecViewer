@@ -40,8 +40,9 @@ class HoleActions(BaseActions):
                     ("select range", lambda: self.box_ops.act_subrange_corr(multi=True), "Performs correlation on a chosed wavelength range"),
                 ]),
                 ("menu", "Fullhole Features", self.extract_feature_list_multi),
-                ("Band Maths", lambda: self.box_ops.act_band_maths(multi=True))
-            ], "Performs operations iteratively on each box in hole"),
+                ("Band Maths", lambda: self.box_ops.act_band_maths(multi=True)),
+                ("Export to ENVI", lambda: self.box_ops.export_envi(multi=True)),
+            ], "Performs operations iteratively on each box in hole. Commits and saves any unsaved box edits without confirmation."),
             ("button", "Save All", self.save_all_changes, "This will commit and save all temp datasets without asking for confirmation"),
             ("button", "Generate Images", lambda: self.box_ops.gen_images(multi=True))
         ])

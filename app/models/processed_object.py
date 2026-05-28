@@ -15,7 +15,7 @@ from ..spectral_ops import IO as io
 from ..spectral_ops.processing import remove_cont, process
 from ..spectral_ops.visualisation import get_false_colour, mk_thumb
 from .dataset import Dataset
-
+from ..config import config
 base_datasets = ["cropped", "savgol", "savgol_cr", "mask", "bands", "metadata", "display"]
 logger = logging.getLogger(__name__)
 
@@ -504,6 +504,98 @@ class ProcessedObject:
                     self.datasets[key].thumb = img.copy()
             else:
                 self.build_thumb(key)
+    
+    
+    def write_to_envi(self, out_dir, smoothed=True, masked=True,
+                  smooth_params=None, force=False):
+        """
+        Export a cube to an ENVI file pair for use in external tools.
+    
+        The four export modes are the orthogonal product of two choices, matching
+        the GUI's two checkboxes:
+    
+        ===========  ========  ===================================================
+        smoothed     masked    result
+        ===========  ========  ===================================================
+        True         False     savgol cube, as-is
+        True         True      savgol cube, masked pixels set to 0
+        False        False     reflectance (cropped) cube, as-is
+        False        True      reflectance (cropped) cube, masked pixels set to 0
+        ===========  ========  ===================================================
+    
+        Masking writes 0 into masked pixels and declares 'data ignore value = 0' in
+        the header (ENVI-native nodata convention). Smoothing provenance is recorded
+        in the header only for smoothed exports. The cube's dtype is preserved; pass
+        a dtype to ``write_envi`` directly if a downcast is wanted. Written BIL,
+        little-endian.
+    
+        This is a true export — there is no plan to re-import these files.
+    
+        Parameters
+        ----------
+        out_dir : str or Path
+            Destination folder. Created if it does not exist.
+        smoothed : bool, optional
+            Export the savgol cube (True, default) or the reflectance/cropped
+            cube (False).
+        masked : bool, optional
+            Set masked pixels to 0 and declare nodata (default True).
+        smooth_params : dict, optional
+            Smoothing provenance ('method'/'window'/'polyorder') to stamp in the
+            header. Used only when ``smoothed`` is True; ignored otherwise. If None
+            and ``smoothed`` is True, a default is built from the current config
+            (these may be stale relative to how the data was actually smoothed).
+        force : bool, optional
+            Overwrite existing files if True; otherwise raise (default False).
+    
+        Returns
+        -------
+        str
+            Path to the written ``.hdr``.
+    
+        Raises
+        ------
+        ValueError
+            Propagated from ``write_envi`` on a band-count mismatch.
+        """
+        cube = self.savgol if smoothed else self.cropped
+        cube_label = "smoothed" if smoothed else "reflectance"
+    
+        # Masking needs a writable copy off the read-only memmap; unmasked exports
+        # need no mutation so a view suffices. dtype is preserved in both cases.
+        if masked:
+            arr = np.array(cube)          # writable copy
+            arr[self.mask == 1] = 0
+        else:
+            arr = np.asarray(cube)        # zero-copy view
+    
+        # Smoothing provenance: only meaningful for the savgol cube.
+        sp = None
+        if smoothed:
+            sp = smooth_params or {
+                "method": "Savitzky-Golay",  # hardcoded for now; single source later
+                "window": config.savgol_window,
+                "polyorder": config.savgol_polyorder,
+            }
+    
+        header = io.translate_metadata(
+            self.metadata,
+            self.bands,
+            smooth_params=sp,
+            include_ignore_value=masked,
+            ignore_value=0,
+        )
+    
+        # Encode the mode into the stem so the four exports never clobber each other.
+        stem = f"{self.basename}-{cube_label}" + ("-masked" if masked else "")
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        head_path = out_dir / f"{stem}.hdr"
+    
+        return io.write_envi(arr, header, str(head_path),
+                             interleave="bil", byteorder=0, force=force)
+    
+    
     
     def save_archive_file(self, output_dir: Path | str = None, 
                   include_products: bool = False) -> Path:

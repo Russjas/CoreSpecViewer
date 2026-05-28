@@ -55,7 +55,8 @@ class VisActions(BaseActions):
         ("Add region average", self.act_lib_region, "Add the average spectra of a region to the current library\n WARNING: This will modify the library on disk, use a back up"),
     ]),
     ("button", "Generate Images", self.box_ops.gen_images, "Generates full size images of all products and base datasets in an outputs folder"),
-    ("button", "Generate box report", self.create_report, "Generates full size images of all products and base datasets in an outputs folder")
+    ("button", "Generate box report", self.create_report, "Generates full size images of all products and base datasets in an outputs folder"),
+    ("button", "Export to ENVI", self.box_ops.export_envi, "Export this box to an ENVI file pair for use in external tools"),
 ])
         
     # -------- VISUALISE actions --------

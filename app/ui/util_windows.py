@@ -51,8 +51,9 @@ from PyQt5.QtWidgets import (
     QWidget,
     QComboBox,
     QDoubleSpinBox,
-    QShortcut
-    
+    QShortcut,
+    QCheckBox,
+    QSpinBox    
 )
 
 logger = logging.getLogger(__name__)
@@ -819,6 +820,152 @@ class ProfileExportDialog(QDialog):
             key, step, out_dir, mode = dlg.values()
             return True, key, step, out_dir, mode
         return False, None, None, None, None
+
+
+class EnviExportDialog(QDialog):
+    """
+    Dialog to choose ENVI export options:
+      - Smoothed?  (checkbox) — savgol cube vs reflectance/cropped cube
+      - Masked?    (checkbox) — set masked pixels to 0, declare nodata
+      - smoothing provenance: method (fixed label), window, polyorder
+        (pre-populated from config, editable; disabled when not smoothed)
+      - an output directory (browse)
+
+    The smoothing fields are header provenance only — editing them annotates
+    the .hdr, it does NOT reprocess the cube. Pre-populated values come from the
+    current config and may be stale relative to how the data was smoothed.
+
+    Usage:
+        ok, out_dir, smoothed, masked, smooth_params = EnviExportDialog.get_values(
+            parent=self,
+            window_default=config.savgol_window,
+            poly_default=config.savgol_polyorder,
+            dir_default=hole.root_dir / "envi",
+            title="Export to ENVI")
+    """
+
+    SMOOTHING_METHOD = "Savitzky-Golay"  # hardcoded for now; single source later
+
+    def __init__(self, parent=None, window_default=None, poly_default=None,
+                 dir_default=None, title="Export to ENVI"):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+
+        dir_default = Path(dir_default) if dir_default is not None else None
+
+        # --- Mode checkboxes ---
+        self.smoothed_check = QCheckBox("Smoothed (savgol cube)")
+        self.smoothed_check.setChecked(True)
+        self.masked_check = QCheckBox("Masked (nodata = 0)")
+        self.masked_check.setChecked(True)
+
+        # --- Smoothing provenance ---
+        self.method_label = QLabel(self.SMOOTHING_METHOD)  # fixed; not editable
+        self.window_spin = QSpinBox()
+        self.window_spin.setRange(1, 999)
+        if window_default is not None:
+            self.window_spin.setValue(int(window_default))
+        self.poly_spin = QSpinBox()
+        self.poly_spin.setRange(0, 99)
+        if poly_default is not None:
+            self.poly_spin.setValue(int(poly_default))
+
+        note = QLabel("Recorded in header for provenance; does not reprocess.")
+        note.setStyleSheet("color: grey; font-size: 11px;")
+        note.setWordWrap(True)
+
+        # --- Output dir ---
+        self.dir_edit = QLineEdit()
+        if dir_default is not None:
+            self.dir_edit.setText(str(dir_default))
+        self.browse_btn = QPushButton("Browse…")
+        self.browse_btn.clicked.connect(self._browse_for_dir)
+
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+            orientation=Qt.Horizontal, parent=self,
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        # --- Layout ---
+        row_method = QHBoxLayout()
+        row_method.addWidget(QLabel("Smoothing method:"))
+        row_method.addWidget(self.method_label)
+        row_method.addStretch(1)
+
+        row_window = QHBoxLayout()
+        row_window.addWidget(QLabel("Window:"))
+        row_window.addWidget(self.window_spin)
+
+        row_poly = QHBoxLayout()
+        row_poly.addWidget(QLabel("Poly order:"))
+        row_poly.addWidget(self.poly_spin)
+
+        row_dir = QHBoxLayout()
+        row_dir.addWidget(QLabel("Output folder:"))
+        row_dir.addWidget(self.dir_edit)
+        row_dir.addWidget(self.browse_btn)
+
+        main = QVBoxLayout()
+        main.addWidget(self.smoothed_check)
+        main.addWidget(self.masked_check)
+        main.addLayout(row_method)
+        main.addLayout(row_window)
+        main.addLayout(row_poly)
+        main.addWidget(note)
+        main.addLayout(row_dir)
+        main.addWidget(buttons)
+        self.setLayout(main)
+
+        # Disable provenance fields when not exporting the smoothed cube.
+        self.smoothed_check.toggled.connect(self._sync_smoothing_enabled)
+        self._sync_smoothing_enabled(self.smoothed_check.isChecked())
+
+    def _sync_smoothing_enabled(self, on):
+        for w in (self.method_label, self.window_spin, self.poly_spin):
+            w.setEnabled(on)
+
+    def _browse_for_dir(self):
+        start_dir = self.dir_edit.text().strip() or ""
+        chosen = QFileDialog.getExistingDirectory(self, "Select output folder", start_dir)
+        if chosen:
+            self.dir_edit.setText(chosen)
+
+    def values(self):
+        """
+        Return (out_dir, smoothed, masked, smooth_params) or
+        (None, None, None, None) if invalid. smooth_params is None when the
+        smoothed cube is not being exported.
+        """
+        out_text = self.dir_edit.text().strip()
+        if not out_text:
+            return None, None, None, None
+
+        smoothed = self.smoothed_check.isChecked()
+        masked = self.masked_check.isChecked()
+        smooth_params = None
+        if smoothed:
+            smooth_params = {
+                "method": self.SMOOTHING_METHOD,
+                "window": int(self.window_spin.value()),
+                "polyorder": int(self.poly_spin.value()),
+            }
+        return Path(out_text), smoothed, masked, smooth_params
+
+    @classmethod
+    def get_values(cls, parent=None, window_default=None, poly_default=None,
+                   dir_default=None, title=None):
+        dlg = cls(parent=parent, window_default=window_default,
+                  poly_default=poly_default, dir_default=dir_default,
+                  title=title or "Export to ENVI")
+        if dlg.exec_() == QDialog.Accepted:
+            out_dir, smoothed, masked, smooth_params = dlg.values()
+            return True, out_dir, smoothed, masked, smooth_params
+        return False, None, None, None, None
+
 
 class AutoSettingsDialog(QDialog):
     def __init__(self, parent=None):

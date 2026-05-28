@@ -23,7 +23,7 @@ class AppConfig:
     fenix_slice_stop: int = -20
 
     # Savitzky-Golay
-    savgol_window: int = 10
+    savgol_window: int = 11
     savgol_polyorder: int = 2
 
     # Feature detection

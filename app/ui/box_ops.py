@@ -19,10 +19,9 @@ from PyQt5.QtWidgets import (QInputDialog,
 from ..models import CurrentContext
 from ..interface import tools as t
 from .base_actions import BaseActions
-from . import busy_cursor, LibMetadataDialog, WavelengthRangeDialog, LibMetadataDialog
+from . import busy_cursor, LibMetadataDialog, WavelengthRangeDialog, LibMetadataDialog, EnviExportDialog    
 from .band_math_dialogue import BandMathsDialog
-
-
+from ..config import config
 
 class BoxOperations:
     """Handles spectral operations in single or multi-box mode"""
@@ -471,6 +470,57 @@ class BoxOperations:
                 return
         logger.info(f"Exported images for {self.cxt.current.basename}")
         
+
+    def export_envi(self, multi=False):
+        logger.info(f"Button clicked: Export ENVI, Multi-mode = {multi}")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE if multi else self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Export ENVI", msg)
+            return
+
+        dir_default = self.cxt.ho.root_dir / "envi" if multi else None
+        ok, out_dir, smoothed, masked, smooth_params = EnviExportDialog.get_values(
+            parent=self.controller,
+            window_default=config.savgol_window,
+            poly_default=config.savgol_polyorder,
+            dir_default=dir_default,
+            title="Export to ENVI",
+        )
+        if not ok:
+            logger.warning("ENVI export cancelled by user")
+            return
+
+        if multi:
+            with busy_cursor("Exporting ENVI…", self.controller) as progress:
+                for po in self.cxt.ho:
+                    try:
+                        progress.set(f"Exporting ENVI for {po.basename}")
+                        po.write_to_envi(out_dir, smoothed=smoothed, masked=masked,
+                                         smooth_params=smooth_params, force=True)
+                        
+                        po.commit_temps()
+                        po.save_all()
+                        po.reload_all()
+                        po.load_thumbs()
+                        logger.info(f"Exported ENVI for {po.basename}")
+                    except (ValueError, OSError) as e:
+                        logger.error(f"ENVI export failed for {po.basename}", exc_info=True)
+                        continue
+            self.controller.refresh()
+            return
+
+        with busy_cursor("Exporting ENVI…", self.controller):
+            try:
+                self.cxt.current.write_to_envi(out_dir, smoothed=smoothed, masked=masked,
+                                               smooth_params=smooth_params, force=True)
+            except (ValueError, OSError) as e:
+                logger.error(f"ENVI export failed for {self.cxt.current.basename}", exc_info=True)
+                self._show_error("Export ENVI", f"Could not export: {e}")
+                return
+        logger.info(f"Exported ENVI for {self.cxt.current.basename}")
+
+
 class CustomFeatureDialog(QDialog):
     """Dialog to get custom feature parameters from user."""
     
