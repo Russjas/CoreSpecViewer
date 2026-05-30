@@ -39,7 +39,8 @@ from .display_text import gen_display_text
 from .util_windows import (ClosableWidgetWrapper, 
                            busy_cursor, 
                            WavelengthRangeDialog, 
-                           ProfileExportDialog
+                           ProfileExportDialog,
+                           CustomFeatureDialog
                            )
 from .display_canvases import ImageCanvas2D
 
@@ -541,6 +542,12 @@ class HoleControlPanel(QWidget):
         extract_button.clicked.connect(self.prof_feature_extraction)
         profile_derived_layout.addWidget(extract_button)
         
+        custom_feature_button = QPushButton("Custom Feature...", profile_derived_block)
+        custom_feature_button.setToolTip("Define a custom MWL feature and extract it on the profile")
+        custom_feature_button.clicked.connect(self.prof_custom_feature_extraction)
+        profile_derived_layout.addWidget(custom_feature_button)
+
+
         prof_min_map_button = QPushButton("MinMap", profile_derived_block)
         prof_min_map_button.clicked.connect(self.prof_min_map)
         profile_derived_layout.addWidget(prof_min_map_button)
@@ -1127,6 +1134,36 @@ class HoleControlPanel(QWidget):
             self.cluster_windows.remove(win)
         except ValueError:
             pass
+
+
+    def prof_custom_feature_extraction(self):
+        logger.info("Button clicked: Full hole custom feature extraction")
+        valid_state, msg = self.cxt.requires(self.cxt.BASE_HOLE)
+        if not valid_state:
+            logger.info("Custom profile feature extraction cancelled: no hole loaded")
+            return
+
+        custom_feature = CustomFeatureDialog.get_custom_feature(parent=self)
+        if not custom_feature:
+            logger.info("Custom profile feature extraction cancelled by user")
+            return
+
+        feature_name = list(custom_feature.keys())[0]
+        logger.info(f"Full hole custom feature extraction using: {feature_name}")
+        try:
+            with busy_cursor(f'extracting {feature_name}...', self):
+                pt.run_feature_extraction(self.cxt.ho, custom_feature)
+        except (ValueError, AssertionError) as e:
+            logger.error("Failed custom profile feature extraction", exc_info=True)
+            QMessageBox.warning(
+                self,
+                "Failed operation",
+                f"Failed to perform custom feature extraction: {e}\n"
+                "Try different wavelength ranges within the available band coverage."
+            )
+            return
+        logger.info(f"Full hole custom feature {feature_name} created")
+        self.update_for_hole()
 
 
     def prof_min_map(self):

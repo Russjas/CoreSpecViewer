@@ -38,8 +38,13 @@ def profile_kmeans(obj, clusters = 5, iters = 50):
 def run_feature_extraction(obj, key):
     """
     Estimate minimum wavelength (MWL) position and corresponding absorption depth
-    for a specified short-wave infrared absorption feature using multiple
-    possible fitting techniques.
+    for a specified short-wave infrared absorption feature.
+
+    Parameters
+    ----------
+    key : str or dict
+        Either a string key from the standard features (e.g., '2200W')
+        OR a dict in format {feature_name: [wav_min, wav_max, cr_min, cr_max]}
     """
     data = obj.base_datasets["AvSpectra"].data
     data = data[np.newaxis, ...]
@@ -48,14 +53,16 @@ def run_feature_extraction(obj, key):
     bands = obj[obj.first_box].bands
     
     pos, dep, feat_mask = sa.Combined_MWL(data, data_cr, mask, bands, key, technique = 'POLY')
-    
-    obj.add_product_dataset(f'PROF-{key}POS', 
-                            np.ma.masked_array(np.squeeze(pos), mask = np.squeeze(feat_mask)), 
+    name = list(key.keys())[0] if isinstance(key, dict) else key
+
+    obj.add_product_dataset(f'PROF-{name}POS',
+                            np.ma.masked_array(np.squeeze(pos), mask=np.squeeze(feat_mask)),
                             '.npz')
-    obj.add_product_dataset(f'PROF-{key}DEP', 
-                            np.ma.masked_array(np.squeeze(dep), mask = np.squeeze(feat_mask)), 
+    obj.add_product_dataset(f'PROF-{name}DEP',
+                            np.ma.masked_array(np.squeeze(dep), mask=np.squeeze(feat_mask)),
                             '.npz')
     return obj
+
 
 
 def band_math_interface(obj, name, expr, cr = False):

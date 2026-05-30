@@ -1008,3 +1008,140 @@ class AutoSettingsDialog(QDialog):
             t.modify_config(key, val)
             logger.info(f"Config setting {key} changed to {val}")
         self.accept()
+
+
+class CustomFeatureDialog(QDialog):
+    """Dialog to get custom feature parameters from user."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Custom Feature Definition")
+        self.setModal(True)
+        
+        layout = QVBoxLayout(self)
+        
+        # Feature name
+        name_layout = QHBoxLayout()
+        name_layout.addWidget(QLabel("Feature Name:"))
+        self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText("e.g., Custom2300")
+        name_layout.addWidget(self.name_edit)
+        layout.addLayout(name_layout)
+        
+        # Wavelength min
+        wav_min_layout = QHBoxLayout()
+        wav_min_layout.addWidget(QLabel("Feature Wavelength Min (nm):"))
+        self.wav_min_spin = QDoubleSpinBox()
+        self.wav_min_spin.setRange(0, 20000)
+        self.wav_min_spin.setDecimals(1)
+        self.wav_min_spin.setValue(2185.0)
+        self.wav_min_spin.setSingleStep(10.0)
+        wav_min_layout.addWidget(self.wav_min_spin)
+        layout.addLayout(wav_min_layout)
+        
+        # Wavelength max
+        wav_max_layout = QHBoxLayout()
+        wav_max_layout.addWidget(QLabel("Feature Wavelength Max (nm):"))
+        self.wav_max_spin = QDoubleSpinBox()
+        self.wav_max_spin.setRange(0, 20000)
+        self.wav_max_spin.setDecimals(1)
+        self.wav_max_spin.setValue(2215.0)
+        self.wav_max_spin.setSingleStep(10.0)
+        wav_max_layout.addWidget(self.wav_max_spin)
+        layout.addLayout(wav_max_layout)
+        
+        # CR crop min
+        cr_min_layout = QHBoxLayout()
+        cr_min_layout.addWidget(QLabel("CR Crop Min (nm):"))
+        self.cr_min_spin = QDoubleSpinBox()
+        self.cr_min_spin.setRange(0, 20000)
+        self.cr_min_spin.setDecimals(1)
+        self.cr_min_spin.setValue(2120.0)
+        self.cr_min_spin.setSingleStep(10.0)
+        cr_min_layout.addWidget(self.cr_min_spin)
+        layout.addLayout(cr_min_layout)
+        
+        # CR crop max
+        cr_max_layout = QHBoxLayout()
+        cr_max_layout.addWidget(QLabel("CR Crop Max (nm):"))
+        self.cr_max_spin = QDoubleSpinBox()
+        self.cr_max_spin.setRange(0, 20000)
+        self.cr_max_spin.setDecimals(1)
+        self.cr_max_spin.setValue(2245.0)
+        self.cr_max_spin.setSingleStep(10.0)
+        cr_max_layout.addWidget(self.cr_max_spin)
+        layout.addLayout(cr_max_layout)
+        
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.validate_and_accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        
+        self.setLayout(layout)
+    
+    def validate_and_accept(self):
+        """Validate inputs before accepting."""
+        import re
+        from PyQt5.QtWidgets import QMessageBox
+        
+        name = self.name_edit.text().strip()
+        
+        # Check name is not empty
+        if not name:
+            QMessageBox.warning(self, "Invalid Input", "Feature name cannot be empty.")
+            return
+        
+        # Validate wavelength ordering
+        wav_min = self.wav_min_spin.value()
+        wav_max = self.wav_max_spin.value()
+        cr_min = self.cr_min_spin.value()
+        cr_max = self.cr_max_spin.value()
+        
+        if wav_min >= wav_max:
+            QMessageBox.warning(self, "Invalid Range", "Feature wavelength min must be less than max.")
+            return
+        
+        if cr_min >= cr_max:
+            QMessageBox.warning(self, "Invalid Range", "CR crop min must be less than max.")
+            return
+        
+        if not (cr_min <= wav_min and wav_max <= cr_max):
+            QMessageBox.warning(
+                self, 
+                "Invalid Range", 
+                "Feature wavelength range must be within CR crop range.\n"
+                f"CR range: [{cr_min}, {cr_max}]\n"
+                f"Feature range: [{wav_min}, {wav_max}]"
+            )
+            return
+        
+        self.accept()
+    
+    def get_feature_dict(self):
+        """Return the custom feature dict in the expected format."""
+        import re
+        name = self.name_edit.text().strip()
+        # Auto-sanitize the name
+        name = re.sub(r'[\\/:*?"<>|_]', '-', name)
+        
+        if not name:
+            return None
+        
+        return {
+            name: [
+                self.wav_min_spin.value(),
+                self.wav_max_spin.value(),
+                self.cr_min_spin.value(),
+                self.cr_max_spin.value()
+            ]
+        }
+    
+    @staticmethod
+    def get_custom_feature(parent=None):
+        """Static method to show dialog and return result."""
+        dialog = CustomFeatureDialog(parent)
+        if dialog.exec() == QDialog.Accepted:
+            return dialog.get_feature_dict()
+        return None
+

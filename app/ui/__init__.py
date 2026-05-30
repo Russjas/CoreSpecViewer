@@ -48,7 +48,8 @@ from .util_windows import (
     choice_box,
     two_choice_box,
     WavelengthRangeDialog,
-    ProfileExportDialog
+    ProfileExportDialog,
+    CustomFeatureDialog
 )
 from .display_canvases import ImageCanvas2D, SpectralImageCanvas
 from .vis_page import VisualisePage
@@ -76,5 +77,6 @@ __all__ = [
     "busy_cursor",
     "WavelengthRangeDialog",
     "ProfileExportDialog",
-    EnviExportDialog
+    "EnviExportDialog",
+    "CustomFeatureDialog"
 ]
