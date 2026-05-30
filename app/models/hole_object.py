@@ -416,7 +416,7 @@ class HoleObject:
                 logger.info(f"Loaded {po.basename}")
                 hole.add_box(po)                    # will skip/raise if hole_id mismatches
             except ValueError:
-                logger.error(f"mismatched hole_id or bad metadata -> skipped {fp}")
+                logger.error(f"mismatched hole_id or bad metadata -> skipped {fp}", exc_info=True)
                 # mismatched hole_id or bad metadata -> skip
                 continue
             except Exception:
@@ -457,14 +457,14 @@ class HoleObject:
             box_hole_id = meta["borehole id"]
             box_num = int(meta["box number"])
         except Exception as e:
-            logger.error(f"Box metadata missing required fields")
+            logger.error(f"Box metadata missing required fields", exc_info=True)
             raise ValueError(f"Box metadata missing required fields: {e}")
 
         # initialise / validate hole_id
         if not self.hole_id:
             self.hole_id = box_hole_id
         elif self.hole_id != box_hole_id:
-            logger.error(f"Box hole_id '{box_hole_id}' does not match HoleObject.hole_id '{self.hole_id}'")
+            logger.error(f"Box hole_id '{box_hole_id}' does not match HoleObject.hole_id '{self.hole_id}'", exc_info=True)
             raise ValueError(
                 f"Box hole_id '{box_hole_id}' does not match HoleObject.hole_id '{self.hole_id}'"
             )

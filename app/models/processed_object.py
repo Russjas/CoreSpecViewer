@@ -135,8 +135,14 @@ class ProcessedObject:
 
             ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
 
-
-            ds = Dataset(base=basename, key=key, path=fp, suffix=key, ext=ext)
+            try:
+                ds = Dataset(base=basename, key=key, path=fp, suffix=key, ext=ext)
+            except (ValueError, OSError):
+                logger.error(f"Failed to load dataset {key} for box {basename}", exc_info=True)
+                if key not in base_datasets:
+                    continue
+                else:
+                    raise ValueError(f'Required dataset {key} failed to load for box {basename}')
             datasets[key] = ds
         obj = cls(basename=basename, root_dir=root, datasets=datasets)
         if 'display' not in obj.datasets:
