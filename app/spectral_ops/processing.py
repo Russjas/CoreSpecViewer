@@ -64,7 +64,7 @@ def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndar
     return y
 
 
-def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
+def unwrap_from_stats(mask, image, stats, convention = None, MIN_AREA=300, MIN_WIDTH=10):
     """
     Unwrap core segments into a vertically stacked, width-normalized masked array.
 
@@ -76,6 +76,13 @@ def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
         Input 2D or 3D image/cube.
     stats : ndarray, shape (N, 5)
         (x, y, width, height, area) rows from `cv2.connectedComponentsWithStats`.
+    convention : str or None, optional
+        Box reading convention controlling segment sort order.
+        'rl_tb': right-to-left, top-to-bottom (default)
+        'lr_tb': left-to-right, top-to-bottom
+        'rl_bt': right-to-left, bottom-to-top
+        'lr_bt': left-to-right, bottom-to-top
+        None falls back to 'rl_tb' for backward compatibility.
     MIN_AREA : int, optional
         Minimum area to keep.
     MIN_WIDTH : int, optional
@@ -89,11 +96,18 @@ def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
 
     Notes
     -----
-    - Sorting is right-to-left (columns) then top-to-bottom (rows).
+    - Default Sorting is right-to-left (columns) then top-to-bottom (rows),
+      with three other conventions to ensure correct depth registration.
     - Padding is symmetric to match the maximum width across segments, applied
       to both data and mask before stacking. 
     """
-
+    _SORT_KEYS = {
+        'rl_tb': lambda s: ( round(-s[0][0] / 10),  s[0][1]),
+        'lr_tb': lambda s: ( round( s[0][0] / 10),  s[0][1]),
+        'rl_bt': lambda s: ( round(-s[0][0] / 10), -s[0][1]),
+        'lr_bt': lambda s: ( round( s[0][0] / 10), -s[0][1]),
+    }
+    sort_key = _SORT_KEYS.get(convention, _SORT_KEYS['rl_tb'])
     full_mask = np.zeros_like(image)
     full_mask[mask==1] = 1
     segments = []
@@ -104,13 +118,11 @@ def unwrap_from_stats(mask, image, stats, MIN_AREA=300, MIN_WIDTH=10):
             continue # Skip small regions
         else:
             segment = np.ma.masked_array(image, mask = full_mask)[y:y+h, x:x+w]
-
-                        # Store top-left x, y for sorting
             segments.append(((x, y), segment))
 
     # Sort segments: right to left (x descending), top to bottom (y ascending)
-    tolerance = 10
-    segments_sorted = sorted(segments, key=lambda s: (round(-s[0][0]/tolerance), s[0][1]))
+    
+    segments_sorted = sorted(segments, key=sort_key)
 
     # Determine max width
     max_width = max(s[1].shape[1] for s in segments_sorted)

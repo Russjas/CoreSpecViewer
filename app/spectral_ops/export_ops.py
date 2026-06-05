@@ -246,9 +246,9 @@ def write_categorical_profile(
 def _format_depth(depth: float) -> str:
     """
     Format depth value for CSV output.
-    Uses 2 decimal places (centimeter precision).
+    Uses 6 decimal places, may be too much depending on the step exported.
     """
-    return f"{depth:.2f}"
+    return f"{depth:.6f}"
 
 
 def _format_value(value: float, nodata: int = -999) -> str:

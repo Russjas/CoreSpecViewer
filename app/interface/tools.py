@@ -10,7 +10,7 @@ import time
 from matplotlib.path import Path as mpl_path
 import numpy as np
 
-from ..config import config
+from ..config import config, VALID_CONVENTIONS, CONVENTION_DISPLAY
 from ..models import ProcessedObject, RawObject
 from ..spectral_ops.visualisation import get_false_colour
 from ..spectral_ops.processing import resample_spectrum, unwrap_from_stats, remove_cont
@@ -38,6 +38,16 @@ def modify_config(key, value):
     dictionary of config patterns used accross the app
     """
     config.set(key, value)
+
+def save_config():
+    """
+    Persists the users changed config values to dict for consistent config
+    between sessions
+    """
+    try:
+        config.save()
+    except Exception as e:
+        logger.warning(f"Failed to persist config values {e}", exc_info=True)
 
 #==== Data loading helper functions ===========================================
 
@@ -479,6 +489,8 @@ def calc_unwrap_stats(obj):
     label_image = label_image / np.max(label_image)
     obj.add_temp_dataset('stats', stats, '.npy')
     obj.add_temp_dataset('segments', label_image, '.npy')
+    obj.metadata['box_convention'] = config.box_convention
+    logger.info(f"Box convention '{config.box_convention}' embedded in metadata for {obj.basename}")
 
     return obj
 
@@ -489,7 +501,8 @@ def unwrapped_output(obj):
     core box spectral cube and mask. Calculates mask-aware per pixel depths
     using depth values held in the metadata
     """
-    dhole_reflect = unwrap_from_stats(obj.mask, obj.savgol, obj.stats)
+    convention = obj.metadata.get('box_convention', None)
+    dhole_reflect = unwrap_from_stats(obj.mask, obj.savgol, obj.stats, convention=convention)
     dhole_depths = np.linspace(float(obj.metadata['core depth start']), float(obj.metadata['core depth stop']),
                                     dhole_reflect.shape[0])
 

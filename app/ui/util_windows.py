@@ -968,8 +968,13 @@ class EnviExportDialog(QDialog):
 
 
 class AutoSettingsDialog(QDialog):
+
+    
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.CONVENTION_REVERSE = {v: k for k, v in t.CONVENTION_DISPLAY.items()}
+        
         self.setWindowTitle("Settings")
         self.resize(420, 320)
         cfg = t.get_config()
@@ -982,9 +987,17 @@ class AutoSettingsDialog(QDialog):
         for row, (k, v) in enumerate(cfg.items()):
             key_item = QTableWidgetItem(k)
             key_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
-            val_item = QTableWidgetItem(str(v))
             self.tbl.setItem(row, 0, key_item)
-            self.tbl.setItem(row, 1, val_item)
+
+            if k == 'box_convention':
+                combo = QComboBox()
+                combo.addItems(t.CONVENTION_DISPLAY.values())
+                combo.setCurrentText(t.CONVENTION_DISPLAY.get(str(v), str(v)))
+                self.tbl.setCellWidget(row, 1, combo)
+            else:
+                val_item = QTableWidgetItem(str(v))
+                self.tbl.setItem(row, 1, val_item)
+
 
         btn_save = QPushButton("Save")
         btn_cancel = QPushButton("Cancel")
@@ -1001,12 +1014,16 @@ class AutoSettingsDialog(QDialog):
         root.addLayout(row)
 
     def _on_save(self):
-        
         for r in range(self.tbl.rowCount()):
             key = self.tbl.item(r, 0).text()
-            val = self.tbl.item(r, 1).text()
+            widget = self.tbl.cellWidget(r, 1)
+            if widget is not None:
+                val = self.CONVENTION_REVERSE[widget.currentText()]
+            else:
+                val = self.tbl.item(r, 1).text()
             t.modify_config(key, val)
             logger.info(f"Config setting {key} changed to {val}")
+        t.save_config()
         self.accept()
 
 

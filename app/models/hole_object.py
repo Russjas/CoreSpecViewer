@@ -140,7 +140,8 @@ class HoleObject:
             
 # =============================================================================
             for po in self:
-                img = unwrap_from_stats(po.mask, po.savgol, po.stats)
+                convention = po.metadata.get('box_convention', None)
+                img = unwrap_from_stats(po.mask, po.savgol, po.stats, convention = convention)
                 checkpoint_1 = time.perf_counter()
                 logger.debug(f"Unwrapped {po.datasets['metadata'].data['box number']}: {checkpoint_1 - start:.4f}s")
                 depths = np.linspace(float(po.metadata['core depth start']), 
@@ -218,7 +219,8 @@ class HoleObject:
         legend = dicts[0]
         
         for po in self:
-            seg = unwrap_from_stats(po.mask, po.datasets[ind_key].data, po.stats)
+            convention = po.metadata.get('box_convention', None)
+            seg = unwrap_from_stats(po.mask, po.datasets[ind_key].data, po.stats, convention = convention)
             fractions, dominant = compute_downhole_mineral_fractions(seg.data, seg.mask, 
                                                                      po.datasets[leg_key].data)
             if full_fractions is None:
@@ -255,8 +257,8 @@ class HoleObject:
             if po.datasets[key].ext != ".npz":
                 logger.warning(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
                 raise ValueError(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
-                
-            seg = unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats)
+            convention = po.metadata.get('box_convention', None)
+            seg = unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats, convention = convention)
             feat_row = np.ma.mean(seg, axis=1)
             if full_feature is None:
                 full_feature = feat_row
