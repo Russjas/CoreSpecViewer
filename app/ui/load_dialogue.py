@@ -434,13 +434,13 @@ class LoadDialogue(QDialog):
         btn_browse.clicked.connect(
             lambda: self._browse_file_into(self.le_ref_envi, "Select ENVI header", "JSON (*.hdr)")
         )
-        
+
         head_grid.addWidget(QLabel("Header File:"), 0, 0)
         head_grid.addWidget(self.le_ref_envi, 0, 1)
         head_grid.addWidget(btn_browse, 0, 2)
 
         lay.addLayout(head_grid)
-        
+
         dat_grid = QGridLayout()
         dat_grid.setHorizontalSpacing(8)
         dat_grid.setVerticalSpacing(8)
@@ -449,17 +449,18 @@ class LoadDialogue(QDialog):
         btn_browse = QPushButton("Browse folder…")
         btn_browse.clicked.connect(
             lambda: self._browse_file_into(self.le_dat_envi, "Select ENVI binary", "binary (*)")
-            )
+        )
 
         dat_grid.addWidget(QLabel("Data File:"), 0, 0)
         dat_grid.addWidget(self.le_dat_envi, 0, 1)
         dat_grid.addWidget(btn_browse, 0, 2)
-        
+
         lay.addLayout(dat_grid)
-        #Sep + label
+
+        # Sep + label
         lay.addWidget(self._hline())
         lay.addWidget(self._subsection_label("Optional"))
-        
+
         meta_grid = QGridLayout()
         meta_grid.setHorizontalSpacing(8)
         meta_grid.setVerticalSpacing(8)
@@ -468,27 +469,37 @@ class LoadDialogue(QDialog):
         btn_browse = QPushButton("Browse folder…")
         btn_browse.clicked.connect(
             lambda: self._browse_file_into(self.le_met_file, "Select metadata", "XML (*xml)")
-            )
+        )
 
         meta_grid.addWidget(QLabel("Metadata File:"), 0, 0)
         meta_grid.addWidget(self.le_met_file, 0, 1)
         meta_grid.addWidget(btn_browse, 0, 2)
-        
+
         lay.addLayout(meta_grid)
+
+        mask_grid = QGridLayout()
+        mask_grid.setHorizontalSpacing(8)
+        mask_grid.setVerticalSpacing(8)
+
+        self.le_mask_file = self._path_line("Select a mask file ...")
+        btn_browse = QPushButton("Browse folder…")
+        btn_browse.clicked.connect(
+            lambda: self._browse_file_into(self.le_mask_file, "Select mask", "Mask files (*.tif *.tiff *.png *.bmp *.gif)")
+        )
+
+        mask_grid.addWidget(QLabel("Mask File:"), 0, 0)
+        mask_grid.addWidget(self.le_mask_file, 0, 1)
+        mask_grid.addWidget(btn_browse, 0, 2)
+
+        lay.addLayout(mask_grid)
+
         self.cb_data_smoothed = QCheckBox("Is your data smoothed?")
         self.cb_data_smoothed.setStyleSheet("margin-top: 10px;")
         lay.addWidget(self.cb_data_smoothed)
+
         btn_load = QPushButton("Load reflectance")
         btn_load.clicked.connect(self._load_reflectance_clicked)
         lay.addWidget(btn_load)
-
-        hint = QLabel(
-            "Builds HoleObject via HoleObject.build_from_parent_dir(dir_path).\n"
-            "Important: this does NOT change the active/current dataset (po/ro)."
-        )
-        hint.setWordWrap(True)
-        hint.setStyleSheet("color: #666;")
-        #lay.addWidget(hint)
 
         lay.addStretch(1)
         return w
@@ -763,8 +774,11 @@ class LoadDialogue(QDialog):
     def _load_reflectance_clicked(self):
         head = (self.le_ref_envi.text() or "").strip()
         dat = (self.le_dat_envi.text() or "").strip()
-        meta_xml = (self.le_meta_xml.text() or "").strip()
+        meta_xml = (self.le_met_file.text() or "").strip()
         meta_path = meta_xml if meta_xml else None
+        mask_file = (self.le_mask_file.text() or "").strip()
+        mask_path = mask_file if mask_file else None
+        
         is_smoothed = self.cb_data_smoothed.isChecked()
         logger.info(f"Button clicked: Load Post-processed reflectance | paths={head, dat, meta_path}")
         if not head:
@@ -773,7 +787,7 @@ class LoadDialogue(QDialog):
 
         try:
             with busy_cursor("Loading processed dataset...", self):
-                obj = ProcessedObject.load_post_processed_envi(head, dat, meta_path, smoothed=is_smoothed)
+                obj = ProcessedObject.load_post_processed_envi(head, dat, meta_path, mask_path, smoothed=is_smoothed)
         except Exception as e:
             self._warn("Failed to open processed dataset", str(e))
             logger.error(f"Failed to open reflectance using data header {head}", exc_info=True)

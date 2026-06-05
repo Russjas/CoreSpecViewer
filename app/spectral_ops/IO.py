@@ -32,6 +32,7 @@ import os
 import glob
 import xml.etree.ElementTree as ET
 import logging
+import re
 
 from hylite.sensors import Fenix as HyliteFenix
 from hylite.io.images import loadWithNumpy
@@ -73,10 +74,121 @@ def read_envi_header(file):
     """
     return envi.read_envi_header(file)
 
+
+
+
+# Canonical keys to hunt for, mapped to their normalised token
+# these are based on keys used in Lumo acquisition software
+# they could be extended to match other metadata formats
+_BRUTE_TARGETS = {
+    "borehole id":      "boreholeid",
+    "box number":       "boxnumber",
+    "core depth start": "coredepthstart",
+    "sensor type":      "sensortype",
+    "core depth stop":  "coredepthstop",
+}
+
+def _normalise(s: str) -> str:
+    """Lowercase and strip all non-alphanumeric characters for fuzzy matching."""
+    return re.sub(r'[^a-z0-9]', '', s.lower())
+
+
+def brute_force_xml_metadata(xml_file) -> dict:
+    """
+    Metadata xml's have been found to have a variety of formats, this is designed
+    to bypass the structure for xml's with unexpected structures.
+
+    Walk every node in an XML tree without structural assumptions.
+    For each node, check three locations where a required field name
+    could appear: as an attribute value, as a tag name, or as element text.
+    The corresponding value is then extracted from the sibling, own text,
+    or next-sibling respectively.
+
+    Normalises all candidate strings before matching, so variants like
+    'boreholeid', 'borehole_id', 'BOREHOLE ID' all resolve correctly.
+
+    Parameters
+    ----------
+    xml_file : str or Path
+        Path to any XML file.
+
+    Returns
+    -------
+    dict
+        Canonical key -> extracted value, for every target that was found.
+        Keys not found are absent from the dict (not None).
+        Each value is a dict: {'value': str, 'strategy': str, 'raw_key': str}
+        so the caller has a diagnostic trail.
+    """
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+
+    # Build reverse lookup: normalised token -> canonical key
+    norm_to_canonical = {v: k for k, v in _BRUTE_TARGETS.items()}
+
+    found = {}  # canonical key -> {'value', 'strategy', 'raw_key'}
+
+    def _record(canonical, value, strategy, raw_key):
+        """Store a hit only if not already found (first hit wins)."""
+        if canonical not in found and value:
+            found[canonical] = {
+                'value':    value.strip(),
+                'strategy': strategy,
+                'raw_key':  raw_key,
+            }
+
+    def _walk(node):
+        # --- Strategy 1: field name appears as an ATTRIBUTE VALUE ---
+        # e.g. <item field="borehole id">BH1</item>
+        for attr_name, attr_val in node.attrib.items():
+            norm_attr_val = _normalise(attr_val)
+            if norm_attr_val in norm_to_canonical:
+                canonical = norm_to_canonical[norm_attr_val]
+                value = (node.text or '').strip()
+                _record(canonical, value, f'attribute_value[{attr_name}]', attr_val)
+
+        # --- Strategy 2: field name IS the tag name ---
+        # e.g. <boreholeid>BH1</boreholeid>
+        norm_tag = _normalise(node.tag)
+        if norm_tag in norm_to_canonical:
+            canonical = norm_to_canonical[norm_tag]
+            value = (node.text or '').strip()
+            _record(canonical, value, 'tag_name', node.tag)
+
+        # --- Strategy 3: field name appears as TEXT, value is in next sibling ---
+        # e.g. <key>borehole id</key><value>BH1</value>
+        children = list(node)
+        for i, child in enumerate(children):
+            norm_text = _normalise(child.text or '')
+            if norm_text in norm_to_canonical and i + 1 < len(children):
+                canonical = norm_to_canonical[norm_text]
+                value = (children[i + 1].text or '').strip()
+                _record(canonical, value, 'sibling_text', child.text)
+
+        for child in node:
+            _walk(child)
+
+    _walk(root)
+
+    # Log findings for diagnostics
+    for canonical, hit in found.items():
+        logger.debug(
+            f"brute_force_xml_metadata | found '{canonical}' = '{hit['value']}' "
+            f"via {hit['strategy']} (raw key: '{hit['raw_key']}')"
+        )
+    missing = [k for k in _BRUTE_TARGETS if k not in found]
+    if missing:
+        logger.warning(f"brute_force_xml_metadata | could not resolve: {missing}")
+
+    # Return flat canonical_key -> value for easy merging
+    return {k: v['value'] for k, v in found.items()}
+
+
 def parse_lumo_metadata(xml_file):
     """
     Parser specifically for metadata produced using the Specim Lumo 
-    aquisition system
+    aquisition system, and contains assumptions about the format of the metadata
+    which have proved to not be consistent across sensors and Lumo versions
     """
     tree = ET.parse(xml_file)
     root = tree.getroot()
@@ -100,7 +212,24 @@ def parse_lumo_metadata(xml_file):
     out = dict(pairs)
     out.update(flat)
 
+    # Check whether any brute-force targets are missing or blank
+    missing = [
+        k for k in _BRUTE_TARGETS
+        if not out.get(k, '').strip()
+    ]
+    print(f"TEMP PRINT MISSING {missing}")
+    if missing:
+        logger.warning(
+            f"parse_lumo_metadata structured parse missing {missing} — falling back to brute force for {xml_file}"
+        )
+        brute = brute_force_xml_metadata(xml_file)
+        # Only fill gaps — do not overwrite what structured parsing already found
+        for k in missing:
+            if k in brute:
+                out[k] = brute[k]
+
     return out
+
 
 def find_bands(metadata: dict, arr: np.ndarray):
     """

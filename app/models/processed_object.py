@@ -154,7 +154,7 @@ class ProcessedObject:
 
 
     @classmethod
-    def load_post_processed_envi(cls, head_path, data_path, meta_path = None, smoothed = True):
+    def load_post_processed_envi(cls, head_path, data_path, meta_path = None,  mask_path = None, smoothed = True):
         """
         Instantiate a ProcessedObject from a post processed dataset stored in an
         ENVI file.
@@ -201,11 +201,20 @@ class ProcessedObject:
         if smoothed:
             savgol = data
             cropped = np.zeros_like(savgol)
-            mask = np.zeros(savgol.shape[:2]).astype(int)
             savgol_cr = remove_cont(savgol)
         else:
             cropped = data
-            savgol, savgol_cr, mask = process(cropped)
+            savgol, savgol_cr, _ = process(cropped)
+            
+        if mask_path is not None:
+            msk = 1 - np.array(Image.open(mask_path)).astype(np.uint8)
+            if msk.shape == savgol_cr.shape[:2]:
+                mask = msk
+            else:
+                logger.warning(f"Mask shape {msk.shape} does not match data shape {savgol_cr.shape[:2]}, ignoring mask")
+                mask = np.zeros(savgol_cr.shape[:2], dtype=np.uint8)
+        else:
+            mask = np.zeros(savgol_cr.shape[:2], dtype=np.uint8)
         mask[np.all(savgol == 0, axis=2)] = 1
         po = cls.new(root, name)
         po.add_dataset('metadata', metadata, ext='.json')
