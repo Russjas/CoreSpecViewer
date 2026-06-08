@@ -64,42 +64,39 @@ def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndar
     return y
 
 
-def unwrap_from_stats(mask, image, stats, convention = None, MIN_AREA=300, MIN_WIDTH=10):
+def unwrap_from_stats(mask, image, stats, 
+                                anchors=None,
+                                convention=None, 
+                                depth_start = None,
+                                depth_stop = None,
+                                MIN_AREA=300, MIN_WIDTH=10):
     """
-    Unwrap core segments into a vertically stacked, width-normalized masked array.
+    Extended unwrap_from_stats that resolves anchor (x, y) positions to
+    output row indices, then performs the standard unwrap.
+
+    Matches the production signature of unwrap_from_stats exactly, with the
+    addition of anchors and returning resolved anchor metadata.
 
     Parameters
     ----------
-    mask : ndarray of {0,1} or bool
-        Binary mask (same H×W as `image`), 1/True = core pixels.
-    image : ndarray
-        Input 2D or 3D image/cube.
-    stats : ndarray, shape (N, 5)
-        (x, y, width, height, area) rows from `cv2.connectedComponentsWithStats`.
-    convention : str or None, optional
-        Box reading convention controlling segment sort order.
-        'rl_tb': right-to-left, top-to-bottom (default)
-        'lr_tb': left-to-right, top-to-bottom
-        'rl_bt': right-to-left, bottom-to-top
-        'lr_bt': left-to-right, bottom-to-top
-        None falls back to 'rl_tb' for backward compatibility.
-    MIN_AREA : int, optional
-        Minimum area to keep.
-    MIN_WIDTH : int, optional
-        Minimum width to keep.
+    mask, image, stats : same as original
+    anchors : list of dict or None
+        Each dict has keys 'x', 'y', 'depth' — pixel-space position of a
+        known depth point on the tray image.
+    convention : str or None
+        Sort convention: 'rl_tb' (default), 'lr_tb', 'rl_bt', 'lr_bt'.
+    MIN_AREA, MIN_WIDTH : int
+        Filter thresholds, same as original.
 
     Returns
     -------
-    np.ma.MaskedArray
-        Vertically concatenated masked array of segments; padded regions are masked
-        and original non-core pixels remain masked.
-
-    Notes
-    -----
-    - Default Sorting is right-to-left (columns) then top-to-bottom (rows),
-      with three other conventions to ensure correct depth registration.
-    - Padding is symmetric to match the maximum width across segments, applied
-      to both data and mask before stacking. 
+    concatenated : np.ma.MaskedArray
+        Same stacked output as the original function.
+    resolved_anchors : list of dict
+        Each input anchor dict extended with:
+            'row'     : resolved output row index (int)
+            'snapped' : True if the point was outside every valid segment
+            'segment' : index of the owning segment in the sorted list
     """
     _SORT_KEYS = {
         'rl_tb': lambda s: ( round(-s[0][0] / 10),  s[0][1]),
@@ -108,56 +105,120 @@ def unwrap_from_stats(mask, image, stats, convention = None, MIN_AREA=300, MIN_W
         'lr_bt': lambda s: ( round( s[0][0] / 10), -s[0][1]),
     }
     sort_key = _SORT_KEYS.get(convention, _SORT_KEYS['rl_tb'])
-    full_mask = np.zeros_like(image)
-    full_mask[mask==1] = 1
-    segments = []
 
-    for i in range(1, stats.shape[0]): # Skip background (label 0)
+    anchors = anchors or []
+
+    full_mask = np.zeros_like(image)
+    full_mask[mask == 1] = 1
+
+    # ---- collect valid segments — stored as ((x, y), segment) matching
+    #      production tuple structure; w/h derived from segment.shape ----
+    segments = []
+    for i in range(1, stats.shape[0]):
         x, y, w, h, area = stats[i]
         if area < MIN_AREA or w < MIN_WIDTH:
-            continue # Skip small regions
-        else:
-            segment = np.ma.masked_array(image, mask = full_mask)[y:y+h, x:x+w]
-            segments.append(((x, y), segment))
+            continue
+        seg = np.ma.masked_array(image, mask=full_mask)[y:y+h, x:x+w]
+        segments.append(((x, y), seg))
 
-    # Sort segments: right to left (x descending), top to bottom (y ascending)
-    
+    # ---- sort using the same key as production ----
     segments_sorted = sorted(segments, key=sort_key)
 
-    # Determine max width
-    max_width = max(s[1].shape[1] for s in segments_sorted)
-    # Pad segments to same width
+    # ---- cumulative row offsets — height from segment.shape[0] ----
+    cumulative_rows = []
+    running = 0
+    for (sx, sy), seg in segments_sorted:
+        cumulative_rows.append(running)
+        running += seg.shape[0]
+
+    print(f"\nValid segments after filter: {len(segments_sorted)}")
+    for idx, ((sx, sy), seg) in enumerate(segments_sorted):
+        sh, sw = seg.shape[:2]
+        print(f"  seg[{idx}]  origin=({sx},{sy})  size=({sw}x{sh})  "
+              f"rows [{cumulative_rows[idx]}, {cumulative_rows[idx]+sh})")
+
+    # ---- resolve each anchor to an output row ----
+    resolved_anchors = []
+
+    for anc in anchors:
+        ax, ay, adepth = anc['x'], anc['y'], anc['depth']
+        result = dict(anc)
+        result['snapped'] = False
+
+        # Check whether anchor falls inside a valid segment bounding box
+        hit_idx = None
+        for idx, ((sx, sy), seg) in enumerate(segments_sorted):
+            sh, sw = seg.shape[:2]
+            if sx <= ax < sx + sw and sy <= ay < sy + sh:
+                hit_idx = idx
+                break
+
+        if hit_idx is not None:
+            (sx, sy), seg = segments_sorted[hit_idx]
+            within_row        = ay - sy
+            result['row']     = cumulative_rows[hit_idx] + within_row
+            result['segment'] = hit_idx
+            print(f"\nAnchor depth={adepth}m  →  segment {hit_idx}, "
+                  f"within_row={within_row}, output_row={result['row']}")
+        else:
+            # Snap: find nearest segment in sort order by column bin,
+            # breaking ties by y proximity
+            anchor_col_bin = sort_key(((ax, ay), None))[0]
+            seg_col_bins   = [sort_key(s)[0] for s in segments_sorted]
+
+            best_idx = min(
+                range(len(segments_sorted)),
+                key=lambda i: (
+                    abs(seg_col_bins[i] - anchor_col_bin),
+                    abs(segments_sorted[i][0][1] - ay)
+                )
+            )
+            result['row']     = cumulative_rows[best_idx]
+            result['segment'] = best_idx
+            result['snapped'] = True
+            print(f"\nAnchor depth={adepth}m  SNAPPED to segment {best_idx}, "
+                  f"output_row={result['row']} (outside all valid segments)")
+
+        resolved_anchors.append(result)
+
+    # ---- pad and stack — identical to production ----
+    max_width = max(seg.shape[1] for _, seg in segments_sorted)
     padded_segments = []
 
     for _, seg in segments_sorted:
-        h, w = seg.shape[:2]
+        h, w      = seg.shape[:2]
         pad_total = max_width - w
 
         if pad_total > 0:
-            pad_left = pad_total // 2
+            pad_left  = pad_total // 2
             pad_right = pad_total - pad_left
-            if seg.ndim == 2:
-                pad_shape = ((0, 0), (pad_left, pad_right))
-            else:
-                pad_shape = ((0, 0), (pad_left, pad_right), (0, 0))
-
-            seg_pad = np.pad(seg.data, pad_shape, mode='constant', constant_values=0)
-            seg_mask_padded = np.pad(seg.mask, pad_shape, mode='constant', constant_values=1)
-            seg_padded = np.ma.masked_array(seg_pad, mask = seg_mask_padded)
+            pad_shape = ((0, 0), (pad_left, pad_right)) if seg.ndim == 2 \
+                        else ((0, 0), (pad_left, pad_right), (0, 0))
+            seg_pad   = np.pad(seg.data, pad_shape, mode='constant', constant_values=0)
+            seg_mask_ = np.pad(seg.mask, pad_shape, mode='constant', constant_values=1)
+            padded_segments.append(np.ma.masked_array(seg_pad, mask=seg_mask_))
         else:
+            padded_segments.append(seg)
 
-            seg_padded = seg
+    concatenated = np.ma.masked_array(
+        np.vstack([s.data for s in padded_segments]),
+        mask=np.vstack([s.mask for s in padded_segments])
+    )
 
-        padded_segments.append(seg_padded)
+    depths = None
+    if depth_start is not None and depth_stop is not None:
+        n_rows = concatenated.shape[0]
+        if resolved_anchors:
+            anchor_rows   = [0]           + [r['row']   for r in resolved_anchors] + [n_rows - 1]
+            anchor_depths = [depth_start] + [r['depth'] for r in resolved_anchors] + [depth_stop]
+            order         = np.argsort(anchor_rows)
+            anchor_rows   = np.array(anchor_rows)[order]
+            anchor_depths = np.array(anchor_depths)[order]
+            depths        = np.interp(np.arange(n_rows), anchor_rows, anchor_depths)
+        else:
+            depths = np.linspace(depth_start, depth_stop, n_rows)
 
-    padded_seg_data = [x.data for x in padded_segments]
-    padded_seg_mask = [x.mask for x in padded_segments]
-    # Stack vertically
-    concatenated_data = np.vstack(padded_seg_data)
-    concatenated_mask = np.vstack(padded_seg_mask)
-    concatenated= np.ma.masked_array(concatenated_data, mask = concatenated_mask)
-
-    return concatenated
+    return concatenated, depths
 
 
 def compute_downhole_mineral_fractions(

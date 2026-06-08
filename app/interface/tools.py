@@ -495,6 +495,16 @@ def calc_unwrap_stats(obj):
     return obj
 
 
+def add_depth_anchor(obj, x, y, depth):
+    metadata = dict(obj.metadata)
+    anchors = list(metadata.get('anchors') or [])
+    anchors.append({'x': int(x), 'y': int(y), 'depth': float(depth)})
+    metadata['anchors'] = anchors
+    obj.add_temp_dataset('metadata', metadata, ext='.json')
+    logger.info(f"Depth anchor added to {obj.basename}: x={x}, y={y}, depth={depth}m "
+                f"({len(anchors)} total)")
+    return obj
+
 def unwrapped_output(obj):
     """
     Uses previously computed unwrap stats to produce a vertically concatenated
@@ -502,15 +512,23 @@ def unwrapped_output(obj):
     using depth values held in the metadata
     """
     convention = obj.metadata.get('box_convention', None)
-    dhole_reflect = unwrap_from_stats(obj.mask, obj.savgol, obj.stats, convention=convention)
-    dhole_depths = np.linspace(float(obj.metadata['core depth start']), float(obj.metadata['core depth stop']),
-                                    dhole_reflect.shape[0])
+    anchors = obj.metadata.get('anchors', None)
+    depth_start = float(obj.metadata['core depth start'])
+    depth_stop = float(obj.metadata['core depth stop'])
+    dhole_reflect, dhole_depths = unwrap_from_stats(obj.mask, obj.savgol, obj.stats, 
+                                                    convention=convention,
+                                                    anchors = anchors,
+                                                    depth_start = depth_start,
+                                                    depth_stop = depth_stop)
+    
 
     obj.add_temp_dataset('DholeAverage', dhole_reflect.data, '.npy')
     obj.add_temp_dataset('DholeMask', dhole_reflect.mask, '.npy')
     obj.add_temp_dataset('DholeDepths', dhole_depths, '.npy')
 
     return obj
+
+
 #==========pass through helpers===============================================
 def get_cr(spectra):
     return remove_cont(spectra)

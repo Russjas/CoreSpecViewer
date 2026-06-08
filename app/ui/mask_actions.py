@@ -5,7 +5,7 @@ Callback handler for Masking Actions.
 import logging
 logger = logging.getLogger(__name__)
 
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QInputDialog
 from .display_canvases import ImageCanvas2D
 from ..interface import tools as t
 from .base_actions import BaseActions
@@ -33,6 +33,8 @@ class MaskActions(BaseActions):
                 ("Vertical", lambda: self.act_mask_improve(mode="vertical"), "Heuristically improves the mask, only on true-vertical boxes"),
                 ("Connect Lines", lambda: self.act_mask_improve(mode="hough"), "Heuristically connect the lines using hough line connection", "Alt+S")
             ]),
+            ("button", "Add depth anchor", self.act_depth_anchor, "Add a known depth point to constrain depth registration"),
+            ("button", "Clear all depth anchors", self.act_clear_depth_anchors, "Clear all depth anchors from metadata"),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom'),
@@ -214,6 +216,80 @@ class MaskActions(BaseActions):
         self.cxt.current = t.mask_by_cluster(po, cluster_array, chosen_idx)
         logger.info(f"{po.basename} auto-mask by cluster complete, class {chosen_idx} masked")
         self.controller.refresh()
+
+    def act_depth_anchor(self):
+        logger.info("Button clicked: Add depth anchor")
+        valid_state, msg = self.cxt.requires(self.cxt.UNWRAP)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Depth Anchor", msg)
+            return
+
+        p = self.controller.active_page()
+        if not p or not p.dispatcher:
+            return
+
+        def handle_click(y, x):
+            try:
+                depth, ok = QInputDialog.getDouble(
+                    self.controller, "Depth Anchor",
+                    f"Enter depth (m) for point ({int(x)}, {int(y)}):",
+                    decimals=2
+                )
+                if not ok:
+                    return
+                self.cxt.current = t.add_depth_anchor(self.cxt.current, x, y, depth)
+                
+                import uuid
+                ann = dict(self.cxt.current['annotations'].data) if self.cxt.current.has('annotations') else {}
+                ann[f"ann_{uuid.uuid4().hex[:8]}"] = {
+                    "shape": "point",
+                    "x": int(x),
+                    "y": int(y),
+                    "label": f"Depth Anchor: {depth:.3f}m"
+                }
+                self.cxt.current.add_temp_dataset('annotations', ann, ext='.json')
+
+                self.controller.refresh()
+            except Exception as e:
+                logger.error("Failed to add depth anchor", exc_info=True)
+                self._show_error("Depth Anchor", f"Failed to add depth anchor: {e}")
+            finally:
+                p.dispatcher.clear_all_temp()
+
+        p.dispatcher.set_single_click(handle_click, temporary=True)
+
+
+    def act_clear_depth_anchors(self):
+        logger.info("Button clicked: Clear depth anchors")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Clear Depth Anchors", msg)
+            return
+
+        if not self.cxt.current.metadata.get('anchors'):
+            return
+
+        try:
+            #Clear from metadata
+            metadata = dict(self.cxt.current.metadata)
+            metadata.pop('anchors', None)
+            self.cxt.current.add_temp_dataset('metadata', metadata, ext='.json')
+            logger.info(f"Depth anchors cleared for {self.cxt.current.basename}")
+            
+            # Clear from annotations
+            if self.cxt.current.has('annotations'):
+                ann = dict(self.cxt.current['annotations'].data)
+                ann = {k: v for k, v in ann.items() 
+                            if "depth anchor" not in v.get("label", "").lower()}
+                self.cxt.current.add_temp_dataset('annotations', ann, ext='.json')
+
+            self.controller.refresh()
+        except Exception as e:
+            logger.error("Failed to clear depth anchors", exc_info=True)
+            self._show_error("Clear Depth Anchors", f"Failed to clear depth anchors: {e}")
+
 
 # ======= Dialogue for experimental auto masking
 class ClusterMaskDialog(QDialog):
