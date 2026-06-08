@@ -343,13 +343,13 @@ def mask_by_cluster(obj, cluster_array, index):
 
 # ===========Proven masking tools ============================================
 
-def mask_rect(obj, ymin, ymax, xmin, xmax):
+def mask_rect(obj, ymin, ymax, xmin, xmax, unmask = False):
     """
-    Adds a user selected rectangle to the mask.
+    Adds (or removes) a user selected rectangle to/from the mask.
     Mask values follow the convention 0 = valid, 1 = masked.
     """
     msk = np.array(obj.mask)
-    msk[ymin:ymax, xmin:xmax] = 1
+    msk[ymin:ymax, xmin:xmax] = 0 if unmask else 1
     obj.add_temp_dataset('mask', data = msk)
     return obj
 

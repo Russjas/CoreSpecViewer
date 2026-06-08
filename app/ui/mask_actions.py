@@ -37,13 +37,15 @@ class MaskActions(BaseActions):
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom'),
             ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)"),
+            ("button", "Unmask region", lambda: self.act_mask_rect(unmask=True), "Unmasks a rectangle in existing mask", "Ctrl+Shift+R"),
             ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),
             ("button", "re-generate thumbs (slow)", self.re_thumb, 'Regenerates all thumbnail images. Slow process, but shouldnt be needed often')
         ])
     
     # -------- MASK actions --------
 
-    def act_mask_rect(self):
+    def act_mask_rect(self, unmask = False):
+        label = "Unmask Region" if unmask else "Mask Region"
         logger.info(f"Button clicked: Mask Region")
         valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
         if not valid_state:
@@ -56,8 +58,9 @@ class MaskActions(BaseActions):
 
         def _on_rect(y0, y1, x0, x1):
             try:
-                self.cxt.current = t.mask_rect(self.cxt.current, y0, y1, x0, x1 )
-                logger.info(f"{self.cxt.current.basename} masked at Y {y0}:{y1}, X {x0}:{x1}")
+                self.cxt.current = t.mask_rect(self.cxt.current, y0, y1, x0, x1, unmask = unmask)
+                verb = "unmasked" if unmask else "masked"
+                logger.info(f"{self.cxt.current.basename} {verb} at Y {y0}:{y1}, X {x0}:{x1}")
                 self.controller.refresh()
             finally:
                 p.dispatcher.clear_all_temp()
