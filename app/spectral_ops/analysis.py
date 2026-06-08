@@ -324,11 +324,11 @@ def mineral_map_subrange(cube: np.ndarray,            # (H, W, B_data)
         exemplar_stack = exemplar_stack[..., start:stop]
     except IndexError:
         raise ValueError("range selection failed on this data")
-    if mode=='pearson' :  
+    if mode =='pearson' :  
         index, confidence = mineral_map_wta_strict(cube, exemplar_stack)
-    elif mode == "msam":
-        index, confidence = mineral_map_wta_sam_strict(cube, exemplar_stack)
     elif mode == "sam":
+        index, confidence = mineral_map_wta_sam_strict(cube, exemplar_stack)
+    elif mode == "msam":
         index, confidence = mineral_map_wta_msam_strict(cube, exemplar_stack)
     else:
         raise ValueError(f"Unknown mode {mode!r}; expected 'pearson', 'sam' or 'msam'")
