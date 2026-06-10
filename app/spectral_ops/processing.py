@@ -64,52 +64,125 @@ def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndar
     return y
 
 
-def _segment_path_key(item, convention="rl_tb"):
-    (x, y), seg = item
+def _sort_segments_by_runs(segments, convention="rl_tb"):
+    """
+    Sort existing unwrap segments into a physical depth path.
 
-    seg_mask = np.ma.getmaskarray(seg)
-    if seg_mask.ndim > 2:
-        seg_mask = seg_mask.any(axis=2)
+    Input and output format is unchanged:
+        [((x, y), seg), ...]
 
-    rr, cc = np.nonzero(~seg_mask)
+    Logic:
+        1. Measure actual unmasked component pixels.
+        2. Group nearby x positions into lanes.
+        3. Sort lanes left/right by convention.
+        4. Sort segments within each lane top/bottom by convention.
+    """
 
-    if rr.size == 0:
-        return (0, 0)
+    if not segments:
+        return []
 
-    # Convert component pixels from local segment coords to original-image coords
-    global_x = x + cc
-    global_y = y + rr
+    convention = convention or "rl_tb"
+
+    right_to_left = convention in ("rl_tb", "rl_bt")
+    top_to_bottom = convention in ("rl_tb", "lr_tb")
+
+    measured = []
+
+    for item in segments:
+        (x, y), seg = item
+
+        seg_mask = np.ma.getmaskarray(seg)
+
+        # Collapse cube mask to spatial mask
+        if seg_mask.ndim > 2:
+            seg_mask = seg_mask.any(axis=2)
+
+        rr, cc = np.nonzero(~seg_mask)
+
+        # Degenerate segment: keep it, but fall back to bbox origin
+        if rr.size == 0:
+            measured.append({
+                "item": item,
+                "median_x": float(x),
+                "min_y": int(y),
+                "max_y": int(y + seg.shape[0] - 1),
+            })
+            continue
+
+        global_x = x + cc
+        global_y = y + rr
+
+        measured.append({
+            "item": item,
+            "median_x": float(np.median(global_x)),
+            "min_y": int(np.min(global_y)),
+            "max_y": int(np.max(global_y)),
+            "width": int(np.max(global_x) - np.min(global_x) + 1)
+        })
+    
+
+    #Calclate typical core run widths to threshold
+    widths = [r["width"] for r in measured if r["width"] > 0]
+    lane_gap = max(10, 0.25 * np.median(widths)) if widths else 25
+
+    # ---- build lanes from actual component x positions ----
+    measured_by_x = sorted(measured, key=lambda r: r["median_x"])
+
+    lanes = []
+
+    for rec in measured_by_x:
+        if not lanes:
+            lanes.append({
+                "x_center": rec["median_x"],
+                "records": [rec],
+            })
+            continue
+
+        nearest_lane = min(
+            lanes,
+            key=lambda lane: abs(rec["median_x"] - lane["x_center"])
+        )
+
+        if abs(rec["median_x"] - nearest_lane["x_center"]) <= lane_gap:
+            nearest_lane["records"].append(rec)
+            nearest_lane["x_center"] = float(np.median(
+                [r["median_x"] for r in nearest_lane["records"]]
+            ))
+        else:
+            lanes.append({
+                "x_center": rec["median_x"],
+                "records": [rec],
+            })
+
+    # ---- sort lanes according to convention ----
+    lanes = sorted(
+        lanes,
+        key=lambda lane: lane["x_center"],
+        reverse=right_to_left
+    )
+
+    # ---- sort inside each lane by y according to convention ----
+    sorted_segments = []
+
+    for lane in lanes:
+        lane_records = sorted(
+            lane["records"],
+            key=lambda r: r["min_y"] if top_to_bottom else -r["max_y"]
+        )
+
+        sorted_segments.extend(r["item"] for r in lane_records)
+
+    return sorted_segments
 
 
-
-    median_x = np.median(global_x)
-    min_y = np.min(global_y)
-    max_y = np.max(global_y)
-
-    x_bin = round(median_x / 10)
-
-    if convention == "rl_tb":
-        print(-x_bin, min_y)
-        return (-x_bin, min_y)
-    if convention == "lr_tb":
-        print(x_bin, min_y)
-        return (x_bin, min_y)
-    if convention == "rl_bt":
-        print(-x_bin, -max_y)
-        return (-x_bin, -max_y)
-    if convention == "lr_bt":
-        print(x_bin, -max_y)
-        return (x_bin, -max_y)
-
-    return (-median_x, min_y)
 
 def unwrap_from_stats(mask, image, stats, labels,
                                 anchors=None,
                                 convention=None, 
                                 depth_start = None,
                                 depth_stop = None,
-                                return_map = False,
-                                MIN_AREA=300, MIN_WIDTH=10):
+                                return_map = False
+                                ):
     """
     Extended unwrap_from_stats that resolves anchor (x, y) positions to
     output row indices, then performs the standard unwrap.
@@ -128,7 +201,7 @@ def unwrap_from_stats(mask, image, stats, labels,
     convention : str or None
         Sort convention: 'rl_tb' (default), 'lr_tb', 'rl_bt', 'lr_bt'.
     MIN_AREA, MIN_WIDTH : int
-        Filter thresholds, same as original.
+        Filter thresholds, pulled from the config and user definable.
 
     Returns
     -------
@@ -140,6 +213,8 @@ def unwrap_from_stats(mask, image, stats, labels,
             'snapped' : True if the point was outside every valid segment
             'segment' : index of the owning segment in the sorted list
     """
+    MIN_AREA = config.min_seg_area
+    MIN_WIDTH = config.min_seg_width
     _SORT_KEYS = {
         'rl_tb': lambda s: ( round(-s[0][0] / 10),  s[0][1]),
         'lr_tb': lambda s: ( round( s[0][0] / 10),  s[0][1]),
@@ -178,8 +253,13 @@ def unwrap_from_stats(mask, image, stats, labels,
         segments.append(((x, y), seg))
 
     #segments_sorted = sorted(segments, key=sort_key)
-    segments_sorted = sorted(segments,
-    key=lambda s: _segment_path_key(s, convention=convention or "rl_tb"))
+    #segments_sorted = sorted(segments,
+    #key=lambda s: _segment_path_key(s, convention=convention or "rl_tb"))
+    segments_sorted = _sort_segments_by_runs(
+    segments,
+    convention=convention or "rl_tb")
+
+
     # ---- cumulative row offsets — height from segment.shape[0] ----
     cumulative_rows = []
     running = 0

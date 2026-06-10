@@ -49,6 +49,9 @@ class AppConfig:
     # lr_bt: left-right, bottom-top
     box_convention: str = 'rl_tb'
 
+    min_seg_width: int = 10
+    min_seg_area: int = 300
+
     def as_dict(self) -> dict:
         """Return all settings as a dict. For GUI table population."""
         return {f.name: getattr(self, f.name) for f in fields(self)}
