@@ -64,6 +64,45 @@ def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndar
     return y
 
 
+def _segment_path_key(item, convention="rl_tb"):
+    (x, y), seg = item
+
+    seg_mask = np.ma.getmaskarray(seg)
+    if seg_mask.ndim > 2:
+        seg_mask = seg_mask.any(axis=2)
+
+    rr, cc = np.nonzero(~seg_mask)
+
+    if rr.size == 0:
+        return (0, 0)
+
+    # Convert component pixels from local segment coords to original-image coords
+    global_x = x + cc
+    global_y = y + rr
+
+
+
+    median_x = np.median(global_x)
+    min_y = np.min(global_y)
+    max_y = np.max(global_y)
+
+    x_bin = round(median_x / 10)
+
+    if convention == "rl_tb":
+        print(-x_bin, min_y)
+        return (-x_bin, min_y)
+    if convention == "lr_tb":
+        print(x_bin, min_y)
+        return (x_bin, min_y)
+    if convention == "rl_bt":
+        print(-x_bin, -max_y)
+        return (-x_bin, -max_y)
+    if convention == "lr_bt":
+        print(x_bin, -max_y)
+        return (x_bin, -max_y)
+
+    return (-median_x, min_y)
+
 def unwrap_from_stats(mask, image, stats, labels,
                                 anchors=None,
                                 convention=None, 
@@ -138,9 +177,9 @@ def unwrap_from_stats(mask, image, stats, labels,
         seg = np.ma.masked_array(sub, mask=seg_mask)
         segments.append(((x, y), seg))
 
-    # ---- sort using the same key as production ----
-    segments_sorted = sorted(segments, key=sort_key)
-
+    #segments_sorted = sorted(segments, key=sort_key)
+    segments_sorted = sorted(segments,
+    key=lambda s: _segment_path_key(s, convention=convention or "rl_tb"))
     # ---- cumulative row offsets — height from segment.shape[0] ----
     cumulative_rows = []
     running = 0
