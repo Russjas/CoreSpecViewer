@@ -144,7 +144,7 @@ class HoleObject:
                 anchors = po.metadata.get('anchors', None)
                 depth_start = float(po.metadata['core depth start'])
                 depth_stop = float(po.metadata['core depth stop'])
-                img, depths = unwrap_from_stats(po.mask, po.savgol, po.stats, 
+                img, depths = unwrap_from_stats(po.mask, po.savgol, po.stats, po.segments,
                                         convention = convention,
                                         anchors = anchors,
                                         depth_start = depth_start,
@@ -224,7 +224,7 @@ class HoleObject:
         
         for po in self:
             convention = po.metadata.get('box_convention', None)
-            seg, _ = unwrap_from_stats(po.mask, po.datasets[ind_key].data, po.stats, convention = convention)
+            seg, _ = unwrap_from_stats(po.mask, po.datasets[ind_key].data, po.stats, po.segments, convention = convention)
             fractions, dominant = compute_downhole_mineral_fractions(seg.data, seg.mask, 
                                                                      po.datasets[leg_key].data)
             if full_fractions is None:
@@ -262,7 +262,7 @@ class HoleObject:
                 logger.warning(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
                 raise ValueError(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
             convention = po.metadata.get('box_convention', None)
-            seg, _ = unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats, convention = convention)
+            seg, _ = unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats, po.segments, convention = convention)
             feat_row = np.ma.mean(seg, axis=1)
             if full_feature is None:
                 full_feature = feat_row

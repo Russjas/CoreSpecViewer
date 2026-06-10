@@ -64,22 +64,25 @@ def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndar
     return y
 
 
-def unwrap_from_stats(mask, image, stats, 
+def unwrap_from_stats(mask, image, stats, labels,
                                 anchors=None,
                                 convention=None, 
                                 depth_start = None,
                                 depth_stop = None,
+                                return_map = False,
                                 MIN_AREA=300, MIN_WIDTH=10):
     """
     Extended unwrap_from_stats that resolves anchor (x, y) positions to
     output row indices, then performs the standard unwrap.
 
-    Matches the production signature of unwrap_from_stats exactly, with the
-    addition of anchors and returning resolved anchor metadata.
+    
 
     Parameters
     ----------
-    mask, image, stats : same as original
+    mask, image, stats : pre-requisite datasets 
+    labels : ndarray
+        Connected-component label image matching stats. Older normalised
+        segment images are accepted and reconstructed for compatibility.
     anchors : list of dict or None
         Each dict has keys 'x', 'y', 'depth' — pixel-space position of a
         known depth point on the tray image.
@@ -107,9 +110,19 @@ def unwrap_from_stats(mask, image, stats,
     sort_key = _SORT_KEYS.get(convention, _SORT_KEYS['rl_tb'])
 
     anchors = anchors or []
+    
+    # Adjustments to the unwrapping code now requires originally label image
+    # to avoid mis-registration on overlapping bboxes
+    # For backwards compatibility old, normalised label images are accepted and sanitised here
+    # calc_unwrap_stats no longer normalises the label image
 
-    full_mask = np.zeros_like(image)
-    full_mask[mask == 1] = 1
+    max_label = stats.shape[0] - 1
+    if max_label <= 0:
+        labels = np.zeros_like(labels, dtype=np.int32)
+    elif np.nanmax(labels) <= 1.0:
+        labels =  np.rint(labels * max_label).astype(np.int32)
+    else:
+        labels =  labels.astype(np.int32)
 
     # ---- collect valid segments — stored as ((x, y), segment) matching
     #      production tuple structure; w/h derived from segment.shape ----
@@ -118,7 +131,11 @@ def unwrap_from_stats(mask, image, stats,
         x, y, w, h, area = stats[i]
         if area < MIN_AREA or w < MIN_WIDTH:
             continue
-        seg = np.ma.masked_array(image, mask=full_mask)[y:y+h, x:x+w]
+        sub      = image[y:y+h, x:x+w]
+        seg_mask = labels[y:y+h, x:x+w] != i
+        if sub.ndim > 2:                                  # broadcast across bands for a cube
+            seg_mask = np.repeat(seg_mask[:, :, None], sub.shape[2], axis=2)
+        seg = np.ma.masked_array(sub, mask=seg_mask)
         segments.append(((x, y), seg))
 
     # ---- sort using the same key as production ----
@@ -131,11 +148,10 @@ def unwrap_from_stats(mask, image, stats,
         cumulative_rows.append(running)
         running += seg.shape[0]
 
-    print(f"\nValid segments after filter: {len(segments_sorted)}")
+    
     for idx, ((sx, sy), seg) in enumerate(segments_sorted):
         sh, sw = seg.shape[:2]
-        print(f"  seg[{idx}]  origin=({sx},{sy})  size=({sw}x{sh})  "
-              f"rows [{cumulative_rows[idx]}, {cumulative_rows[idx]+sh})")
+        
 
     # ---- resolve each anchor to an output row ----
     resolved_anchors = []
@@ -158,8 +174,7 @@ def unwrap_from_stats(mask, image, stats,
             within_row        = ay - sy
             result['row']     = cumulative_rows[hit_idx] + within_row
             result['segment'] = hit_idx
-            print(f"\nAnchor depth={adepth}m  →  segment {hit_idx}, "
-                  f"within_row={within_row}, output_row={result['row']}")
+            
         else:
             # Snap: find nearest segment in sort order by column bin,
             # breaking ties by y proximity
@@ -176,8 +191,7 @@ def unwrap_from_stats(mask, image, stats,
             result['row']     = cumulative_rows[best_idx]
             result['segment'] = best_idx
             result['snapped'] = True
-            print(f"\nAnchor depth={adepth}m  SNAPPED to segment {best_idx}, "
-                  f"output_row={result['row']} (outside all valid segments)")
+            
 
         resolved_anchors.append(result)
 
@@ -218,7 +232,60 @@ def unwrap_from_stats(mask, image, stats,
         else:
             depths = np.linspace(depth_start, depth_stop, n_rows)
 
-    return concatenated, depths
+    if not return_map:
+        return concatenated, depths
+
+    depth_map = (build_depth_map(depths, segments_sorted, cumulative_rows, image.shape[:2])
+                if depths is not None else None)
+    return concatenated, depths, depth_map
+
+
+def build_depth_map(depths, segments_sorted, cumulative_rows, out_shape):
+    """
+    Reverse the unwrap: give every original-image pixel its registered depth.
+
+    Built from the same segment geometry the forward pass used, so it is a
+    true inverse of *this* unwrap, not a re-derivation. The forward pass
+    assigns one depth per stacked row, i.e. per original row within a segment,
+    so depth is constant across a segment's width and every core pixel inherits
+    its row's depth.
+
+    Parameters
+    ----------
+    depths : np.ndarray, shape (n_rows,)
+        Per-stacked-row depths; n_rows == sum of segment heights.
+    segments_sorted : list of ((x, y), np.ma.MaskedArray)
+        Convention-sorted segments; value is the masked bbox crop, origin
+        (x, y) in original-image coordinates.
+    cumulative_rows : list of int
+        Starting stacked-row offset per segment, aligned with segments_sorted.
+    out_shape : tuple of int
+        (H, W) of the original (cropped) image being registered.
+
+    Returns
+    -------
+    np.ma.MaskedArray, shape (H, W), float
+        Per-pixel depth, masked wherever no kept-segment core pixel contributed.
+    """
+    H, W = out_shape
+    depth_map = np.ma.masked_all((H, W), dtype=float)
+
+    for i, ((sx, sy), seg) in enumerate(segments_sorted):
+        h, w = seg.shape[:2]
+        off = cumulative_rows[i]
+        row_depths = depths[off:off + h]                   # (h,) one depth per row
+
+        seg_mask = np.ma.getmaskarray(seg)                 # full bool, seg.shape
+        if seg_mask.ndim > 2:                              # cube: collapse bands
+            seg_mask = seg_mask.any(axis=tuple(range(2, seg_mask.ndim)))
+        core_r, core_c = np.nonzero(~seg_mask)             # local coords of core
+
+        depth_map[sy + core_r, sx + core_c] = row_depths[core_r]
+
+    
+    return depth_map
+
+
 
 
 def compute_downhole_mineral_fractions(

@@ -486,7 +486,7 @@ def calc_unwrap_stats(obj):
     Also creates a dataset image of the derived segments for user inspection
     """
     label_image, stats = sm.get_stats_from_mask(obj.mask)
-    label_image = label_image / np.max(label_image)
+    #label_image = label_image / np.max(label_image)
     obj.add_temp_dataset('stats', stats, '.npy')
     obj.add_temp_dataset('segments', label_image, '.npy')
     obj.metadata['box_convention'] = config.box_convention
@@ -509,23 +509,29 @@ def unwrapped_output(obj):
     """
     Uses previously computed unwrap stats to produce a vertically concatenated
     core box spectral cube and mask. Calculates mask-aware per pixel depths
-    using depth values held in the metadata
+    using depth values held in the metadata. 
+    This preview of the unwrapped result also produces an image map of the depth
+    registration
     """
     convention = obj.metadata.get('box_convention', None)
     anchors = obj.metadata.get('anchors', None)
     depth_start = float(obj.metadata['core depth start'])
     depth_stop = float(obj.metadata['core depth stop'])
-    dhole_reflect, dhole_depths = unwrap_from_stats(obj.mask, obj.savgol, obj.stats, 
+    dhole_reflect, dhole_depths, dmap = unwrap_from_stats(obj.mask, obj.savgol, obj.stats, obj.segments, 
                                                     convention=convention,
                                                     anchors = anchors,
                                                     depth_start = depth_start,
-                                                    depth_stop = depth_stop)
+                                                    depth_stop = depth_stop,
+                                                    return_map=True)
     
 
     obj.add_temp_dataset('DholeAverage', dhole_reflect.data, '.npy')
     obj.add_temp_dataset('DholeMask', dhole_reflect.mask, '.npy')
     obj.add_temp_dataset('DholeDepths', dhole_depths, '.npy')
-
+    if dmap is not None:
+        obj.add_temp_dataset('DepthMap', dmap, '.npz')
+    
+    
     return obj
 
 

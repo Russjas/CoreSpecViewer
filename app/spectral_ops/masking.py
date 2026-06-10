@@ -266,7 +266,7 @@ def get_stats_from_mask(mask, proportion=16, iters=2):
     Parameters
     ----------
     mask : ndarray of {0,1}
-        Binary mask with 1 = core region.
+        Binary mask with 1 = non-core region.
     proportion : int, optional
         (Unused here) placeholder for future scaling.
     iters : int, optional
