@@ -106,6 +106,7 @@ def _sort_segments_by_runs(segments, convention="rl_tb"):
                 "median_x": float(x),
                 "min_y": int(y),
                 "max_y": int(y + seg.shape[0] - 1),
+                "width": 0
             })
             continue
 
@@ -163,18 +164,66 @@ def _sort_segments_by_runs(segments, convention="rl_tb"):
 
     # ---- sort inside each lane by y according to convention ----
     sorted_segments = []
+    sorted_records = []
 
-    for lane in lanes:
+    for lane_idx, lane in enumerate(lanes):
         lane_records = sorted(
             lane["records"],
             key=lambda r: r["min_y"] if top_to_bottom else -r["max_y"]
         )
+        for rec in lane_records:
+            rec["lane_index"] = lane_idx
+            rec["lane_center"] = lane["x_center"]
+            sorted_records.append(rec)
+            sorted_segments.append(rec["item"])
 
-        sorted_segments.extend(r["item"] for r in lane_records)
+        
 
-    return sorted_segments
+    return sorted_segments, sorted_records
+
+def _spatial_mask(seg):
+    """
+    Return a 2D True=masked/invalid spatial mask for a segment.
+    """
+    seg_mask = np.ma.getmaskarray(seg)
+
+    if seg_mask.ndim > 2:
+        seg_mask = seg_mask.any(axis=tuple(range(2, seg_mask.ndim)))
+
+    return seg_mask
 
 
+def _anchor_hits_segment(ax, ay, item):
+    """
+    True only if the anchor falls inside the segment bbox AND on an
+    unmasked component pixel.
+    """
+    (sx, sy), seg = item
+    sh, sw = seg.shape[:2]
+
+    if not (sx <= ax < sx + sw and sy <= ay < sy + sh):
+        return False
+
+    local_r = int(ay - sy)
+    local_c = int(ax - sx)
+
+    seg_mask = _spatial_mask(seg)
+
+    return not bool(seg_mask[local_r, local_c])
+
+
+def _y_distance_to_record(ay, rec):
+    """
+    Distance from anchor y to a segment's real vertical extent.
+    Zero if the anchor lies within that vertical range.
+    """
+    if rec["min_y"] <= ay <= rec["max_y"]:
+        return 0
+
+    return min(
+        abs(ay - rec["min_y"]),
+        abs(ay - rec["max_y"])
+    )
 
 def unwrap_from_stats(mask, image, stats, labels,
                                 anchors=None,
@@ -252,10 +301,8 @@ def unwrap_from_stats(mask, image, stats, labels,
         seg = np.ma.masked_array(sub, mask=seg_mask)
         segments.append(((x, y), seg))
 
-    #segments_sorted = sorted(segments, key=sort_key)
-    #segments_sorted = sorted(segments,
-    #key=lambda s: _segment_path_key(s, convention=convention or "rl_tb"))
-    segments_sorted = _sort_segments_by_runs(
+    
+    segments_sorted, segment_records_sorted  = _sort_segments_by_runs(
     segments,
     convention=convention or "rl_tb")
 
@@ -268,53 +315,79 @@ def unwrap_from_stats(mask, image, stats, labels,
         running += seg.shape[0]
 
     
-    for idx, ((sx, sy), seg) in enumerate(segments_sorted):
-        sh, sw = seg.shape[:2]
-        
-
     # ---- resolve each anchor to an output row ----
     resolved_anchors = []
 
     for anc in anchors:
-        ax, ay, adepth = anc['x'], anc['y'], anc['depth']
-        result = dict(anc)
-        result['snapped'] = False
+        ax, ay, adepth = anc["x"], anc["y"], anc["depth"]
 
-        # Check whether anchor falls inside a valid segment bounding box
+        result = dict(anc)
+        result["snapped"] = False
+
+        # First: exact hit test.
+        # The anchor must land on an unmasked component pixel.
         hit_idx = None
-        for idx, ((sx, sy), seg) in enumerate(segments_sorted):
-            sh, sw = seg.shape[:2]
-            if sx <= ax < sx + sw and sy <= ay < sy + sh:
+
+        for idx, item in enumerate(segments_sorted):
+            if _anchor_hits_segment(ax, ay, item):
                 hit_idx = idx
                 break
 
         if hit_idx is not None:
             (sx, sy), seg = segments_sorted[hit_idx]
-            within_row        = ay - sy
-            result['row']     = cumulative_rows[hit_idx] + within_row
-            result['segment'] = hit_idx
-            
-        else:
-            # Snap: find nearest segment in sort order by column bin,
-            # breaking ties by y proximity
-            anchor_col_bin = sort_key(((ax, ay), None))[0]
-            seg_col_bins   = [sort_key(s)[0] for s in segments_sorted]
 
-            best_idx = min(
-                range(len(segments_sorted)),
-                key=lambda i: (
-                    abs(seg_col_bins[i] - anchor_col_bin),
-                    abs(segments_sorted[i][0][1] - ay)
-                )
+            within_row = int(ay - sy)
+
+            result["row"] = cumulative_rows[hit_idx] + within_row
+            result["segment"] = hit_idx
+
+        else:
+            # Lane-aware snapping:
+            # use the same lane model that determined segment order.
+            if not segment_records_sorted:
+                raise ValueError("Cannot snap anchor: no sorted segment records available.")
+
+            # Find nearest lane by x-position.
+            lane_centres = {}
+
+            for rec in segment_records_sorted:
+                lane_centres[rec["lane_index"]] = rec["lane_center"]
+
+            nearest_lane = min(
+                lane_centres,
+                key=lambda lane_idx: abs(ax - lane_centres[lane_idx])
             )
-            result['row']     = cumulative_rows[best_idx]
-            result['segment'] = best_idx
-            result['snapped'] = True
-            
+
+            # Restrict candidates to that lane.
+            candidates = [
+                (idx, rec)
+                for idx, rec in enumerate(segment_records_sorted)
+                if rec["lane_index"] == nearest_lane
+            ]
+
+            if not candidates:
+                raise ValueError("Cannot snap anchor: nearest lane contains no segments.")
+
+            # Pick the segment in that lane closest in y.
+            best_idx, best_rec = min(
+                candidates,
+                key=lambda pair: _y_distance_to_record(ay, pair[1])
+            )
+
+            (sx, sy), seg = segments_sorted[best_idx]
+            sh = seg.shape[0]
+
+            # Preserve the anchor's y-position where possible.
+            # If it lies above/below the chosen segment, clamp to top/bottom.
+            within_row = int(np.clip(ay - sy, 0, sh - 1))
+
+            result["row"] = cumulative_rows[best_idx] + within_row
+            result["segment"] = best_idx
+            result["snapped"] = True
 
         resolved_anchors.append(result)
 
-    # ---- pad and stack — identical to production ----
+    # ---- pad and stack ----
     max_width = max(seg.shape[1] for _, seg in segments_sorted)
     padded_segments = []
 
