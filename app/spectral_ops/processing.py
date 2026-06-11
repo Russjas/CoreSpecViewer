@@ -79,7 +79,7 @@ def _sort_segments_by_runs(segments, convention="rl_tb"):
     """
 
     if not segments:
-        return []
+        return [], []
 
     convention = convention or "rl_tb"
 
@@ -295,7 +295,7 @@ def unwrap_from_stats(mask, image, stats, labels,
         if area < MIN_AREA or w < MIN_WIDTH:
             continue
         sub      = image[y:y+h, x:x+w]
-        seg_mask = labels[y:y+h, x:x+w] != i
+        seg_mask = (labels[y:y+h, x:x+w] != i) | mask[y:y+h, x:x+w].astype(bool)
         if sub.ndim > 2:                                  # broadcast across bands for a cube
             seg_mask = np.repeat(seg_mask[:, :, None], sub.shape[2], axis=2)
         seg = np.ma.masked_array(sub, mask=seg_mask)
