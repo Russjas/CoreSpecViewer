@@ -37,7 +37,7 @@ class MaskActions(BaseActions):
             ("button", "Clear all depth anchors", self.act_clear_depth_anchors, "Clear all depth anchors from metadata"),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
-            ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom'),
+            ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom', "Ctrl+G"),
             ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)"),
             ("button", "Unmask region", lambda: self.act_mask_rect(unmask=True), "Unmasks a rectangle in existing mask", "Ctrl+Shift+R"),
             ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),

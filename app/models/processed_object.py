@@ -400,59 +400,33 @@ class ProcessedObject:
         if ds is None:
             return
         if key == "stats":
-            logger.error(f"Cannot export {key}")
+            logger.warning(f"Cannot export {key}")
             return
         final_path = output_dir / f'{self.basename}-{key}.jpg'  
         logger.debug(f"Attempting export {self.basename} {key} to {final_path}")
         try:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
-                if key.startswith('Dhole'):
-                    if key == 'DholeMask':
-                        im = mk_thumb(ds.data)
-                        im.save(str(final_path), quality = 95)
-                        logger.info(f"Exported {self.basename} {key}")
+                if key == "mask" or key == "DholeMask":
+                    im = mk_thumb(ds.data, resize = False)                      # it *is* a mask — don't mask it
+                elif key.startswith('Dhole'):
+                    dmask = getattr(self, "DholeMask", None)
+                    if dmask is not None:
+                        mask_data = dmask[:, :, 0] if dmask.ndim == 3 else dmask
+                        im = mk_thumb(ds.data, mask=mask_data, resize = False)
+                        
                     else:
-                        mask_to_use = getattr(self, 'DholeMask', None)
-                        if mask_to_use is not None:
-                            if mask_to_use.ndim == 3:
-                                mask_data = mask_to_use[:, :, 0]
-                            elif mask_to_use.ndim == 2:
-                                mask_data = mask_to_use
-                            im = mk_thumb(ds.data, mask=mask_data, index_mode=True, resize=False)
-                            im.save(str(final_path), quality = 95)
-                            logger.info(f"Exported {self.basename} {key}")
-                        else:
-                            logger.warning(f"Warning: 'DholeMask' not found on self for key {key}. Skipping.")
-                            
-                            return
-                elif key == "mask":
-                    im = mk_thumb(ds.data)
-                    im.save(str(final_path), quality = 95)
-                    
-                    logger.info(f"Exported {self.basename} {key}")
+                        im = mk_thumb(ds.data, resize = False)                  # no matching mask → skip masking
                 elif key.endswith("INDEX"):
                     im = mk_thumb(ds.data, mask=self.mask, index_mode=True, resize=False)
-                    im.save(str(final_path), quality = 95)
-                    
-                    logger.info(f"Exported {self.basename} {key}")
                 else:
                     im = mk_thumb(ds.data, mask=self.mask, resize=False)
-                    im.save(str(final_path), quality = 95)
-                    
-                    logger.info(f"Exported {self.basename} {key}")
-                
-
             elif ds.ext == ".npz":
-                im = mk_thumb(ds.data.data, mask=ds.data.mask)
-                im.save(str(final_path), quality = 95)
-                
-                logger.info(f"Exported {self.basename} {key}")
-                               
+                im = mk_thumb(ds.data.data, mask=ds.data.mask, resize =False)
             else:
                 logger.warning(f"Failed to export {self.basename} {key}")
-                
                 return
-
+            im.save(str(final_path), quality = 95)
+            logger.info(f"Exported {self.basename} {key}")
         except ValueError:
             logger.error(f"ValueError exporting image for {key}")
             return
@@ -468,21 +442,24 @@ class ProcessedObject:
 
         try:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
-                if key == "mask":
-                    im = mk_thumb(ds.data)
+                if key == "mask" or key == "DholeMask":
+                    im = mk_thumb(ds.data)                      # it *is* a mask — don't mask it
+                elif key.startswith("Dhole"):
+                    dmask = getattr(self, "DholeMask", None)
+                    if dmask is not None:
+                        mask_data = dmask[:, :, 0] if dmask.ndim == 3 else dmask
+                        im = mk_thumb(ds.data, mask=mask_data)
+                    else:
+                        im = mk_thumb(ds.data)                  # no matching mask → skip masking
                 elif key.endswith("INDEX"):
                     im = mk_thumb(ds.data, mask=self.mask, index_mode=True)
                 else:
                     im = mk_thumb(ds.data, mask=self.mask)
-                ds.thumb = im
-
             elif ds.ext == ".npz":
-                
-                im = mk_thumb(ds.data.data, mask=ds.data.mask)
-                ds.thumb = im
+                im = mk_thumb(ds.data.data, mask=ds.data.mask)    
             else:
                 return
-
+            ds.thumb = im
         except ValueError:
             logger.warning(f"ValueError building thumb for {key}")
             return
