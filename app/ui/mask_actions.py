@@ -219,7 +219,7 @@ class MaskActions(BaseActions):
 
     def act_depth_anchor(self):
         logger.info("Button clicked: Add depth anchor")
-        valid_state, msg = self.cxt.requires(self.cxt.UNWRAP)
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
         if not valid_state:
             logger.warning(msg)
             self._show_error("Depth Anchor", msg)

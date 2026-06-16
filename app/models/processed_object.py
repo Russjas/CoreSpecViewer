@@ -383,7 +383,7 @@ class ProcessedObject:
             try:
                 
                 self.export_image(key)
-                logger.info(f"exported {self.basename} {key}")
+                
             except (ValueError, FileNotFoundError):
                 logger.debug(f"export failed for  {self.basename} {key}", exc_info=True)
                 logger.warning(f"export failed for  {self.basename} {key}")
@@ -407,7 +407,8 @@ class ProcessedObject:
         try:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
                 if key == "mask" or key == "DholeMask":
-                    im = mk_thumb(ds.data, resize = False)                      # it *is* a mask — don't mask it
+                    msk = ds.data if (ds.data.ndim == 2) else ds.data[:,:,0]
+                    im = mk_thumb(msk, resize = False)                      # it *is* a mask — don't mask it
                 elif key.startswith('Dhole'):
                     dmask = getattr(self, "DholeMask", None)
                     if dmask is not None:
@@ -443,7 +444,8 @@ class ProcessedObject:
         try:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
                 if key == "mask" or key == "DholeMask":
-                    im = mk_thumb(ds.data)                      # it *is* a mask — don't mask it
+                    msk = ds.data if (ds.data.ndim == 2) else ds.data[:,:,0]
+                    im = mk_thumb(msk)                      # it *is* a mask — don't mask it
                 elif key.startswith("Dhole"):
                     dmask = getattr(self, "DholeMask", None)
                     if dmask is not None:

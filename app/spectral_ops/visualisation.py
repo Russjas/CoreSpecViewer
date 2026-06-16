@@ -205,53 +205,44 @@ def mk_thumb(
     PIL.Image.Image
         RGB thumbnail image, ready to save as JPEG.
     """
-    
-    t0 = time.perf_counter()
-    
-    # ---- to ndarray + sanity checks
-    t1 = time.perf_counter()
+  
     arr = np.asarray(arr)
-    logger.debug(f"[{time.perf_counter() - t0:.4f}s] Array conversion (+{time.perf_counter() - t1:.4f}s)")
     
-    t1 = time.perf_counter()
+    
+    
     if arr.ndim not in (2, 3):
         raise ValueError(f"Unsupported array shape {arr.shape}; expected 2D or 3D.")
         
     if 0 in arr.shape:
         raise ValueError(f"arr shape {arr.shape} cannot have a zero size dim")
-    logger.debug(f"[{time.perf_counter() - t0:.4f}s] Shape validation (+{time.perf_counter() - t1:.4f}s)")
-
+    
     # ---- mask validation
-    t1 = time.perf_counter()
+    
     if mask is not None:
         mask = np.asarray(mask, dtype=bool)
         if mask.shape != arr.shape[:2]:
             raise ValueError(
                 f"Mask shape {mask.shape} does not match array spatial shape {arr.shape[:2]}."
             )
-    logger.debug(f"[{time.perf_counter() - t0:.4f}s] Mask validation (+{time.perf_counter() - t1:.4f}s)")
-    
+        
     # ---- orientation flip
-    t1 = time.perf_counter()
+    
     if arr.shape[0] > arr.shape[1]:
         arr = np.flip(np.swapaxes(arr, 0, 1), axis=0)
         if mask is not None:
             mask = np.flip(np.swapaxes(mask, 0, 1), axis=0)
-    logger.debug(f"[{time.perf_counter() - t0:.4f}s] Orientation flip (+{time.perf_counter() - t1:.4f}s)")
-    
+       
     # ------------------------------------------------------------------
     # 1) INDEX MODE: use classification colour map (tab20)
     # ------------------------------------------------------------------
     if index_mode:
-        t1 = time.perf_counter()
+        
         if arr.ndim != 2:
             raise ValueError(
                 f"index_mode=True requires a 2-D index map; got shape {arr.shape}"
             )
 
         rgb8 = index_to_rgb(arr, mask=mask)
-        logger.debug(f"[{time.perf_counter() - t0:.4f}s] Index mode: index_to_rgb (+{time.perf_counter() - t1:.4f}s)")
-        
 
     # ------------------------------------------------------------------
     # 2) NORMAL MODE: original mk_thumb behaviour
@@ -259,15 +250,11 @@ def mk_thumb(
     else:
         if arr.ndim == 2:
             # 2D → colormap
-            t1 = time.perf_counter()
+            
             if mask is not None:
                 a = np.ma.masked_array(arr, mask = mask).astype(float)
             else:
-                a = np.ma.array(arr, dtype=float)
-            logger.debug(f"[{time.perf_counter() - t0:.4f}s] 2D mode: masked array creation (+{time.perf_counter() - t1:.4f}s)")
-            
-            t1 = time.perf_counter()
-            
+                a = np.ma.array(arr, dtype=float)           
             # Auto-detect appropriate range based on data
             data_min = np.nanmin(a)
             data_max = np.nanmax(a)
@@ -294,142 +281,93 @@ def mk_thumb(
                     # Band maths or other - use local stretch
                     amin, amax = data_min, data_max
                     logger.debug("Using local stretch")
-            
-            logger.debug(f"[{time.perf_counter() - t0:.4f}s] 2D mode: range determination (+{time.perf_counter() - t1:.4f}s)")
-            
-            t1 = time.perf_counter()
+
             if amax > amin:
                 norm = np.clip((a - amin) / (amax - amin), 0, 1)
             else:
                 norm = np.zeros_like(a, dtype=float)
-            logger.debug(f"[{time.perf_counter() - t0:.4f}s] 2D mode: normalization (+{time.perf_counter() - t1:.4f}s)")
-            
-            t1 = time.perf_counter()
+
             norm = np.ma.array(norm, mask=a.mask)
             rgb = my_map(norm)[..., :3]
-            logger.debug(f"[{time.perf_counter() - t0:.4f}s] 2D mode: colormap application (+{time.perf_counter() - t1:.4f}s)")
-            
-            t1 = time.perf_counter()
+
             rgb8 = np.nan_to_num(
                 rgb * 255.0,
                 nan=0.0,
                 posinf=255.0,
                 neginf=0.0,
             ).astype(np.uint8)
-            logger.debug(f"[{time.perf_counter() - t0:.4f}s] 2D mode: RGB8 conversion (+{time.perf_counter() - t1:.4f}s)")
             
-
         else:
             # 3D
             H, W, C = arr.shape
-            logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D mode: shape = ({H}, {W}, {C})")
-
             if C > 3:
                 # hyperspectral false-colour conversion
-                t1 = time.perf_counter()
+                
                 fc = get_false_colour_fast(arr)
-                logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D hyperspectral: get_false_colour_fast (+{time.perf_counter() - t1:.4f}s)")
-                
-                t1 = time.perf_counter()
                 fc = np.asarray(fc)
-                logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D hyperspectral: asarray(fc) (+{time.perf_counter() - t1:.4f}s)")
-                
-                t1 = time.perf_counter()
                 if fc.ndim != 3 or fc.shape[2] != 3:
                     raise ValueError("get_false_colour_fast must return (H, W, 3) array.")
 
                 if np.issubdtype(fc.dtype, np.integer):
                     rgb8 = np.clip(fc, 0, 255).astype(np.uint8)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D hyperspectral: integer clip/convert (+{time.perf_counter() - t1:.4f}s)")
                     
                 else:
-                    t2 = time.perf_counter()
                     vmin = np.nanmin(fc)
                     vmax = np.nanmax(fc)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D hyperspectral: nanmin/nanmax on fc (+{time.perf_counter() - t2:.4f}s)")
                     
-                    t2 = time.perf_counter()
                     if vmax > vmin:
                         rgb = (fc - vmin) / (vmax - vmin)
                     else:
                         rgb = np.zeros_like(fc, dtype=float)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D hyperspectral: normalization (+{time.perf_counter() - t2:.4f}s)")
                     
-                    t2 = time.perf_counter()
                     rgb8 = np.nan_to_num(
                         rgb * 255.0,
                         nan=0.0,
                         posinf=255.0,
                         neginf=0.0,
                     ).astype(np.uint8)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D hyperspectral: nan_to_num + uint8 (+{time.perf_counter() - t2:.4f}s)")
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D hyperspectral: float path total (+{time.perf_counter() - t1:.4f}s)")
                     
-
             else:
                 # C == 1 or C == 3
-                t1 = time.perf_counter()
                 a = arr
 
                 if C == 1:
                     a = np.repeat(a, 3, axis=2)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D C=1: np.repeat (+{time.perf_counter() - t1:.4f}s)")
-                    
-                t1 = time.perf_counter()
+                                  
                 if np.issubdtype(a.dtype, np.integer):
                     rgb8 = np.clip(a, 0, 255).astype(np.uint8)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D C<=3: integer clip/convert (+{time.perf_counter() - t1:.4f}s)")
-                    
+                                        
                 else:
-                    t2 = time.perf_counter()
                     vmin = np.nanmin(a)
                     vmax = np.nanmax(a)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D C<=3: nanmin/nanmax (+{time.perf_counter() - t2:.4f}s)")
                     
-                    t2 = time.perf_counter()
                     if vmax > vmin:
                         rgb = (a - vmin) / (vmax - vmin)
                     else:
                         rgb = np.zeros_like(a, dtype=float)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D C<=3: normalization (+{time.perf_counter() - t2:.4f}s)")
                     
-                    t2 = time.perf_counter()
                     rgb8 = np.nan_to_num(
                         rgb * 255.0,
                         nan=0.0,
                         posinf=255.0,
                         neginf=0.0,
                     ).astype(np.uint8)
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D C<=3: nan_to_num + uint8 (+{time.perf_counter() - t2:.4f}s)")
-                    logger.debug(f"[{time.perf_counter() - t0:.4f}s] 3D C<=3: float path total (+{time.perf_counter() - t1:.4f}s)")
-                    
-
+    
         # ---- apply mask (normal mode only; index_mode already handled it)
-        t1 = time.perf_counter()
         if mask is not None:
             rgb8[mask] = 0
-        logger.debug(f"[{time.perf_counter() - t0:.4f}s] Apply mask to rgb8 (+{time.perf_counter() - t1:.4f}s)")
-            
-
+    
     # ---- final resize (PIL, as in original)
-    t1 = time.perf_counter()
+    
     h, w = rgb8.shape[:2]
     scale = min(basewidth / float(w), baseheight / float(h), 1.0)
     new_w = max(1, int(round(w * scale)))
     new_h = max(1, int(round(h * scale)))
 
     im = Image.fromarray(rgb8, mode="RGB")
-    logger.debug(f"[{time.perf_counter() - t0:.4f}s] PIL Image.fromarray (+{time.perf_counter() - t1:.4f}s)")
     
-    t1 = time.perf_counter()
     if (new_w, new_h) != (w, h) and resize:
         im = im.resize((new_w, new_h), Image.LANCZOS)
-        logger.debug(f"[{time.perf_counter() - t0:.4f}s] PIL resize ({w}x{h} -> {new_w}x{new_h}) (+{time.perf_counter() - t1:.4f}s)")
-    else:
-        logger.debug(f"[{time.perf_counter() - t0:.4f}s] No resize needed (resize={resize}, same_size={(new_w, new_h) == (w, h)})")
-    
-    logger.debug(f"[{time.perf_counter() - t0:.4f}s] ===== TOTAL mk_thumb time (shape={arr.shape}, index_mode={index_mode}, resize={resize}) =====")
-    
     return im
 
 

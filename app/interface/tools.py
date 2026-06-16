@@ -523,10 +523,10 @@ def unwrapped_output(obj):
                                                     depth_start = depth_start,
                                                     depth_stop = depth_stop,
                                                     return_map=True)
-    
+    dmask = dhole_reflect.mask[:,:,0]
 
     obj.add_temp_dataset('DholeAverage', dhole_reflect.data, '.npy')
-    obj.add_temp_dataset('DholeMask', dhole_reflect.mask, '.npy')
+    obj.add_temp_dataset('DholeMask', dmask, '.npy')
     obj.add_temp_dataset('DholeDepths', dhole_depths, '.npy')
     if dmap is not None:
         obj.add_temp_dataset('DepthMap', dmap, '.npz')
