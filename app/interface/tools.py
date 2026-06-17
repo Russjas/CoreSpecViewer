@@ -477,6 +477,35 @@ def invert_mask(obj):
     obj.add_temp_dataset('mask', data=msk)
     return obj
 
+def rim(obj):
+    """
+    Write a rim around the cropped cube. This prevents small angular segments
+    on slanted boxes.
+    """
+    if obj.is_raw:
+        return obj
+    msk = np.array(obj.mask)
+    rim_px = 5                        # rim width in pixels — adjustable here
+
+    h, w = msk.shape[:2]
+
+    # Guard: a rim wider than half the frame would mask everything.
+    if h <= 2 * rim_px or w <= 2 * rim_px:
+        logger.warning(f"rim: mask {h}x{w} too small for a {rim_px}px rim; skipping")
+        return obj
+
+    # 1 = masked/background. Force the outer border to background so no core
+    # content reaches the image edge, clipping the thin angular slivers that
+    # appear at the corners of a slanted/rotated box.
+    msk[:rim_px, :]  = 1   # top
+    msk[-rim_px:, :] = 1   # bottom
+    msk[:, :rim_px]  = 1   # left
+    msk[:, -rim_px:] = 1   # right
+
+    obj.add_temp_dataset('mask', data = msk)
+    logger.info(f"rim: applied {rim_px}px background rim to mask")
+    return obj
+
 #============ Unwrapping tools ================================================
 
 def calc_unwrap_stats(obj):

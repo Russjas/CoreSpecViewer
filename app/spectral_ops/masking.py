@@ -294,7 +294,7 @@ def improve_mask_from_graph(mask):
     Parameters
     ----------
     mask : ndarray of {0,1}
-        Binary mask image with 1s indicating core.
+        Binary mask image with 0s indicating core.
 
     Returns
     -------

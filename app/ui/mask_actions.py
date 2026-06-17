@@ -41,7 +41,8 @@ class MaskActions(BaseActions):
             ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)"),
             ("button", "Unmask region", lambda: self.act_mask_rect(unmask=True), "Unmasks a rectangle in existing mask", "Ctrl+Shift+R"),
             ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),
-            ("button", "re-generate thumbs (slow)", self.re_thumb, 'Regenerates all thumbnail images. Slow process, but shouldnt be needed often')
+            ("button", "re-generate thumbs (slow)", self.re_thumb, 'Regenerates all thumbnail images. Slow process, but shouldnt be needed often'),
+            ("button", "Rim", self.rim_mask, "Apply a rim to the mask", "Ctrl+Alt+R")
         ])
     
     # -------- MASK actions --------
@@ -113,6 +114,19 @@ class MaskActions(BaseActions):
         self.cxt.current = t.despeckle_mask(self.cxt.current)
         logger.info(f"{self.cxt.current.basename} Mask despeckled")
         self.controller.refresh()
+
+    
+    def rim_mask(self):
+        logger.info(f"Button clicked: Rim Mask")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Masking", msg)
+            return
+        self.cxt.current = t.rim(self.cxt.current)
+        logger.info(f"{self.cxt.current.basename} Mask rimmed")
+        self.controller.refresh()
+
 
     def act_mask_polygon(self, mode = "mask outside"):
         logger.info(f"Button clicked: Freehand Mask mode {mode}")
