@@ -87,8 +87,12 @@ def spatial_display(func):
         def wrapper(self, *args, **kwargs):
             self.toolbar._ann_btn.setEnabled(True)   # 1. enable button
             result = func(self, *args, **kwargs)      # 2. ax.clear(), imshow(), canvas.draw()
+            #self.fig.tight_layout() 
+            self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)  
             if self._show_annotations:               # 3. after canvas.draw() has fired
                 self.draw_annotations(self._last_annotations)
+            else:
+                self.canvas.draw_idle()
             return result
         return wrapper
 
@@ -98,7 +102,10 @@ def chart_display(func):
         self.toolbar._ann_btn.setChecked(False)
         self.toolbar._ann_btn.setEnabled(False)
         self.clear_annotations()
-        return func(self, *args, **kwargs)
+        result = func(self, *args, **kwargs)
+        self.fig.tight_layout()
+        self.canvas.draw()
+        return result
     return wrapper
 
 # ============================================================================
@@ -700,7 +707,7 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
             return
 
         self.ax.set_axis_off()
-        self.canvas.draw()
+        
 
     @spatial_display
     def _show_index_with_legend(self, index_2d: np.ndarray, mask: np.ndarray, legend: list[dict]):
@@ -791,7 +798,7 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
             leg.set_title("Mineral", prop={"size": 9})
             leg.set_draggable(True)
 
-        self.canvas.draw_idle()
+        
 
     # ------------------------------------------------------------------
     # Downhole display methods
@@ -864,7 +871,7 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
             frameon=True, framealpha=0.9,
             fontsize=9, handlelength=1.8, handletextpad=0.6,
         )
-        self.canvas.draw_idle()
+        
 
     @chart_display
     def display_discrete(
@@ -931,7 +938,7 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
             borderaxespad=0.0, frameon=True, framealpha=0.9,
             fontsize=9, handlelength=1.8, handletextpad=0.6,
         )
-        self.canvas.draw_idle()
+        
 
     @chart_display
     def display_continuous(self, depths, values, key):
@@ -947,8 +954,7 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
         self.ax.set_ylabel("Depth (m)")
         self.ax.set_xlabel(key)
         self.ax.grid(True, alpha=0.3)
-        self.canvas.figure.tight_layout()
-        self.canvas.draw_idle()
+        
 
     def clear_memmap_refs(self):
         """Release data references and clear axes."""
@@ -1001,8 +1007,7 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
         self.ax.clear()
         self.ax.imshow(rgb, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
-
+        
     @spatial_display
     def show_rgb_direct(self, rgb_array, annotations=None):
         """
@@ -1017,7 +1022,7 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
         self.ax.clear()
         self.ax.imshow(rgb_array, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        
 
     @spatial_display
     def increase_contrast(self):
@@ -1030,7 +1035,7 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
         self.ax.clear()
         self.ax.imshow(rgb_contrast, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        
 
     @spatial_display
     def equalize_histogram(self):
@@ -1048,7 +1053,7 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
         self.ax.clear()
         self.ax.imshow(rgb_eq, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        
 
     @spatial_display
     def reset_display(self):
@@ -1058,7 +1063,7 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
         self.ax.clear()
         self.ax.imshow(self._current_rgb, origin="upper")
         self.ax.set_axis_off()
-        self.canvas.draw()
+        
 
     # ------------------------------------------------------------------
     # Click handling
