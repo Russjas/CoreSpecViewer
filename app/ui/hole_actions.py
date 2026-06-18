@@ -27,8 +27,8 @@ class HoleActions(BaseActions):
         self.extract_feature_list_multi.append(("Custom Feature...", lambda: self.box_ops.custom_feature_act(multi=True))) 
         self.extract_feature_list_multi.append(("Cache Features...", lambda: self.box_ops.cache_features(multi=True))) 
         self._register_group('Hole operations', [
-            ("button", "Previous", self.hole_prev_box, "View previous box in hole"),
-            ("button", "Next", self.hole_next_box, "View next box in hole"),
+            ("button", "Previous", self.hole_prev_box, "View previous box in hole", "Left"),
+            ("button", "Next", self.hole_next_box, "View next box in hole", "Right"),
             ("button", "Return to Raw", self.hole_return_to_raw, "Open the raw dataset to replace this box"),
             ("menu", "Iterative Operations", [
                 ("Quick Cluster", lambda: self.box_ops.act_kmeans(multi=True)),

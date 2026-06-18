@@ -18,7 +18,7 @@ class MaskActions(BaseActions):
         """Define and register ribbon buttons"""
         
         self._register_group('Masking', [
-            ("button", "Auto-mask by cluster", self.act_mask_by_cluster, "Clusters image into 2 classes, then masks the selected class. New, and experimental.", "Ctrl+Alt"),
+            ("button", "Auto-mask by cluster", self.act_mask_by_cluster, "Clusters image into 2 classes, then masks the selected class. New, and experimental.", "Ctrl_Alt+C"),
             ("button", "New mask", lambda: self.act_mask_point('new'), "Creates a blank mask,\n then masks by correlation with selected pixel.", "Ctrl+W"),
             ("button", "Enhance mask", lambda: self.act_mask_point('enhance'), "Adds to existing mask by correlation with selected pixel", "Ctrl+E"),
             ("button", "Mask region", self.act_mask_rect, "Adds a masked rectangle to existing mask", "Ctrl+R"),
@@ -37,7 +37,7 @@ class MaskActions(BaseActions):
             ("button", "Clear all depth anchors", self.act_clear_depth_anchors, "Clear all depth anchors from metadata"),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
-            ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation: Right→Left, Top→Bottom', "Ctrl+G"),
+            ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation, adjust convention in settings', "Ctrl+G"),
             ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)"),
             ("button", "Unmask region", lambda: self.act_mask_rect(unmask=True), "Unmasks a rectangle in existing mask", "Ctrl+Shift+R"),
             ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),

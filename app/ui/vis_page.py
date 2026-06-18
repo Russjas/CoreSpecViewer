@@ -57,7 +57,8 @@ class VisualisePage(BasePage):
         self._splitter.setStretchFactor(2, 2)
 
         self.cache = set()
-        self.table.cellDoubleClicked.connect(self._on_row_activated)
+        self.table.cellActivated.connect(self._on_row_activated)
+        #self.table.cellDoubleClicked.connect(self._on_row_activated)
         self.table.rightClicked.connect(self.tbl_right_click_handler)
 
         self._mpl_cids = []  # store mpl connection ids
