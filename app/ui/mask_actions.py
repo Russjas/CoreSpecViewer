@@ -18,7 +18,7 @@ class MaskActions(BaseActions):
         """Define and register ribbon buttons"""
         
         self._register_group('Masking', [
-            ("button", "Auto-mask by cluster", self.act_mask_by_cluster, "Clusters image into 2 classes, then masks the selected class. New, and experimental.", "Ctrl_Alt+C"),
+            ("button", "Auto-mask by cluster", self.act_mask_by_cluster, "Clusters image into 2 classes, then masks the selected class. New, and experimental.", "Ctrl+Alt+C"),
             ("button", "New mask", lambda: self.act_mask_point('new'), "Creates a blank mask,\n then masks by correlation with selected pixel.", "Ctrl+W"),
             ("button", "Enhance mask", lambda: self.act_mask_point('enhance'), "Adds to existing mask by correlation with selected pixel", "Ctrl+E"),
             ("button", "Mask region", self.act_mask_rect, "Adds a masked rectangle to existing mask", "Ctrl+R"),
