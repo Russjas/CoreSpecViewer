@@ -686,7 +686,7 @@ class ProcessedObject:
             products = {}
             
             for key, ds in self.datasets.items():
-                # Skip the base ones already added
+                # Skip the base ones already added or not wanted
                 if key in ('savgol', 'savgol_cr', 'metadata', 'bands', 'cropped', 'mask'):
                     continue
                 
@@ -695,7 +695,7 @@ class ProcessedObject:
                     ds.load_dataset()
                 
                 # Handle different data types
-                if isinstance(ds.data, dict):
+                if isinstance(ds.data, (dict, list)):
                     # Dictionary (e.g., legends) - store directly in products dict
                     # It will be pickled as part of the outer products dict
                     products[key] = ds.data
@@ -703,13 +703,13 @@ class ProcessedObject:
                     
                 elif isinstance(ds.data, np.ma.MaskedArray):
                     # Masked array - store data and mask separately with suffix
-                    products[f"{key}DATA"] = ds.data.data
-                    products[f"{key}MASK"] = ds.data.mask
+                    products[f"{key}DATA"] = np.array(ds.data.data)
+                    products[f"{key}MASK"] = np.array(ds.data.mask)
                     logger.debug(f"Including masked_array: {key} (as {key}DATA, {key}MASK)")
                     
                 elif isinstance(ds.data, np.ndarray):
                     # Regular ndarray - store directly
-                    products[key] = ds.data
+                    products[key] = np.array(ds.data)
                     logger.debug(f"Including ndarray: {key}")
                     
                 else:
@@ -848,6 +848,7 @@ class ProcessedObject:
                 
                 # Load products if present and requested
                 if load_products and 'products' in npz.files:
+                    print("looking for products at hydrations")
                     products = npz['products'].item()
                     
                     # Track which keys are part of masked arrays
@@ -872,7 +873,7 @@ class ProcessedObject:
                         if key in handled:
                             continue
                         
-                        if isinstance(data, dict):
+                        if isinstance(data, (dict, list)):
                             # Dictionary product (e.g., legends)
                             po.add_dataset(key, data, ext='.json')
                             logger.debug(f"Loaded dict: {key}")

@@ -40,7 +40,8 @@ from .util_windows import (ClosableWidgetWrapper,
                            busy_cursor, 
                            WavelengthRangeDialog, 
                            ProfileExportDialog,
-                           CustomFeatureDialog
+                           CustomFeatureDialog,
+                           two_choice_box
                            )
 from .display_canvases import ImageCanvas2D
 
@@ -585,6 +586,19 @@ class HoleControlPanel(QWidget):
         btn_export_overview.clicked.connect(self.export_overview_image)
         export_layout.addWidget(btn_export_overview)
 
+        btn_export_overview = QPushButton("Export Overview Image")
+        btn_export_overview.clicked.connect(self.export_overview_image)
+        export_layout.addWidget(btn_export_overview)
+
+        btn_archive_hole = QPushButton("Archive Hole", export_block)
+        btn_archive_hole.setToolTip(
+            "Save all boxes and hole-level products to an NPZ archive directory"
+        )
+        btn_archive_hole.clicked.connect(self.archive_hole)
+        export_layout.addWidget(btn_archive_hole)
+
+        self.layout.addWidget(export_block)
+
         self.layout.addWidget(export_block)
         # END NEW
         
@@ -722,7 +736,61 @@ class HoleControlPanel(QWidget):
         self.lbl_missing_boxes.setText(missing_text)
 
         self._set_dataset_keys()
-#-----------Export csv handler-------------------------------------------------------------------
+#-----------Export handlers-------------------------------------------------------------------
+    def archive_hole(self):
+        logger.info("Button clicked: Archive Hole")
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.warning(msg)
+            QMessageBox.information(self, "Archive Hole", msg)
+            return
+
+        ho = self.cxt.ho
+
+        # Offer to commit unsaved box edits before they're frozen into the archive
+        if any(po.has_temps for po in ho):
+            choice = two_choice_box(
+                "Some boxes have unsaved datasets. Save them first?",
+                "Save & Archive",
+                "Archive without saving",
+            )
+            if choice == "left":
+                try:
+                    with busy_cursor("Committing box edits...", self) as progress:
+                        for po in ho:
+                            if po.has_temps:
+                                progress.set(f"Saving box {po.metadata['box number']}")
+                                po.commit_temps()
+                                po.save_all()
+                                po.reload_all()
+                except Exception as e:
+                    logger.error("Failed to commit temps before archiving", exc_info=True)
+                    QMessageBox.warning(self, "Commit Error", f"Failed to upgrade datasets: {e}")
+                    return
+
+        dest = QFileDialog.getExistingDirectory(
+            self, "Choose archive folder", str(ho.root_dir)
+        )
+        if not dest:
+            return
+
+        include = two_choice_box("Include per-box product datasets?", "yes", "no")
+        include_box_products = (include == "left")
+
+        try:
+            with busy_cursor("Archiving hole...", self):
+                archive_path = ho.save_full_hole_archive(
+                    archive_dir=dest,
+                    include_box_products=include_box_products,
+                )
+        except (KeyError, FileNotFoundError, PermissionError) as e:
+            logger.error(f"Failed to archive hole {ho.hole_id}", exc_info=True)
+            QMessageBox.warning(self, "Archive Hole", f"Failed to archive hole: {e}")
+            return
+
+        logger.info(f"Archived hole {ho.hole_id} to {archive_path}")
+        QMessageBox.information(self, "Archived", f"Hole archived to:\n{archive_path}")
+    
     def export_csv_dialog(self):
         logger.info(f"Button clicked: Export CSV button")
         valid_state, msg = self.cxt.requires(self.cxt.HOLE)

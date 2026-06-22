@@ -539,12 +539,14 @@ class HoleObject:
                 ds.load_dataset()
             
             if isinstance(ds.data, np.ma.MaskedArray):
-                products[f"{key}DATA"] = ds.data.data
-                products[f"{key}MASK"] = ds.data.mask
-            elif isinstance(ds.data, dict):
+                products[f"{key}DATA"] = np.array(ds.data.data)
+                products[f"{key}MASK"] = np.array(ds.data.mask)
+            elif isinstance(ds.data, (dict, list)):
+                products[key] = ds.data
+            elif isinstance(ds.data, np.ndarray):
                 products[key] = ds.data
             else:
-                products[key] = ds.data
+                logger.warning(f"Skipping unknown data type for {key}: {type(ds.data)}")
         output_dict = {}
         output_dict["base_datasets"] = base_dict
         output_dict["product_datasets"] = products
@@ -624,7 +626,13 @@ class HoleObject:
         """
         archive_dir = Path(archive_dir)
         save_dir = Path(save_dir)
-        
+        boxes_dir = archive_dir / "boxes"
+        if not boxes_dir.exists():
+            boxes_dir = archive_dir
+        if not boxes_dir.exists():
+            raise FileNotFoundError(
+                f"No hole products archive (*_HOLE_PRODUCTS.npz) and no boxes/ directory found in {archive_dir}"
+                )
         # Check for hole products archive
         hole_npz_files = list(archive_dir.glob("*_HOLE_PRODUCTS.npz"))
         
@@ -685,7 +693,7 @@ class HoleObject:
                 if key in handled:
                     continue
                 
-                if isinstance(data, dict):
+                if isinstance(data, (dict, list)):
                     path = save_dir / f"{hole_id}_{key}.json"
                     ds = Dataset(base=hole_id, key=key, path=path, suffix=key, ext='.json', data=data)
                     ho.product_datasets[key] = ds
@@ -705,13 +713,6 @@ class HoleObject:
             logger.info(f"No hole products archive found, building HoleObject from boxes only")
             
             # Check that boxes directory exists
-            boxes_dir = archive_dir / "boxes"
-            if not boxes_dir.exists():
-                boxes_dir = archive_dir
-            if not boxes_dir.exists():
-                raise FileNotFoundError(
-                    f"No hole products archive (*_HOLE_PRODUCTS.npz) and no boxes/ directory found in {archive_dir}"
-                )
             
             box_archives = sorted(boxes_dir.glob("*.npz"))
             if not box_archives:

@@ -591,16 +591,21 @@ def run_feature_extraction(obj, key):
         )
     else:
         cached_arrays = None
-    if isinstance(key, dict):
-        # Custom feature - extract the name for dataset keys
-        feature_name = list(key.keys())[0]
-        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique='POLY', cached_arrays=cached_arrays)
-        obj.add_temp_dataset(f'{feature_name}POS', np.ma.masked_array(pos, mask=feat_mask), '.npz')
-        obj.add_temp_dataset(f'{feature_name}DEP', np.ma.masked_array(dep, mask=feat_mask), '.npz')
-    else:
-        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'POLY', cached_arrays=cached_arrays)
-        obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
-        obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
+    try:
+        if isinstance(key, dict):
+            # Custom feature - extract the name for dataset keys
+            feature_name = list(key.keys())[0]
+            pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique='POLY', cached_arrays=cached_arrays)
+            obj.add_temp_dataset(f'{feature_name}POS', np.ma.masked_array(pos, mask=feat_mask), '.npz')
+            obj.add_temp_dataset(f'{feature_name}DEP', np.ma.masked_array(dep, mask=feat_mask), '.npz')
+        else:
+            pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'POLY', cached_arrays=cached_arrays)
+            obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
+            obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
+    except AssertionError as e:
+        logger.warning(f"hylite error: {e}")
+    except ValueError as e:
+        logger.warning(f"Error calculating MWL: {e}")
     return obj
 
 

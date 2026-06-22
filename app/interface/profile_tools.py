@@ -51,16 +51,20 @@ def run_feature_extraction(obj, key):
     data_cr = remove_cont(data)
     mask = np.zeros((data.shape[:2]))
     bands = obj[obj.first_box].bands
-    
-    pos, dep, feat_mask = sa.Combined_MWL(data, data_cr, mask, bands, key, technique = 'POLY')
-    name = list(key.keys())[0] if isinstance(key, dict) else key
+    try:
+        pos, dep, feat_mask = sa.Combined_MWL(data, data_cr, mask, bands, key, technique = 'POLY')
+        name = list(key.keys())[0] if isinstance(key, dict) else key
 
-    obj.add_product_dataset(f'PROF-{name}POS',
-                            np.ma.masked_array(np.squeeze(pos), mask=np.squeeze(feat_mask)),
-                            '.npz')
-    obj.add_product_dataset(f'PROF-{name}DEP',
-                            np.ma.masked_array(np.squeeze(dep), mask=np.squeeze(feat_mask)),
-                            '.npz')
+        obj.add_product_dataset(f'PROF-{name}POS',
+                                np.ma.masked_array(np.squeeze(pos), mask=np.squeeze(feat_mask)),
+                                '.npz')
+        obj.add_product_dataset(f'PROF-{name}DEP',
+                                np.ma.masked_array(np.squeeze(dep), mask=np.squeeze(feat_mask)),
+                                '.npz')
+    except AssertionError as e:
+        logger.warning(f"hylite error: {e}")
+    except ValueError as e:
+        logger.warning(f"Error calculating MWL: {e}")
     return obj
 
 
