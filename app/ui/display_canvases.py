@@ -689,11 +689,17 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
             return
 
         if len(shp) == 2:
-            lo = np.nanpercentile(image.data, 2)
-            hi = np.nanpercentile(image.data, 98)
-            clipped = np.clip(image, lo, hi) if hi > lo else image
+            # Added the percentile stretch to solve unmasked outliers
+            # But is actually adding more problems
+            # Removing until original problem re-surfaces
+            # may need to be solved with kw in signature and call-sites
+            #lo = np.nanpercentile(image.data, 2)
+            #hi = np.nanpercentile(image.data, 98)
+            #print("data:", np.nanmin(image.data), np.nanmax(image.data))
+            #print("p2/p98:", np.nanpercentile(image.data, 2), np.nanpercentile(image.data, 98))
+            #clipped = np.clip(image, lo, hi) if hi > lo else image
             self.ax.clear()
-            self.ax.imshow(clipped, cmap=my_map, origin="upper")
+            self.ax.imshow(image, cmap=my_map, origin="upper")
 
         elif len(shp) == 3 and shp[2] == 3:
             self.ax.clear()

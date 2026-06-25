@@ -669,6 +669,8 @@ def main():
     logger.info("CoreSpecViewer starting...")
     app = QApplication(sys.argv)
     win = MainRibbonController()
-    win.showMaximized()  
+    win.setMinimumWidth(1400)
+    win.setWindowState(win.windowState() | Qt.WindowMaximized)
+    win.show() 
     sys.exit(app.exec())
     

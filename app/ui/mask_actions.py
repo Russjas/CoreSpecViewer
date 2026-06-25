@@ -33,7 +33,7 @@ class MaskActions(BaseActions):
                 ("Vertical", lambda: self.act_mask_improve(mode="vertical"), "Heuristically improves the mask, only on true-vertical boxes"),
                 ("Connect Lines", lambda: self.act_mask_improve(mode="hough"), "Heuristically connect the lines using hough line connection", "Alt+S")
             ]),
-            ("button", "Add depth anchor", self.act_depth_anchor, "Add a known depth point to constrain depth registration"),
+            ("button", "Add depth anchor", self.act_depth_anchor, "Add a known depth point to constrain depth registration", "Ctrl+Alt+D"),
             ("button", "Clear all depth anchors", self.act_clear_depth_anchors, "Clear all depth anchors from metadata"),
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
