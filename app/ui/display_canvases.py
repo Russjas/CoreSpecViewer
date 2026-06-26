@@ -690,7 +690,8 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
 
         if len(shp) == 2:
             # Added the percentile stretch to solve unmasked outliers
-            # But is actually adding more problems
+            # But is actually adding more problems.
+            # Original problem may have been solved with improved masking.
             # Removing until original problem re-surfaces
             # may need to be solved with kw in signature and call-sites
             #lo = np.nanpercentile(image.data, 2)

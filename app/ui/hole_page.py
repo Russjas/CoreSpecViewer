@@ -26,7 +26,8 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QInputDialog,
     QLineEdit,
-    QFrame
+    QFrame,
+    QMenu
 )
 
 from ..models import HoleObject
@@ -567,39 +568,29 @@ class HoleControlPanel(QWidget):
         separator5.setFrameShape(QFrame.HLine)
         separator5.setFrameShadow(QFrame.Sunken)
         self.layout.addWidget(separator5)
+        
+
+        export_button = QPushButton("Export / Archive…", self)
+        export_menu = QMenu(export_button)
+        export_menu.setToolTipsVisible(True)
+        
+        act_csv = export_menu.addAction("Export to CSV", self.export_csv_dialog)
+        act_csv.setToolTip("Write the downhole profile datasets to a CSV file")
+
+        act_pdf = export_menu.addAction("Export PDF Report", self.export_pdf_booklet)
+        act_pdf.setToolTip("Generate a multi-page PDF report for this hole")
+
+        act_img = export_menu.addAction("Export Overview Image", self.export_overview_image)
+        act_img.setToolTip("Save a single overview image of the whole hole")
+        
+        act_archive = export_menu.addAction("Archive Hole", self.archive_hole)
+        act_archive.setToolTip("Archive a minimal reproducible set of files")
+
+        export_button.setMenu(export_menu) 
+        self.layout.addWidget(export_button)
+        
         self.layout.addStretch(1)
-        
-        export_block = QWidget(self)
-        export_layout = QVBoxLayout(export_block)
-        export_layout.setContentsMargins(0, 0, 0, 0)
-        export_layout.setSpacing(1)
-        
-        export_csv_button = QPushButton("Export to CSV", export_block)
-        export_csv_button.clicked.connect(self.export_csv_dialog)
-        export_layout.addWidget(export_csv_button)
-        
-        btn_export_pdf = QPushButton("Export PDF Report")
-        btn_export_pdf.clicked.connect(self.export_pdf_booklet)
-        export_layout.addWidget(btn_export_pdf)
 
-        btn_export_overview = QPushButton("Export Overview Image")
-        btn_export_overview.clicked.connect(self.export_overview_image)
-        export_layout.addWidget(btn_export_overview)
-
-        btn_export_overview = QPushButton("Export Overview Image")
-        btn_export_overview.clicked.connect(self.export_overview_image)
-        export_layout.addWidget(btn_export_overview)
-
-        btn_archive_hole = QPushButton("Archive Hole", export_block)
-        btn_archive_hole.setToolTip(
-            "Save all boxes and hole-level products to an NPZ archive directory"
-        )
-        btn_archive_hole.clicked.connect(self.archive_hole)
-        export_layout.addWidget(btn_archive_hole)
-
-        self.layout.addWidget(export_block)
-
-        self.layout.addWidget(export_block)
         # END NEW
         
         separator6 = QFrame(self)
