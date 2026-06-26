@@ -573,7 +573,7 @@ class HoleControlPanel(QWidget):
         export_button = QPushButton("Export / Archive…", self)
         export_menu = QMenu(export_button)
         export_menu.setToolTipsVisible(True)
-        
+
         act_csv = export_menu.addAction("Export to CSV", self.export_csv_dialog)
         act_csv.setToolTip("Write the downhole profile datasets to a CSV file")
 
@@ -1064,7 +1064,8 @@ class HoleControlPanel(QWidget):
             keys = keys | box.datasets.keys() | box.temp_datasets.keys()
         
         suffixes = ("INDEX",)
-        raw_names = [x for x in keys if x.endswith(suffixes)]
+        raw_names = [x for x in keys
+             if x.endswith("INDEX") and x.replace("INDEX", "LEGEND") in keys]
         display_to_key = {gen_display_text(k): k for k in raw_names}
         
         choice, ok = QInputDialog.getItem(self, "Select Mineral Map", "MinMaps:", sorted(display_to_key.keys()), 0, False)
@@ -1402,15 +1403,7 @@ class HolePage(BasePage):
         self._box_table.cellDoubleClicked.connect(self._on_box_selected)
         self._box_table.cellClicked.connect(self._on_box_clicked)
 
-        btn_open  = QPushButton("Open hole dataset", self)
-        self._control_panel.layout.addWidget(btn_open)
-        btn_open.clicked.connect(self.open_hole)
-
-        btn_save = QPushButton("Save all changes", self)
-        self._control_panel.layout.addWidget(btn_save)
-        btn_save.clicked.connect(self.save_changes)
-
-
+        
     #====== Dynamic column handling =========================
     def add_column(self, dataset_key = 'mask'):
         new_col = HoleBoxTable(self, columns=["thumb"], dataset_key=dataset_key)
@@ -1496,26 +1489,8 @@ class HolePage(BasePage):
     # ------------------------------------------------------------------
     # Context handling
     # ------------------------------------------------------------------
-
-    def open_hole(self):
-        logger.info("Button clicked: Open Hole Dataset")
-        path = QFileDialog.getExistingDirectory(
-                   self,
-                   "Select hole directory of processed data",
-                   "",
-                   QFileDialog.ShowDirsOnly
-                   )
-        if not path:
-            logger.info("Opening cancelled in dialogue")
-            return
-        with busy_cursor('loading...', self):
-            hole = HoleObject.build_from_parent_dir(path)
-            self.set_hole(hole)
-        logger.info(f"Opened {self.cxt.ho.hole_id}")
-
-    def set_hole(self, hole):
-        """Set the HoleObject and repopulate the left table."""
-        self.cxt.ho = hole
+    # override of BasePage method called by controller
+    def update_display(self, key=''):
         self._refresh_from_hole()
 
     def _refresh_from_hole(self):
@@ -1596,29 +1571,8 @@ class HolePage(BasePage):
             return
 
         self.cxt.current = po
-        
 
 
-    def save_changes(self):
-        logger.info("Button clicked: Save changes (hole page)")
-        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
-        if not valid_state:
-            return
-        with busy_cursor('Saving.....', self):
-            self.cxt.ho.save_product_datasets()
-            for po in self.cxt.ho:
-                po.save_all_thumbs()
-                if po.has_temps:
-                    po.commit_temps()
-                    po.save_all()
-                    po.reload_all()
-                    po.load_thumbs()
-                    logger.info(f"{po.basename} saved")
-            self._refresh_from_hole()
-
-
-    def update_display(self, key=''):
-        self._refresh_from_hole()
 
 
 

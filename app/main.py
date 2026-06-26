@@ -408,6 +408,18 @@ class MainRibbonController(QMainWindow):
         logger.info('Button clicked: Catalogue window viewed')
         if not path:
             return
+        lines = self.check_unsaved_on_context()
+        if lines:
+            detail = "\n".join(lines)
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Data",
+                f"The following unsaved data may be lost:\n\n{detail}\n\nOpen new data anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply == QMessageBox.No:
+                return
         with busy_cursor(self, 'Loading....'):
             try:
                 loaded_obj = t.load(path)
@@ -442,6 +454,19 @@ class MainRibbonController(QMainWindow):
 
     def load_from_disk(self):
         logger.info("load dialogue opened")
+        lines = self.check_unsaved_on_context()
+        if lines:
+            detail = "\n".join(lines)
+            reply = QMessageBox.question(
+                self,
+                "Unsaved Data",
+                f"The following unsaved data will be lost:\n\n{detail}\n\nReplace current dataset anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply == QMessageBox.No:
+                return
+            
         dlg = LoadDialogue(self.cxt, parent=self)
         if dlg.exec_() == QDialog.Accepted:
             self.choose_view(dlg.view_flag)
@@ -628,7 +653,7 @@ class MainRibbonController(QMainWindow):
         
 #============Check for unsaved data on close=====================
 
-    def closeEvent(self, event):
+    def check_unsaved_on_context(self):
         lines = []
 
         # Check po for temp datasets
@@ -648,6 +673,11 @@ class MainRibbonController(QMainWindow):
             ]
             if unsaved_hole:
                 lines.append(f"  Hole products: {', '.join(unsaved_hole)}")
+
+        return lines
+
+    def closeEvent(self, event):
+        lines = self.check_unsaved_on_context()
 
         if lines:
             detail = "\n".join(lines)

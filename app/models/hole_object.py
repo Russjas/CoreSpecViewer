@@ -293,6 +293,9 @@ class HoleObject:
             if key.endswith(suffix):
                 logger.warning(f"Cannot step {suffix} datasets: '{key}'")
                 raise ValueError(f"Cannot step {suffix} datasets: '{key}'")
+        if "depths" not in self.base_datasets:
+            logger.warning("No 'depths' base dataset — run 'Generate base datasets' first")
+            raise ValueError("Base datasets not generated — run 'Generate base datasets' first")
         depths = self.base_datasets["depths"].data
         data = self.product_datasets[key].data
         
