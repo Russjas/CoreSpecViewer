@@ -61,7 +61,9 @@ def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndar
     """
     y = np.interp(x_tgt_nm, x_src_nm, y_src, left=y_src[0], right=y_src[-1]).astype(float)
     y = np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
+    
     return y
+
 
 
 def _sort_segments_by_runs(segments, convention="rl_tb"):

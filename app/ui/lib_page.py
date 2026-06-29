@@ -42,7 +42,8 @@ class LibraryPage(BasePage):
         # State
         self.spec_win = None
         self.spec_win_cr = None
-        
+        self._current_plotted = []
+        self._current_plotted_cr = []
 # ===== UI set up==============================================================
         header = QToolBar("Database / Collection", self)
         self.layout().insertWidget(0, header)   # put header above the splitter
@@ -264,7 +265,106 @@ class LibraryPage(BasePage):
 
             self.display_spectra(sample_id, item_name, hull_rem=True)
             logger.info(f"Displayed CR for lib entry {sample_id}, {item_name}")
-            
+
+#==========Functions for handling the popout spectrum windows and band range resampling toggle
+
+    def _on_spec_win_closed(self, win):
+        """A SpectrumWindow was closed by the user — drop our references and
+        its retained source list so a re-open starts clean."""
+        if win is self.spec_win_cr:
+            self.spec_win_cr = None
+            self._current_plotted_cr.clear()
+        elif win is self.spec_win:
+            self.spec_win = None
+            self._current_plotted.clear()
+
+
+    def _toggle_band_range(self, win, checked):
+        """Redraw `win`'s spectra in native (checked=False) or current-band
+        (checked=True) representation. Logic lives here; window stays dumb."""
+        logger.info(f"Band-range toggle -> {'current' if checked else 'native'} "
+                    f"on {win.windowTitle()}")
+        if win is self.spec_win_cr:
+            series, is_cr = self._current_plotted_cr, True
+        elif win is self.spec_win:
+            series, is_cr = self._current_plotted, False
+        else:
+            return
+        if not series:
+            return
+        bands_nm = None
+        if self.cxt.po is not None and getattr(self.cxt.po, "bands", None) is not None:
+            bands_nm = np.asarray(self.cxt.po.bands, dtype=float)
+        if checked and bands_nm is None:
+            return  # no PO to resample onto (button should be disabled anyway)
+        win.clear_all()
+        for x_nm, y, label in series:
+            if checked:
+                x_src = np.asarray(x_nm, float)
+                in_range = (bands_nm >= x_src.min()) & (bands_nm <= x_src.max())
+                y_disp = np.full(bands_nm.shape, np.nan)
+                if in_range.any():
+                    # resample ONLY the covered bands (all interpolation, no clamp/extrapolation)
+                    y_cov = t.resample_spectrum(x_src, np.asarray(y, float), bands_nm[in_range])
+                    if is_cr:
+                        y_cov = t.get_cr(y_cov)      # hull over real coverage only
+                    y_disp[in_range] = y_cov
+                x_disp = bands_nm
+            else:
+                # NATIVE: exactly what the original click drew
+                x_disp = np.asarray(x_nm, float)
+                y_disp = t.get_cr(y) if is_cr else np.asarray(y, float)
+                
+            win.plot_spectrum(x_disp, y_disp, label=label)
+
+        if is_cr:
+            win.ax.set_ylabel("CR Reflectance (Unitless)")
+        win.canvas.draw()
+
+
+    def _add_band_range_button(self, win):
+        """
+        Attach a checkable 'Current band range' button to a SpectrumWindow's mpl
+        toolbar (Option E2: lib_page owns the control; the window stays dumb).
+        Idempotent + guarded — disabled when no PO/bands are available, since
+        'current band range' is meaningless without a target grid.
+        """
+        # don't double-add if this window already has one (windows are reused)
+        if getattr(win, "_band_btn", None) is not None:
+            return
+
+        win.toolbar.addSeparator()
+        btn = QPushButton("Current band range", win.toolbar)
+        btn.setToolTip("Show spectra resampled onto the loaded dataset's bands "
+                    "(what WTA actually sees)")
+        btn.setCheckable(True)
+        btn.setStyleSheet("""
+            QPushButton:checked {
+                background-color: #4a90d9;
+                color: white;
+                border: 1px solid #2a70b9;
+                border-radius: 3px;
+            }
+            QPushButton:!checked { background-color: none; }
+        """)
+
+        # only usable when a PO with bands is loaded
+        has_bands = (self.current_obj is not None
+                    and getattr(self.current_obj, "bands", None) is not None
+                    and len(self.current_obj.bands) > 0)
+        btn.setEnabled(has_bands)
+        if not has_bands:
+            btn.setToolTip("Load a dataset first — no band range to resample onto")
+
+        # bind to the redraw handler, passing which window was toggled
+        btn.toggled.connect(lambda checked, w=win: self._toggle_band_range(w, checked))
+
+        win.toolbar.addWidget(btn)
+        win._band_btn = btn          # stash so we can read isChecked() in redraw
+
+
+
+
     def display_spectra(self, sample_id, item_name, hull_rem = False):
         """Queries the spectra table, unpacks BLOBs using the correct dtype, and launches the plot window."""
         lib = self.cxt.library
@@ -273,6 +373,7 @@ class LibraryPage(BasePage):
 
         try:
             x_nm, y = lib.get_spectrum(sample_id)
+            
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -280,21 +381,27 @@ class LibraryPage(BasePage):
                 f"Failed to fetch spectrum for ID {sample_id}:\n{e}",
             )
             return
-
+        
         # Launch the plot window
         if hull_rem:
             title = f"CR Spectra for: {item_name} (ID: {sample_id})"
             if self.spec_win_cr is None:
                 self.spec_win_cr = SpectrumWindow(self)
+                self._add_band_range_button(self.spec_win_cr)
 
             self.spec_win_cr.plot_spectrum(x_nm, t.get_cr(y), title, label=item_name)
             self.spec_win_cr.ax.set_ylabel("CR Reflectance (Unitless)")
+            self._current_plotted_cr.append((x_nm, y, item_name))
+            self.spec_win_cr.closed.connect(self._on_spec_win_closed)
         else:
             title = f"Spectra for: {item_name} (ID: {sample_id})"
             if self.spec_win is None:
                 self.spec_win = SpectrumWindow(self)
+                self._add_band_range_button(self.spec_win)
     
-            self.spec_win.plot_spectrum(x_nm*1000, y, title, label=item_name)
+            self.spec_win.plot_spectrum(x_nm, y, title, label=item_name)
+            self._current_plotted.append((x_nm, y, item_name))
+            self.spec_win.closed.connect(self._on_spec_win_closed)
             
             
     def _selected_sample_ids(self):
@@ -485,9 +592,11 @@ class LibraryPage(BasePage):
         if self.spec_win:
             self.spec_win.close()
             self.spec_win = None
+            self._current_plotted_cr.clear()
         if self.spec_win_cr:
             self.spec_win_cr.close()
             self.spec_win_cr = None
+            self._current_plotted_cr.clear()
         super().teardown()
 
 

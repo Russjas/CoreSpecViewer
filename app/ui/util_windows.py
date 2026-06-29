@@ -462,6 +462,7 @@ class ClosableWidgetWrapper(QWidget):
         event.accept()
 
 class SpectrumWindow(QMainWindow):
+    closed = pyqtSignal(object)
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Pixel spectrum")
@@ -507,6 +508,7 @@ class SpectrumWindow(QMainWindow):
         self.show()
 
     def closeEvent(self, ev):
+        self.closed.emit(self)
         self.clear_all()
 
 
