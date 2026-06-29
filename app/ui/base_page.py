@@ -3,17 +3,18 @@ Base class for CoreSpecViewer pages.
 
 Provides access to shared context, tool dispatch, and common UI layout helpers.
 """
-
+import logging
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QSplitter, QVBoxLayout, QWidget
+from PyQt5 import sip
 
 from ..interface import ToolDispatcher
 from ..models import CurrentContext
 from .util_windows import (ClosableWidgetWrapper, 
                             PopoutWindow)
 from .display_canvases import ImageCanvas2D, SpectralImageCanvas, BaseMatplotlibCanvas
-
+logger = logging.getLogger(__name__)
 class BasePage(QWidget):
     """
     Common base: holds a QSplitter with left/right/(optional)third widgets,
@@ -97,7 +98,7 @@ class BasePage(QWidget):
 
         # Connect the wrapper's closed signal to the page's removal handler
         wrapper.closed.connect(self.remove_widget)
-
+        wrapper.destroyed.connect(self._purge_dead_refs)  # truth: object is gone
         # Add the wrapper to the splitter
         # Add the wrapper to the splitter at the specified index
         if index is None:
@@ -136,7 +137,9 @@ class BasePage(QWidget):
         elif w is self._third:
             self._third = None
 
-        
+    def _purge_dead_refs(self, *_):
+        # destroyed has fired — the wrapper's C++ side is gone. Drop it by identity.
+        self._popouts = [w for w in self._popouts if not sip.isdeleted(w)]
 
     
     def _handle_popout_request(self, wrapper: ClosableWidgetWrapper):
@@ -150,6 +153,7 @@ class BasePage(QWidget):
         wrapper.setWindowTitle(wrapper.label.text())
         wrapper.show()
         self._popouts.append(wrapper)
+        logger.info(f"{wrapper.label.text()} popped out")
 
 
 

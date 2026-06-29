@@ -9,7 +9,7 @@ import logging
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QTableWidgetItem, QMenu
-
+from PyQt5 import sip
 from .base_page import BasePage
 from ..interface import ToolDispatcher
 from .util_windows import (SpectrumWindow, 
@@ -154,6 +154,12 @@ class VisualisePage(BasePage):
                 self._unbind_mpl_for_canvas(inner)
         
         super().remove_widget(w)
+    
+
+    def _purge_dead_refs(self, *_):
+        super()._purge_dead_refs()
+        self._sync_canvases = [c for c in self._sync_canvases if not sip.isdeleted(c)]
+        self._mpl_cids = [(cv, cid) for cv, cid in self._mpl_cids if not sip.isdeleted(cv)]
 
     def _unbind_mpl_for_canvas(self, canvas):
         """Disconnect mpl events for a specific canvas."""
