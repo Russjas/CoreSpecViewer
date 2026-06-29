@@ -275,6 +275,33 @@ class MainRibbonController(QMainWindow):
         self.action_groups.append(act_instance)
         return act_instance
 
+    # Count number of boxes with unsaved data. Unsaved work may have triggered a full
+    # in memory array assignment, requires a save cycle to free up RAM
+    def _warn_if_memory_heavy(self):
+        if self.cxt.ho is None:
+            return
+        tmp_bx_count = sum(1 for po in self.cxt.ho if po.has_temps)
+        if tmp_bx_count > 3:
+            choice = two_choice_box(
+                "Several boxes may have full arrays in memory.\n"
+                "Save them now to free up Ram?",
+                "Save all", "Continue",
+            )
+            if choice == 'left':
+                try:
+                    with busy_cursor("Committing box edits...", self) as progress:
+                        for po in ho:
+                            if po.has_temps:
+                                progress.set(f"Saving box {po.metadata['box number']}")
+                                po.commit_temps()
+                                po.save_all()
+                                po.reload_all()
+                except Exception as e:
+                    logger.error("Failed to commit temps and save cycle", exc_info=True)
+                    QMessageBox.warning(self, "Commit Error", f"Failed to upgrade datasets: {e}")
+                    return
+
+
 
     #======== UI methods ===============================================
     def _clear_all_canvas_refs(self):
