@@ -735,9 +735,9 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
         position = Mpoly.__getitem__([0,'pos'])
         width = Mpoly.__getitem__([0,'width'])
     feature_mask = mask.copy()
-    feature_mask[check_response < 0] =1
-    #feature_mask[position>wav_max] = 1
-    #feature_mask[position<wav_min] = 1
+    #feature_mask[check_response < 0] =1
+    feature_mask[position>wav_max] = 1
+    feature_mask[position<wav_min] = 1
     if thresh:
         feature_mask[depth<thresh] = 1
         
