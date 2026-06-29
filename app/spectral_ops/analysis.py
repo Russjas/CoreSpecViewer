@@ -306,7 +306,7 @@ def mineral_map_wta_msam_strict(data, members, thresh=0.70, invalid_value=-999):
 def mineral_map_subrange(cube: np.ndarray,            # (H, W, B_data)
     exemplar_stack: np.ndarray,       # (K, B_lib)
     wl_data: np.ndarray,         # (B_data,)
-    ranges: list[tuple[float, float]],  # [(wmin, wmax), ...]
+    ranges: list,  # [wmin, wmax]
     mode: str = "pearson",       # "pearson", "sam", "msam"
     invalid_value: int = -999,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -320,8 +320,8 @@ def mineral_map_subrange(cube: np.ndarray,            # (H, W, B_data)
         else:
             start = np.argmin(np.abs(wl_data - ranges[1]))
             stop = np.argmin(np.abs(wl_data - ranges[0]))
-        cube = cube[..., start:stop]
-        exemplar_stack = exemplar_stack[..., start:stop]
+        cube = cube[..., start:stop + 1]
+        exemplar_stack = exemplar_stack[..., start:stop + 1]
     except IndexError:
         raise ValueError("range selection failed on this data")
     if mode =='pearson' :  
@@ -342,6 +342,10 @@ def mineral_map_multirange(
     mode: str = "pearson",       # "pearson", "sam", "msam"
     invalid_value: int = -999,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Pre-defined windows depeveloped for one experiment.
+    Not robust.
+    """
     windows = [
         (1350, 1500),  # 1.4 µm OH / hydration
         (1850, 2000),  # 1.9 µm H2O
@@ -694,7 +698,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
         logger.info(f"Using fit type {technique} for MWL")
         new_bands = bands[cr_crop_min_index:cr_crop_max_index]
         m, n, b = savgol_cr.shape
-        data = remove_hull(savgol_cr[:,:, cr_crop_min_index:cr_crop_max_index])
+        data = remove_hull(savgol[:,:, cr_crop_min_index:cr_crop_max_index])
         minsA = np.zeros((data.shape[0], data.shape[1]))
         minsA = np.argmin(data, axis=2)
         minsB = np.zeros((data.shape[0], data.shape[1]), dtype=float)
