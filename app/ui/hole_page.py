@@ -45,6 +45,7 @@ from .util_windows import (ClosableWidgetWrapper,
                            two_choice_box
                            )
 from .display_canvases import ImageCanvas2D
+from .interrogate_feature import FeatureSelectDialog, FeatureInterrogationWindow
 
 
 logger = logging.getLogger(__name__)
@@ -549,6 +550,10 @@ class HoleControlPanel(QWidget):
         custom_feature_button.clicked.connect(self.prof_custom_feature_extraction)
         profile_derived_layout.addWidget(custom_feature_button)
 
+        inter_feature_button = QPushButton("Interrogate Feature...", profile_derived_block)
+        inter_feature_button.setToolTip("Examine plots of this feature in more than downhole space")
+        inter_feature_button.clicked.connect(self.interrogate_feature)
+        profile_derived_layout.addWidget(inter_feature_button)
 
         prof_min_map_button = QPushButton("MinMap", profile_derived_block)
         prof_min_map_button.clicked.connect(self.prof_min_map)
@@ -874,6 +879,30 @@ class HoleControlPanel(QWidget):
                 
         return
 # ---------downhole data control handlers---------------------------------------------------------
+    def interrogate_feature(self):
+        valid_state, msg = self.cxt.requires(self.cxt.HOLE)
+        if not valid_state:
+            logger.info(f"Button clicked: interogate feature failed because no hole data loaded")
+            return
+        hole = self.cxt.ho
+        name = FeatureSelectDialog.get_feature(hole, parent=self)
+        if name is None:
+            logger.info(f"Interogate feature cancelled because no feature was selected")
+            return
+        if not hasattr(self, "_feat_wins"):
+            self._feat_wins = {}
+        try:
+            win = FeatureInterrogationWindow(hole, name, parent=self._page)   # parent = the page
+            win.setAttribute(Qt.WA_DeleteOnClose, True)
+            self._page._popouts.append(win)
+            win.destroyed.connect(self._page._purge_dead_refs)   # sip.isdeleted filter — safe
+            win.show()
+        except (AssertionError, ValueError) as e:
+            logger.warning(f"Interogate feature cancelled because depths are misaligned", exc_info=True)
+            return
+    
+
+
     def _on_display_btn_clicked(self):
         """
         User changed the dataset key for the secondary strip. Rebuild the
@@ -1572,7 +1601,8 @@ class HolePage(BasePage):
 
         self.cxt.current = po
 
-
+    def teardown(self):
+        super().teardown()
 
 
 
