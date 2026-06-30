@@ -735,7 +735,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
         position = Mpoly.__getitem__([0,'pos'])
         width = Mpoly.__getitem__([0,'width'])
     feature_mask = mask.copy()
-    #feature_mask[check_response < 0] =1
+    feature_mask[check_response < 0] =1
     feature_mask[position>wav_max] = 1
     feature_mask[position<wav_min] = 1
     if thresh:
@@ -755,7 +755,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
     return position, np.clip(depth, 0,1), feature_mask
 
 
-def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3):
+def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3, tol = 11):
     """
     Detect spectral absorption peaks within a wavelength window using SciPy,
     applying a minimum peak height (depth) threshold per pixel.
@@ -799,22 +799,30 @@ def est_peaks_cube_scipy_thresh(data, bands, wavrange=(2300, 2340), thresh = 0.3
       filters by amplitude. Post-processing or masking may be required for
       robust interpretation.
     """
+    
+    
     w, l, b = data.shape
     arr = np.full((w,l), -999)
+
+    lo = wavrange[0] - tol
+    hi = wavrange[1] + tol
+
     for i in range(w):
         for j in range(l):
             peak_indices, peak_dict = sc.signal.find_peaks(1-data[i,j], height=(None, None))
             
             peak_heights = peak_dict['peak_heights']
            
-            x = [bands[peak_indices[i]] for i in range(len(peak_indices)) if peak_heights[i] >thresh ]
-           
-            for k in x:
-                if k > wavrange[0] and k < wavrange[1]:
-                    arr[i,j] = k
+            for peak_idx, peak_height in zip(peak_indices, peak_heights):
+                if peak_height <= thresh:
+                    continue
+
+                wl = bands[peak_idx]
+
+                if lo < wl < hi:
+                    arr[i, j] = wl
                     break
-                else:
-                    arr[i,j] = -999
+
     return arr
 
 def compute_feature_map(savgol_cr, max_feats=20):
