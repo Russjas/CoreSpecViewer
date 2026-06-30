@@ -3,15 +3,16 @@ channels:
   - conda-forge
 dependencies:
   - python=3.13
-  - numpy>=2.0
-  - scipy
-  - numba
-  - matplotlib
+  - numpy=2.4.3
+  - scipy=1.17.1
+  - numba=0.65.0
+  - llvmlite=0.47.0
+  - matplotlib=3.10.9
   - pyqt=5.15.10
   - opencv
   - spectral
-  - reportlab
+  - reportlab=4.4.10
   - pip
   - pip:
-      - hylite
-      - gfit
+      - hylite==1.36
+      - gfit==0.2
