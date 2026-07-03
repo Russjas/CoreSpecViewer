@@ -2,6 +2,7 @@
 # interrogate_feature.py
 """Single-feature interrogation: downhole position log + position-vs-strength funnel."""
 import numpy as np
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QDialogButtonBox
 )
@@ -60,8 +61,15 @@ class FeatureInterrogationWindow(QDialog):
     """Pop-out with the two single-feature diagnostic plots."""
     def __init__(self, hole, name, parent=None):
         super().__init__(parent)
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowMaximizeButtonHint
+            | Qt.WindowCloseButtonHint
+        )
         self.setWindowTitle(f"Interrogate: {name}")
         self.resize(1100, 750)
+        self.setSizeGripEnabled(True)
 
         depths, pos, _      = hole.step_product_dataset(f"{name}POS")
         depths2, strength, _ = hole.step_product_dataset(f"{name}DEP")
@@ -78,8 +86,8 @@ class FeatureInterrogationWindow(QDialog):
         ax2 = fig.add_subplot(1, 2, 2)
 
         # Panel 1 — position vs depth, coloured by strength (downhole log)
-        sc1 = ax1.scatter(p, d, c=s, s=4, cmap="viridis",
-                          vmin=0, vmax=1, linewidths=0)
+        sc1 = ax1.scatter(p, d, c=s, s=4, cmap="Reds",
+                          linewidths=0)
         ax1.invert_yaxis()
         ax1.set_xlabel(f"{name} position")
         ax1.set_ylabel("Depth (m)")
@@ -94,7 +102,7 @@ class FeatureInterrogationWindow(QDialog):
         ax2.set_xlabel(f"{name} position")
         ax2.set_ylabel("band strength (0–1)")
         ax2.set_title("Position vs strength\n(colour = depth)")
-        ax2.set_ylim(0, 1)
+        ax2.set_ylim(top = 1)
         ax2.grid(True, alpha=0.2)
         ax2.legend(loc="lower right", fontsize=8)
         fig.colorbar(sc2, ax=ax2, label="Depth (m)", fraction=0.046, pad=0.04)

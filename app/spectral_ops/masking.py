@@ -345,20 +345,22 @@ def hough_line_connection(mask):
     return result
 
 
-def despeckle_mask(mask):
-    """
-    Remove small speckles by operating on the inverted mask.
-    mask: boolean array
-    """
+def despeckle_mask(mask, min_area=50):
     mask_bool = mask.astype(bool)
-    inv = ~mask_bool
-    bw = inv.astype(np.uint8) * 255
-    n, labels, stats, _ = cv2.connectedComponentsWithStats(bw, connectivity=8)
-    min_area = 50 # remove only small pixel speckles 
-    clean = np.zeros_like(bw)
-    for i in range(1, n):
-        if stats[i, cv2.CC_STAT_AREA] >= min_area:
-            clean[labels == i] = 255
-    clean_bool = ~(clean.astype(bool))
-    
-    return clean_bool.astype(np.uint8)
+
+    def remove_small(binary_bool, min_area):
+        bw = binary_bool.astype(np.uint8) * 255
+        n, labels, stats, _ = cv2.connectedComponentsWithStats(bw, connectivity=8)
+        out = np.zeros_like(bw, dtype=bool)
+        for i in range(1, n):
+            if stats[i, cv2.CC_STAT_AREA] >= min_area:
+                out[labels == i] = True
+        return out
+
+    # remove small True speckles
+    fg_cleaned = remove_small(mask_bool, min_area)
+    # remove small False speckles (i.e. fill small holes) using the cleaned fg
+    bg_cleaned = remove_small(~fg_cleaned, min_area)
+    result = ~bg_cleaned
+
+    return result.astype(np.uint8)

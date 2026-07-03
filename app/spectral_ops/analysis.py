@@ -647,6 +647,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
         "width_min_nm":  8.0,
         "width_max_nm":  80.0,
     }}
+
     if isinstance(feature, dict):
         # Extract the single key-value pair
         if len(feature) != 1:
@@ -750,6 +751,7 @@ def Combined_MWL(savgol, savgol_cr, mask, bands, feature, technique = 'QUAD', us
             feature_mask[width < wmin] = 1
         if wmax is not None:
             feature_mask[width > wmax] = 1
+    
     
 
     return position, np.clip(depth, 0,1), feature_mask

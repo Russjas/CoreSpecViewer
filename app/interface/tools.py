@@ -606,6 +606,7 @@ def run_feature_extraction(obj, key):
         logger.warning(f"hylite error: {e}")
     except ValueError as e:
         logger.warning(f"Error calculating MWL: {e}")
+    
     return obj
 
 
