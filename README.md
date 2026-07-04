@@ -469,3 +469,22 @@ CoreSpecViewer is an open-source research tool for hyperspectral drill-core visu
 Outputs may include uncertainties and should be interpreted within the broader context of geological knowledge and dataset characteristics.
 
 CoreSpecViewer is provided as-is, without warranty, and the authors and contributors are not liable for any use of the software or results obtained from it.
+
+---
+
+## Dependency Note: `gfit` is pinned to 0.2
+
+**Do not upgrade `gfit` beyond 0.2.** The pin is set in `environment.yml` and is deliberate.
+
+CoreSpecViewer's continuum removal and feature-depth calculations use `gfit.remove_hull`. Version 0.2 shifts each spectrum to a positive minimum before dividing out the hull; version 0.4+ divides the raw signal instead. Both are valid continuum-removal conventions and produce identically-*shaped* spectra, but they put feature **depths on different scales** — 0.2 gives a wider, inflated range, while 0.4+ gives true `(H−R)/H` band depths (substantially smaller; ≈7× on this project's test data).
+
+This project's `feature_detection_threshold` and all saved depth products are calibrated to the 0.2 scale, so upgrading `gfit` will silently rescale every depth map and break comparability with existing datasets.
+
+The effect is pronounced here because reflectance is stored on a 0–100 (percent) scale (see `IO.reflect_correct`), which enlarges the per-spectrum minimum that drives the 0.2 shift; on 0–1 fractional reflectance the two versions differ only marginally. This is a scale convention, not a strict defect to fix.
+
+Upstream discussion: [gfit 0.2→0.4 scale change](https://github.com/samthiele/gfit/issues/1)
+
+
+
+
+
