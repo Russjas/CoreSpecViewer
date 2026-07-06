@@ -11,8 +11,7 @@ from PyQt5 import sip
 
 from ..interface import ToolDispatcher
 from ..models import CurrentContext
-from .util_windows import (ClosableWidgetWrapper, 
-                            PopoutWindow)
+from .util_windows import ClosableWidgetWrapper
 from .display_canvases import ImageCanvas2D, SpectralImageCanvas, BaseMatplotlibCanvas
 logger = logging.getLogger(__name__)
 class BasePage(QWidget):
@@ -99,6 +98,7 @@ class BasePage(QWidget):
         # Connect the wrapper's closed signal to the page's removal handler
         wrapper.closed.connect(self.remove_widget)
         wrapper.destroyed.connect(self._purge_dead_refs)  # truth: object is gone
+        
         # Add the wrapper to the splitter
         # Add the wrapper to the splitter at the specified index
         if index is None:
@@ -148,11 +148,12 @@ class BasePage(QWidget):
         into a new, independent QMainWindow. This is a generic handler 
         for all pages. Canvas remains registered on page, only de-registered on close
         """
-        wrapper.setParent(None)
-        wrapper.setWindowFlags(Qt.Window)
+        wrapper.setParent(self)
+        wrapper.setWindowFlag(Qt.Window, True)
         wrapper.setWindowTitle(wrapper.label.text())
         wrapper.show()
-        self._popouts.append(wrapper)
+        if not any(w is wrapper for w in self._popouts):
+            self._popouts.append(wrapper)
         logger.info(f"{wrapper.label.text()} popped out")
 
 

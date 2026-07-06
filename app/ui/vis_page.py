@@ -220,23 +220,18 @@ class VisualisePage(BasePage):
             return
         if self.current_obj.is_raw:
             return
-        import time
-        start = time.perf_counter()
-        logger.debug(f"PROFILE VIS PAGE UPDATE DISPLAY: Start : {start:.4f}s")
+                
         ann = self.current_obj['annotations'].data if self.current_obj.has('annotations') else {}
         self.left_canvas.show_rgb_direct(self.current_obj.display, annotations=ann)
-        checkpoint_1 = time.perf_counter()
-        logger.debug(f"PROFILE UPDATE DISPLAY: Left canvas displayed: {checkpoint_1 - start:.4f}s")
+        
         self.refresh_cache_table()
-        checkpoint_2 = time.perf_counter()
-        logger.debug(f"PROFILE UPDATE DISPLAY: cache table refreshed: {checkpoint_2 - checkpoint_1:.4f}s")
+        
         for canvas in list(self._sync_canvases):
             if hasattr(canvas, "product_flag"):
                 self._display_product_in_canvas(canvas, canvas.product_flag)
             
-        checkpoint_3 = time.perf_counter()
-        logger.debug(f"PROFILE UPDATE DISPLAY: right canvas displayed: {checkpoint_3 - checkpoint_1:.4f}s")
-        logger.debug(f"PROFILE UPDATE DISPLAY: TOTAL update display : {checkpoint_3 - start:.4f}s")
+        
+        
 
     def _on_row_activated(self, row: int, col: int):
         """

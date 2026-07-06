@@ -204,21 +204,6 @@ class _ProgressHelper:
         
         QApplication.restoreOverrideCursor()
 
-class PopoutWindow(QMainWindow):
-    """
-    A simple top-level window to host a popped-out widget.
-    It takes ownership of the content widget and ensures it's resized.
-    """
-    def __init__(self, content_widget: QWidget, title: str = "Popout Window", parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        content_widget.setParent(self) 
-        
-        self.setCentralWidget(content_widget)
-        self.setAttribute(Qt.WA_DeleteOnClose, True)
-        
-        self.resize(content_widget.sizeHint() * 1.5)
-
 
 class RightClick_TableWidget(QTableWidget):
     rightClicked = pyqtSignal(int, int)  # row, column
