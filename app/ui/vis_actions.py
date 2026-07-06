@@ -5,6 +5,7 @@ Callback handler for Masking Actions.
 import logging
 logger = logging.getLogger(__name__)
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QInputDialog, QFileDialog, QDialog
 
 from ..interface import tools as t
@@ -57,11 +58,34 @@ class VisActions(BaseActions):
     ("button", "Generate Images", self.box_ops.gen_images, "Generates full size images of all products and base datasets in an outputs folder"),
     ("button", "Generate box report", self.create_report, "Generates full size images of all products and base datasets in an outputs folder"),
     ("button", "Export to ENVI", self.box_ops.export_envi, "Export this box to an ENVI file pair for use in external tools"),
+    ("button", "View box downhole", self.act_view_downhole,
+     "Open a single-box downhole preview (requires unwrap stats; save the box first)")
 ])
         
     # -------- VISUALISE actions --------
-    
-    
+    def act_view_downhole(self):
+        logger.info("Button clicked: View box downhole")
+        valid_state, msg = self.cxt.requires(self.cxt.UNWRAP)   # ('processed', 'has:stats')
+        if not valid_state:
+            QMessageBox.information(self.controller, "Downhole preview", msg)
+            return
+
+        from ..ui.dhole_view import DholeView   # local import: pulls in hole_page, avoid cycle
+        try:
+            with busy_cursor("Building downhole preview...", self.controller):
+                view = DholeView.from_box(self.cxt.current, parent=self.controller)
+            view.setWindowFlag(Qt.Window)   # parented, but still a top-level window
+            view.show()
+            logger.info(f"setWindowFlag called, parent = {view.parent}")
+        except ValueError as e:                  # no temps / missing stats/segments, from build_ephemeral_hole
+            self._show_error("Downhole preview", str(e))
+            return
+        except Exception:
+            logger.error("Failed to open downhole preview", exc_info=True)
+            self._show_error("Downhole preview",
+                                 "Failed to build the downhole preview. See log.")
+            return
+   
 
     def _remap_legends(self):
         logger.info(f"Button clicked: Remap legends")

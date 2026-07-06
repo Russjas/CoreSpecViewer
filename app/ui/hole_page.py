@@ -428,41 +428,41 @@ class HoleControlPanel(QWidget):
         self.lbl_missing_boxes = QLabel("—")
         self.lbl_missing_boxes.setWordWrap(True)
 
-        info_layout = QFormLayout()
-        info_layout.setLabelAlignment(Qt.AlignLeft)
-        info_layout.addRow("Hole ID:", self.lbl_hole_id)
-        info_layout.addRow("# boxes:", self.lbl_box_count)
-        info_layout.addRow("Depth range:", self.lbl_depth_range)
-        info_layout.addRow("Missing boxes:", self.lbl_missing_boxes)
-        self.layout.addLayout(info_layout)
+        self.info_layout = QFormLayout()
+        self.info_layout.setLabelAlignment(Qt.AlignLeft)
+        self.info_layout.addRow("Hole ID:", self.lbl_hole_id)
+        self.info_layout.addRow("# boxes:", self.lbl_box_count)
+        self.info_layout.addRow("Depth range:", self.lbl_depth_range)
+        self.info_layout.addRow("Missing boxes:", self.lbl_missing_boxes)
+        self.layout.addLayout(self.info_layout)
         separator1 = QFrame(self)
         separator1.setFrameShape(QFrame.HLine)
         separator1.setFrameShadow(QFrame.Sunken)
         self.layout.addWidget(separator1)
 
         # --- Box level control panel---
-        combo_block = QWidget(self)
-        combo_layout = QVBoxLayout(combo_block)
+        self.combo_block = QWidget(self)
+        combo_layout = QVBoxLayout(self.combo_block)
         combo_layout.setContentsMargins(0, 0, 0, 0)
         combo_layout.setSpacing(1)
         # Label
-        label = QLabel("Add extra columns:", combo_block)
-        combo_layout.addWidget(label)
+        column_label = QLabel("Add extra columns:", self.combo_block)
+        combo_layout.addWidget(column_label)
         # Combo box
-        self.secondary_combo = QComboBox(combo_block)
+        self.secondary_combo = QComboBox(self.combo_block)
         self.secondary_combo.setToolTip(
             "Controls which dataset is used to build thumbnails in the "
             "new strip table.")
         combo_layout.addWidget(self.secondary_combo)
         # Button directly below combo
-        self.create_button = QPushButton("Show", combo_block)
+        self.create_button = QPushButton("Show", self.combo_block)
         self.create_button.clicked.connect(self._on_display_btn_clicked)
         combo_layout.addWidget(self.create_button)
-        self.layout.addWidget(combo_block)
-        separator2 = QFrame(self)
-        separator2.setFrameShape(QFrame.HLine)
-        separator2.setFrameShadow(QFrame.Sunken)
-        self.layout.addWidget(separator2)
+        self.layout.addWidget(self.combo_block)
+        self.separator2 = QFrame(self)
+        self.separator2.setFrameShape(QFrame.HLine)
+        self.separator2.setFrameShadow(QFrame.Sunken)
+        self.layout.addWidget(self.separator2)
         # --- Downhole datasets control panal
         combo_block_full = QWidget(self)
         combo_layout_full = QVBoxLayout(combo_block_full)
@@ -575,8 +575,8 @@ class HoleControlPanel(QWidget):
         self.layout.addWidget(separator5)
         
 
-        export_button = QPushButton("Export / Archive…", self)
-        export_menu = QMenu(export_button)
+        self.export_button = QPushButton("Export / Archive…", self)
+        export_menu = QMenu(self.export_button)
         export_menu.setToolTipsVisible(True)
 
         act_csv = export_menu.addAction("Export to CSV", self.export_csv_dialog)
@@ -591,8 +591,8 @@ class HoleControlPanel(QWidget):
         act_archive = export_menu.addAction("Archive Hole", self.archive_hole)
         act_archive.setToolTip("Archive a minimal reproducible set of files")
 
-        export_button.setMenu(export_menu) 
-        self.layout.addWidget(export_button)
+        self.export_button.setMenu(export_menu) 
+        self.layout.addWidget(self.export_button)
         
         self.layout.addStretch(1)
 
@@ -1066,6 +1066,9 @@ class HoleControlPanel(QWidget):
         )
         if not ok:
             logger.info(f"Generate downhole features cancelled in dialogue")
+            return
+        if not choice:
+            logger.info(f"No feature selected")
             return
         try:
             with busy_cursor("Creating donwhole feature dataset...", self):

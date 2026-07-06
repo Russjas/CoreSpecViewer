@@ -5,6 +5,7 @@ Used by UI pages to manipulate HoleObject base datasets.
 from pathlib import Path
 import re
 import logging
+import tempfile
 
 import numpy as np
 
@@ -469,7 +470,58 @@ def _get_legend_for_key(hole: HoleObject, key: str, export_type: str) -> dict | 
     # Continuous data doesn't need legend
     return None
 
-
+def build_ephemeral_hole(po: "ProcessedObject") -> "HoleObject":
+    """
+    Wrap a single, saved box in a throwaway one-box HoleObject for a
+    downhole preview.
+ 
+    Isolation is the whole point:
+      * the hole is rooted in a fresh scratch dir, set BEFORE add_box so
+        add_box does not adopt the box's real root_dir (it only adopts
+        when root is empty or '.'), keeping the '<hole_id>_depths.npy' /
+        '<hole_id>_AvSpectra.npy' writes out of the real box directory;
+       
+    The live po is added by reference. That is safe for a preview: the
+    generation methods write products to the HOLE (base_datasets /
+    product_datasets), not back onto the box. create_base_datasets does
+    call po.save_all()/reload_all() on the box, but given the guards below
+    that is an identical-bytes rewrite + re-memmap, which the vis page is
+    built to tolerate (it re-resolves all reads through the po accessors).
+ 
+    Raises
+    ------
+    ValueError
+        If the box has unsaved temp datasets, or lacks stats/segments.
+    """
+    if po.has_temps:
+        raise ValueError(
+            "Box has unsaved temporary datasets. Save/commit the box before "
+            "previewing downhole (base-dataset generation reloads the box and "
+            "would drop temps)."
+        )
+    if not (po.has("stats") and po.has("segments")):
+        raise ValueError(
+            "Unwrap stats/segments must be calculated for this box before a "
+            "downhole preview."
+        )
+ 
+    scratch = Path(tempfile.mkdtemp(prefix="dhole_preview_"))
+    
+ 
+    ho = HoleObject.new(hole_id=po.metadata['borehole id'], root_dir=scratch)
+    ho.add_box(po)                 # root already set -> add_box keeps scratch
+    ho.create_base_datasets()      # depths/AvSpectra land in scratch, not box dir
+ 
+    if "depths" not in ho.base_datasets:
+        # create_base_datasets swallows internal failures and returns self;
+        # surface a clear error instead of failing later on a missing key.
+        raise ValueError(
+            "Failed to build base datasets for the box (check box metadata: "
+            "core depth start/stop, anchors, convention)."
+        )
+ 
+    logger.info(f"Built ephemeral one-box hole {ho.hole_id} in {scratch}")
+    return ho
 
 
 
