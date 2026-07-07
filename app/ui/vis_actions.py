@@ -76,7 +76,7 @@ class VisActions(BaseActions):
                 view = DholeView.from_box(self.cxt.current, parent=self.controller)
             view.setWindowFlag(Qt.Window)   # parented, but still a top-level window
             view.show()
-            logger.info(f"setWindowFlag called, parent = {view.parent}")
+            
         except ValueError as e:                  # no temps / missing stats/segments, from build_ephemeral_hole
             self._show_error("Downhole preview", str(e))
             return

@@ -329,7 +329,7 @@ def export_profile_to_csv(
         raise ValueError(f"Invalid mode '{mode}'. Must be one of: {valid_modes}")
     
     # SETUP
-    step = step or hole.step
+    hole.step = step
     dataset = hole.product_datasets[key]
     depths_full = hole.base_datasets['depths'].data
     created_files = []
@@ -511,7 +511,7 @@ def build_ephemeral_hole(po: "ProcessedObject") -> "HoleObject":
     ho = HoleObject.new(hole_id=po.metadata['borehole id'], root_dir=scratch)
     ho.add_box(po)                 # root already set -> add_box keeps scratch
     ho.create_base_datasets()      # depths/AvSpectra land in scratch, not box dir
- 
+    ho.step = 0.005 # at the box scale a large step in not required, half a cm default
     if "depths" not in ho.base_datasets:
         # create_base_datasets swallows internal failures and returns self;
         # surface a clear error instead of failing later on a missing key.

@@ -931,7 +931,8 @@ class HoleControlPanel(QWidget):
         dlg.setInputMode(QInputDialog.DoubleInput)
         dlg.setWindowTitle("Resampling window")
         dlg.setLabelText("Enter resampling window in metres:")
-        
+        dlg.setDoubleDecimals(3)      # allow 3 decimal places
+        dlg.setDoubleMinimum(0.001)   # optional: prevent zero/negative step
         # Access the line edit and set placeholder
         line_edit = dlg.findChild(QLineEdit)
         if line_edit:

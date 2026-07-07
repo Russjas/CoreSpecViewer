@@ -201,6 +201,9 @@ class HoleObject:
         if not self.check_for_all_keys(key):
             logger.warning(f"Missing {key} data for one or more boxes in the hole. Calculate stats before calling this method.")
             raise ValueError(f"{key} dataset is not available for every box in hole")
+        if not self.check_for_all_keys('stats'):
+            logger.warning("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
+            raise ValueError("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
         if not (key.endswith("INDEX") or key.endswith("LEGEND")):
             logger.warning(f"{key} is an invalid dataset for this operation")
             raise ValueError(f"{key} is an invalid dataset for this operation")
@@ -255,7 +258,9 @@ class HoleObject:
         if not self.check_for_all_keys(key):
             logger.warning(f"Missing {key} data for one or more boxes in the hole. Calculate stats before calling this method.")
             raise ValueError(f"{key} dataset is not available for every box in hole")
-        
+        if not self.check_for_all_keys('stats'):
+            logger.warning("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
+            raise ValueError("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
         full_feature = None    # will become (H_total, K+1)
         for po in self:
             if po.datasets[key].ext != ".npz":

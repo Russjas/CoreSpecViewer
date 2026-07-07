@@ -702,7 +702,7 @@ class ProfileExportDialog(QDialog):
         self.key_combo = QComboBox()
         self.key_combo.addItems([str(k) for k in self.display_keys])
 
-        step_label = QLabel("Step:")
+        step_label = QLabel("Step (change resampling window):")
         self.step_spin = QDoubleSpinBox()
         self.step_spin.setDecimals(2)
         self.step_spin.setSingleStep(0.01)
