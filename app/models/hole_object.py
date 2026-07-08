@@ -275,7 +275,7 @@ class HoleObject:
 
             feat_row = np.ma.mean(seg, axis=1)                # (H, K+1)
             feat_row[valid_per_row < min_valid_px] = np.ma.masked   # no-data for thin rows
-            feat_row = np.ma.mean(seg, axis=1)
+           
             if full_feature is None:
                 full_feature = feat_row
             else:
