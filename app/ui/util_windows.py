@@ -690,6 +690,7 @@ class ProfileExportDialog(QDialog):
     ):
         super().__init__(parent)
         self.setWindowTitle(title)
+        self.export_all = False
 
         self.keys = list(keys or [])
         self.display_keys = [gen_display_text(key) for key in self.keys]
@@ -734,6 +735,12 @@ class ProfileExportDialog(QDialog):
             orientation=Qt.Horizontal,
             parent=self,
         )
+        self.all_btn = buttons.addButton("All", QDialogButtonBox.ActionRole)
+        self.all_btn.setToolTip(
+            "Export every valid dataset using the 'Both' option "
+            "to the output folder"
+        )
+        self.all_btn.clicked.connect(self._on_export_all)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
@@ -762,6 +769,15 @@ class ProfileExportDialog(QDialog):
         main.addLayout(row_mode)
         main.addWidget(buttons)
         self.setLayout(main)
+
+    def _on_export_all(self):
+        """Flag an export-all request and accept the dialog.
+
+        The selected key/mode are ignored by the caller when this is set;
+        every valid key is exported using the "both" mode instead.
+        """
+        self.export_all = True
+        self.accept()
 
     def _browse_for_dir(self):
         start_dir = self.dir_edit.text().strip() or ""
@@ -805,8 +821,8 @@ class ProfileExportDialog(QDialog):
         result = dlg.exec_()
         if result == QDialog.Accepted:
             key, step, out_dir, mode = dlg.values()
-            return True, key, step, out_dir, mode
-        return False, None, None, None, None
+            return True, key, step, out_dir, mode, dlg.export_all
+        return False, None, None, None, None, False
 
 
 class EnviExportDialog(QDialog):

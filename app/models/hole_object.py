@@ -268,6 +268,13 @@ class HoleObject:
                 raise ValueError(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
             convention = po.metadata.get('box_convention', None)
             seg, _ = unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats, po.segments, convention = convention)
+            min_valid_px = 6
+            valid_per_row = np.ma.count(seg, axis=1)          # (H, K+1) if 3-D, (H,) if 2-D
+            if valid_per_row.ndim > 1:
+                valid_per_row = valid_per_row.min(axis=1)     # row must clear threshold in every channel
+
+            feat_row = np.ma.mean(seg, axis=1)                # (H, K+1)
+            feat_row[valid_per_row < min_valid_px] = np.ma.masked   # no-data for thin rows
             feat_row = np.ma.mean(seg, axis=1)
             if full_feature is None:
                 full_feature = feat_row

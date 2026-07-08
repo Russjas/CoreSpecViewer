@@ -803,7 +803,7 @@ class HoleControlPanel(QWidget):
                 "No exportable datasets found. Generate base or product datasets first."
             )
             return
-        ok, key, step, out_dir, mode = ProfileExportDialog.get_values(
+        ok, key, step, out_dir, mode, export_all = ProfileExportDialog.get_values(
             parent=self,
             keys=exportable_keys,
             step_default=self.cxt.ho.step,
@@ -812,17 +812,48 @@ class HoleControlPanel(QWidget):
         if not ok:
             logger.info(f"Export cancelled in dialogue")
             return
+        if export_all:
+            exported, failures = [], []
+            for k in exportable_keys:
+                try:
+                    pt.export_profile_to_csv(self.cxt.ho, k, out_dir, "both", step)
+                    exported.append(k)
+                except (KeyError, ValueError) as e:
+                    logger.error(f"Failed to export dataset '{k}'", exc_info=True)
+                    failures.append((k, str(e)))
+
+            logger.info(
+                f"Export All finished for {self.cxt.ho.hole_id}: "
+                f"{len(exported)} exported, {len(failures)} failed")
+
+            if failures and not exported:
+                QMessageBox.warning(
+                    self, "Failed export",
+                    "Failed to export any datasets to csv:\n"
+                    + "\n".join(f"{gen_display_text(k)}: {e}" for k, e in failures))
+            elif failures:
+                QMessageBox.warning(
+                    self, "Exported with errors",
+                    f"Exported {len(exported)} dataset(s) for {self.cxt.ho.hole_id}.\n\n"
+                    "The following failed:\n"
+                    + "\n".join(f"{gen_display_text(k)}: {e}" for k, e in failures))
+            else:
+                QMessageBox.information(
+                    self, "Exported",
+                    f"Successfully exported all {len(exported)} dataset(s) "
+                    f"for {self.cxt.ho.hole_id}")
+            return
+
         try:
             pt.export_profile_to_csv(self.cxt.ho, key, out_dir, mode, step)
         except (KeyError, ValueError) as e:
             logger.error("Failed to export dataset", exc_info=True)
             QMessageBox.warning(
-                self, "Failed export", 
+                self, "Failed export",
                 f"Failed to export dataset to csv: {e}")
             return
         logger.info(f"Successfully exported {gen_display_text(key)} for {self.cxt.ho.hole_id}")
         QMessageBox.information(self, "Exported", f"Successfully exported {gen_display_text(key)} for {self.cxt.ho.hole_id}")
-        
 
     def export_pdf_booklet(self):
         """Open dialog to export PDF booklet."""
