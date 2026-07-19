@@ -48,40 +48,38 @@ class HoleActions(BaseActions):
         ])
             # --- HOLE actions ---
     def hole_next_box(self):
-        import time
-        start = time.perf_counter()
-        logger.info(f"Button clicked: Next Box")
+        logger.info(f"Button clicked: Next Box")     
         valid_state, msg = self.cxt.requires(self.cxt.HOLE)
         if not valid_state:
             logger.warning(msg)
             self._show_error("Hole Navigation", msg)
             return
-        checkpoint_1 = time.perf_counter()
-        logger.debug(f"PROFILE: Context validation: {checkpoint_1 - start:.4f}s")
-        
         try:
             box_num = int(self.cxt.current.metadata.get("box number"))
         except Exception:
             box_num = None
         if box_num is not None:
-            try:
-                checkpoint_2 = time.perf_counter()
-                logger.debug(f"PROFILE: Get box number: {checkpoint_2 - checkpoint_1:.4f}s")
-                self.cxt.current = self.cxt.ho[box_num+1]
-                checkpoint_3 = time.perf_counter()
-                logger.debug(f"PROFILE: Set current context: {checkpoint_3 - checkpoint_2:.4f}s")
-                active_page = self.controller.active_page()
-                if hasattr(active_page, "teardown"):
-                    active_page.teardown()
-                if hasattr(active_page, "activate"):
-                    active_page.activate()
-                
-                self.controller.refresh()
-                checkpoint_4 = time.perf_counter()
-                logger.debug(f"PROFILE: Controller refresh: {checkpoint_4 - checkpoint_3:.4f}s")
-                logger.debug(f"PROFILE: TOTAL next_box: {checkpoint_4 - start:.4f}s")
-            except KeyError:
-                return
+            next_box = None
+            found = False
+            for bn, po in self.cxt.ho.iter_items():
+                if found:
+                    next_box = po
+                    break
+                if bn == box_num:
+                    found = True
+
+            if next_box is None:
+                return   # at the last box
+           
+            self.cxt.current = next_box
+            active_page = self.controller.active_page()
+           
+            if hasattr(active_page, "teardown"):
+                active_page.teardown()
+            if hasattr(active_page, "activate"):
+                active_page.activate()
+            self.controller.refresh()  
+           
 
     def hole_prev_box(self):
         logger.info(f"Button clicked: Previous Box")
@@ -95,16 +93,21 @@ class HoleActions(BaseActions):
         except Exception:
             box_num = None
         if box_num is not None:
-            try:
-                self.cxt.current = self.cxt.ho[box_num-1]
-                active_page = self.controller.active_page()
-                if hasattr(active_page, "teardown"):
-                    active_page.teardown()
-                if hasattr(active_page, "activate"):
-                    active_page.activate()
-                self.controller.refresh()
-            except KeyError:
-                return
+            prev = None
+            for bn, po in self.cxt.ho.iter_items():
+                if bn == box_num:
+                    break
+                prev = po
+
+            if prev is None:
+                return   # at the first box
+            self.cxt.current = prev
+            active_page = self.controller.active_page()
+            if hasattr(active_page, "teardown"):
+                active_page.teardown()
+            if hasattr(active_page, "activate"):
+                active_page.activate()
+            self.controller.refresh()
 
     def hole_return_to_raw(self):
         logger.info(f"Button clicked: Return to Raw")
