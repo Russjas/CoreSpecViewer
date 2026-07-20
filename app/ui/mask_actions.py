@@ -204,6 +204,7 @@ class MaskActions(BaseActions):
             return
         with busy_cursor('unwrapping...', self.controller):
             self.cxt.po.build_all_thumbs(force=True)
+            self.cxt.po.save_all_thumbs()
 
     # Experimental auto masking
     def act_mask_by_cluster(self):

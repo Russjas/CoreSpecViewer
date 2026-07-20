@@ -13,7 +13,7 @@ from PIL import Image
 
 from ..spectral_ops import IO as io
 from ..spectral_ops.processing import remove_cont, process
-from ..spectral_ops.visualisation import get_false_colour, mk_thumb
+from ..spectral_ops.visualisation import get_false_colour, mk_thumb, DISPLAY_RANGE
 from .dataset import Dataset
 from ..config import config
 base_datasets = ["cropped", "savgol", "savgol_cr", "mask", "bands", "metadata", "display"]
@@ -379,9 +379,12 @@ class ProcessedObject:
     
 
     def export_images(self):
+        skip_keys = {'cropped', 'savgol', 'savgol_cr', 'stats'}
         for key in self.datasets.keys()|self.temp_datasets.keys():
-            try:
-                
+            if key in skip_keys:
+                logger.debug(f"Skipping thumbnail for {key} (use display instead)")
+                continue
+            try:                
                 self.export_image(key)
                 
             except (ValueError, FileNotFoundError):
@@ -399,76 +402,25 @@ class ProcessedObject:
             ds = self.datasets.get(key)
         if ds is None:
             return
-        if key == "stats":
-            logger.warning(f"Cannot export {key}")
-            return
         final_path = output_dir / f'{self.basename}-{key}.jpg'  
-        logger.debug(f"Attempting export {self.basename} {key} to {final_path}")
-        try:
-            if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
-                if key == "mask" or key == "DholeMask":
-                    msk = ds.data if (ds.data.ndim == 2) else ds.data[:,:,0]
-                    im = mk_thumb(msk, resize = False)                      # it *is* a mask — don't mask it
-                elif key.startswith('Dhole'):
-                    dmask = getattr(self, "DholeMask", None)
-                    if dmask is not None:
-                        mask_data = dmask[:, :, 0] if dmask.ndim == 3 else dmask
-                        im = mk_thumb(ds.data, mask=mask_data, resize = False)
-                        
-                    else:
-                        im = mk_thumb(ds.data, resize = False)                  # no matching mask → skip masking
-                elif key.endswith("INDEX"):
-                    im = mk_thumb(ds.data, mask=self.mask, index_mode=True, resize=False)
-                else:
-                    im = mk_thumb(ds.data, mask=self.mask, resize=False)
-            elif ds.ext == ".npz":
-                im = mk_thumb(ds.data.data, mask=ds.data.mask, resize =False)
-            else:
-                logger.warning(f"Failed to export {self.basename} {key}")
-                return
+        im = self.get_pil_image(key, resize= False)
+        if im is not None:
             im.save(str(final_path), quality = 95)
             logger.info(f"Exported {self.basename} {key}")
-        except ValueError:
-            logger.error(f"ValueError exporting image for {key}")
+        else:
             return
     
     def build_thumb(self, key):
-        if key == "stats":
+        im = self.get_pil_image(key, resize=True)
+        if im is None:
             return
-        ds = self.temp_datasets.get(key)
-        if ds is None:
-            ds = self.datasets.get(key)
-        if ds is None:
-            return
-
-        try:
-            if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
-                if key == "mask" or key == "DholeMask":
-                    msk = ds.data if (ds.data.ndim == 2) else ds.data[:,:,0]
-                    im = mk_thumb(msk)                      # it *is* a mask — don't mask it
-                elif key.startswith("Dhole"):
-                    dmask = getattr(self, "DholeMask", None)
-                    if dmask is not None:
-                        mask_data = dmask[:, :, 0] if dmask.ndim == 3 else dmask
-                        im = mk_thumb(ds.data, mask=mask_data)
-                    else:
-                        im = mk_thumb(ds.data)                  # no matching mask → skip masking
-                elif key.endswith("INDEX"):
-                    im = mk_thumb(ds.data, mask=self.mask, index_mode=True)
-                else:
-                    im = mk_thumb(ds.data, mask=self.mask)
-            elif ds.ext == ".npz":
-                im = mk_thumb(ds.data.data, mask=ds.data.mask)    
-            else:
-                return
+        ds = self.temp_datasets.get(key) or self.datasets.get(key)
+        if ds is not None:
             ds.thumb = im
-        except ValueError:
-            logger.warning(f"ValueError building thumb for {key}")
-            return
 
     def build_all_thumbs(self, force=False):
         """Build thumbnails for all thumbnail-able datasets."""
-        skip_keys = {'cropped', 'savgol', 'savgol_cr'}
+        skip_keys = {'cropped', 'savgol', 'savgol_cr', 'stats'}
         for key in self.datasets.keys()|self.temp_datasets.keys():
             if not force:
                 if key in skip_keys:
@@ -478,6 +430,55 @@ class ProcessedObject:
                 self.build_thumb(key)
             except Exception:
                 continue
+
+
+    def get_pil_image(self, key, resize):
+        "generate a pil image. Shared logic for build thumb and generate images"
+        
+        if key == "stats":
+            return
+        ds = self.temp_datasets.get(key)
+        if ds is None:
+            ds = self.datasets.get(key)
+        if ds is None:
+            return
+        stretch = self.get_stretch_values(key)
+        try:
+            if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
+                if key == "mask" or key == "DholeMask":
+                    msk = ds.data if (ds.data.ndim == 2) else ds.data[:,:,0]
+                    im = mk_thumb(msk, stretch = stretch, resize=resize)                      # it *is* a mask — don't mask it
+                elif key.startswith("Dhole"):
+                    dmask = getattr(self, "DholeMask", None)
+                    if dmask is not None:
+                        mask_data = dmask[:, :, 0] if dmask.ndim == 3 else dmask
+                        im = mk_thumb(ds.data, mask=mask_data, stretch = stretch, resize=resize)
+                    else:
+                        im = mk_thumb(ds.data, stretch = stretch, resize=resize)                  # no matching mask → skip masking
+                elif key.endswith("INDEX"):
+                    im = mk_thumb(ds.data, mask=self.mask, index_mode=True, stretch = stretch, resize=resize)
+                else:
+                    im = mk_thumb(ds.data, mask=self.mask, stretch = stretch, resize=resize)
+            elif ds.ext == ".npz":
+                im = mk_thumb(ds.data.data, mask=ds.data.mask, stretch = stretch, resize=resize)    
+            else:
+                return
+        except ValueError:
+            logger.warning(f"ValueError building thumb for {key}")
+            return
+        return im
+
+
+
+
+    def get_stretch_values(self, key):
+        """Return (vmin, vmax) for displaying a 2D continuous product, or None for local stretch."""
+        if key.endswith("POS") and key.replace("POS", "") in DISPLAY_RANGE:
+            return DISPLAY_RANGE[key.replace("POS", "")]
+        if key.endswith("DEP"):
+            return (0.0, 1.0)
+        return None 
+
 
     def save_all_thumbs(self):
         """Save any in-memory thumbnails as JPEGs beside their datasets."""

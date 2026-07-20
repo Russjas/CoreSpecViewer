@@ -291,7 +291,7 @@ class VisualisePage(BasePage):
                     wrapper.close()
                 return
 
-        # Fallback for everything else
+        # get display data for everything else
         try:
             disp_data = self.current_obj.get_data(key)
         except KeyError:
@@ -300,7 +300,9 @@ class VisualisePage(BasePage):
                 wrapper.close()
             return
         canvas.set_annotations(ann)
-        canvas.show_rgb(disp_data)
+        stretch = self.current_obj.get_stretch_values(key)
+        canvas.show_rgb(disp_data, stretch = stretch)
+        
 
 
     def _create_flagged_canvas(self, product_key):

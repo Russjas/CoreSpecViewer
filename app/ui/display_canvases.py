@@ -48,7 +48,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QKeySequence
 
-from ..spectral_ops.visualisation import get_false_colour
+from ..spectral_ops.visualisation import get_false_colour, DISPLAY_RANGE
 from .util_windows import SpectrumWindow
 logger = logging.getLogger(__name__)
 
@@ -681,7 +681,7 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
     # Display methods
     # ------------------------------------------------------------------
     @spatial_display
-    def show_rgb(self, image):
+    def show_rgb(self, image, stretch = None):
         if image.dtype == bool:
             image = image.astype(int)
         shp = getattr(image, "shape", None)
@@ -689,18 +689,18 @@ class ImageCanvas2D(BaseMatplotlibCanvas):
             return
 
         if len(shp) == 2:
-            # Added the percentile stretch to solve unmasked outliers
-            # But is actually adding more problems.
-            # Original problem may have been solved with improved masking.
-            # Removing until original problem re-surfaces
-            # may need to be solved with kw in signature and call-sites
-            #lo = np.nanpercentile(image.data, 2)
-            #hi = np.nanpercentile(image.data, 98)
-            #print("data:", np.nanmin(image.data), np.nanmax(image.data))
-            #print("p2/p98:", np.nanpercentile(image.data, 2), np.nanpercentile(image.data, 98))
-            #clipped = np.clip(image, lo, hi) if hi > lo else image
+            # This now enforces certain stretches based on the product type, derived by
+            # the object itself and passed through here
             self.ax.clear()
-            self.ax.imshow(image, cmap=my_map, origin="upper")
+            if stretch is not None:
+                amin, amax = stretch
+            else:
+                amin, amax = np.nanmin(image), np.nanmax(image)
+            if amax > amin:
+                self.ax.imshow(image, cmap=my_map, origin="upper", vmin=amin, vmax=amax)
+            else:
+                self.ax.imshow(image, cmap=my_map, origin="upper")
+
 
         elif len(shp) == 3 and shp[2] == 3:
             self.ax.clear()

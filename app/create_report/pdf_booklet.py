@@ -22,7 +22,7 @@ from reportlab.lib.utils import ImageReader
 import matplotlib
 from matplotlib.figure import Figure
 
-from ..spectral_ops.visualisation import mk_thumb, DISPLAY_RANGE
+
 from ..models.hole_object import HoleObject
 from ..ui.display_text import gen_display_text
 
@@ -395,8 +395,9 @@ def _build_single_box_segment(c, po, key, x_margin, y_top, y_bottom, width, lege
                 _draw_legend_compact(c, legend_ds.data, x, legend_top_y, display_width)
         else:
             ds = po.temp_datasets.get(key) or po.datasets.get(key)
+            stretch = po.get_stretch_values(key)
             if ds and ds.data is not None and ds.data.ndim==2:
-                _draw_colorbar_compact(c, ds.data, po.mask, x, legend_top_y, display_width)
+                _draw_colorbar_compact(c, ds.data, po.mask, x, legend_top_y, display_width, stretch = stretch)
         
         logger.debug(f"Added image for Box {box_num}, key={key}")
         
@@ -449,8 +450,10 @@ def _build_overview_page(c, hole, key):
             first_box = list(hole.boxes.values())[0]
             ds = first_box.temp_datasets.get(key) or first_box.datasets.get(key)
             mask = first_box.mask if first_box.has('mask') else None
-            if ds and ds.data is not None:
-                _draw_colorbar(c, ds.data, mask, x, y, display_width)
+            stretch = first_box.get_stretch_values(key)
+
+            if ds and ds.data is not None and ds.data.ndim==2:
+                _draw_colorbar(c, ds.data, mask, x, y, display_width, stretch = stretch)
         logger.debug(f"Added overview for key={key}")
         
     except Exception as e:
@@ -461,21 +464,10 @@ def _build_overview_page(c, hole, key):
 
 def _generate_box_image(po, key: str) -> Image.Image:
     """Generate full-resolution image for box page."""
-    ds = po.temp_datasets.get(key) or po.datasets.get(key)
-    if ds is None:
-        raise ValueError(f"Dataset key '{key}' not found in box {po.basename}")
-    
-    if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
-        if key == "mask":
-            return mk_thumb(ds.data, resize=False)
-        elif key.endswith("INDEX"):
-            return mk_thumb(ds.data, mask=po.mask, index_mode=True, resize=False)
-        else:
-            return mk_thumb(ds.data, mask=po.mask, resize=False)
-    elif ds.ext == ".npz":
-        return mk_thumb(ds.data.data, mask=ds.data.mask, resize=False)
-    else:
-        raise ValueError(f"Cannot generate image for dataset type {ds.ext}")
+    im = po.get_pil_image(key, resize=False)
+    if im is None:
+        raise ValueError(f"Cannot generate image for '{key}' in box {po.basename}")
+    return im
     
 
 
@@ -539,33 +531,19 @@ def _draw_legend_compact(c, legend: list[dict], x_start, y_bottom, width):
             row += 1
 
 
-def _draw_colorbar_compact(c, data, mask, x_start, y_bottom, width):
+def _draw_colorbar_compact(c, data, mask, x_start, y_bottom, width, stretch = None):
     """Draw compact horizontal colorbar for continuous data below image in tight space."""
     # Determine stretch range (same logic as mk_thumb)
     if mask is not None:
         a = np.ma.masked_array(data, mask=mask).astype(float)
     else:
         a = np.ma.array(data, dtype=float)
-    
-    
-    data_min = np.nanmin(a)
-    data_max = np.nanmax(a)
-    
-    # Detect range type
-    if data_min >= 0 and np.sum((a.compressed() >= 0) & (a.compressed() <= 1)) >= 0.95 * a.compressed().size:
-        amin, amax = 0.0, 1.0
-    else:
-        in_range = False
-        compressed = a.compressed()
-        for range_min, range_max in DISPLAY_RANGE.values():
-            valid_data = compressed[(compressed >= range_min) & (compressed <= range_max)]
-            if valid_data.size > 0.7 * compressed.size:
-                amin, amax = range_min, range_max
-                in_range = True
-                break
-        if not in_range:
-            amin, amax = data_min, data_max
-    
+    if stretch is not None:
+        amin, amax = stretch
+    else:    
+        amin = np.nanmin(a)
+        amax = np.nanmax(a)
+       
     # Draw compact horizontal colorbar
     my_map = matplotlib.colormaps['viridis']
     bar_height = 10  # Smaller height
@@ -589,8 +567,8 @@ def _draw_colorbar_compact(c, data, mask, x_start, y_bottom, width):
     # Draw labels below the colorbar
     c.setFont("Helvetica", 6)  # Smaller font
     c.setFillColorRGB(0, 0, 0)
-    c.drawString(x_bar, y_pos - 10, f"{amin:.0f}")
-    c.drawRightString(x_bar + bar_width, y_pos - 10, f"{amax:.0f}")
+    c.drawString(x_bar, y_pos - 10, f"{amin:.2f}")
+    c.drawRightString(x_bar + bar_width, y_pos - 10, f"{amax:.2f}")
 
 
 # Keep original legend/colorbar functions for overview pages
@@ -652,31 +630,19 @@ def _draw_legend(c, legend: list[dict], img_data, x_start, y_bottom, width):
             row += 1
 
 
-def _draw_colorbar(c, data, mask, x_start, y_bottom, width):
+def _draw_colorbar(c, data, mask, x_start, y_bottom, width, stretch = None):
     """Draw horizontal colorbar for continuous data below image."""
+    
     # Determine stretch range (same logic as mk_thumb)
     if mask is not None:
         a = np.ma.masked_array(data, mask=mask).astype(float)
     else:
         a = np.ma.array(data, dtype=float)
-    
-    data_min = np.nanmin(a)
-    data_max = np.nanmax(a)
-    
-    # Detect range type
-    if data_min >= 0 and np.sum((a.compressed() >= 0) & (a.compressed() <= 1)) >= 0.95 * a.compressed().size:
-        amin, amax = 0.0, 1.0
-    else:
-        in_range = False
-        compressed = a.compressed()
-        for range_min, range_max in DISPLAY_RANGE.values():
-            valid_data = compressed[(compressed >= range_min) & (compressed <= range_max)]
-            if valid_data.size > 0.7 * compressed.size:
-                amin, amax = range_min, range_max
-                in_range = True
-                break
-        if not in_range:
-            amin, amax = data_min, data_max
+    if stretch is not None:
+        amin, amax = stretch
+    else:    
+        amin = np.nanmin(a)
+        amax = np.nanmax(a)
     
     # Draw horizontal colorbar
     my_map = matplotlib.colormaps['viridis']
@@ -701,8 +667,8 @@ def _draw_colorbar(c, data, mask, x_start, y_bottom, width):
     # Draw labels below the colorbar
     c.setFont("Helvetica", 8)
     c.setFillColorRGB(0, 0, 0)
-    c.drawString(x_bar, y_pos - 12, f"{amin:.0f}")
-    c.drawRightString(x_bar + bar_width, y_pos - 12, f"{amax:.0f}")
+    c.drawString(x_bar, y_pos - 12, f"{amin:.2f}")
+    c.drawRightString(x_bar + bar_width, y_pos - 12, f"{amax:.2f}")
 
 
 def _render_downhole_plot_to_buffer(
@@ -965,7 +931,8 @@ def create_po_pdf_booklet(
     exclude_keys = ["savgol", "cropped", "savgol_cr", "metadata", "stats", "bands", "display", "annotations"]
     selected_keys = [key for key in po.datasets.keys() if key not in exclude_keys
                      and not key.endswith("LEGEND")
-                     and not key.endswith("CLUSTERS")]
+                     and not key.endswith("CLUSTERS")
+                     and not key.startswith('Dhole')]
     
     logger.info(f"Creating PDF booklet for {po.basename} with {len(selected_keys)} keys")
     
