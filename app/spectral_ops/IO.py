@@ -459,7 +459,7 @@ def find_snr_and_reflect(header_path, white_path, dark_path, QAQC=False,
     if QAQC:
         band_slice, snr = bands_from_snr(white_ref, dark_ref, snr_thresh=20.0)
     else:
-        sensor = header['sensor type']
+        sensor = header.get('sensor type', 'undetected')
         band_slice = _slice_from_sensor(sensor)
         snr = None
 

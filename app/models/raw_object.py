@@ -69,10 +69,10 @@ class RawObject:
         """Load and merge Specim XML + ENVI header metadata if available."""
         if 'metadata' in self.files.keys() and 'data head' in self.files.keys():
             self.metadata = io.parse_lumo_metadata(self.files['metadata']) | io.read_envi_header(self.files['data head'])
-            self.sensor = self.metadata['sensor type']
+            self.sensor = self.metadata.get('sensor type', 'Undetected')
         elif 'metadata' not in self.files.keys() and 'data head' in self.files.keys():
             self.metadata = io.read_envi_header(self.files['data head'])
-            self.sensor = self.metadata['sensor type']
+            self.sensor = self.metadata.get('sensor type', 'Undetected')
     @property
     def is_raw(self) -> bool:
         """Return True; distinguishes from ProcessedObject."""
