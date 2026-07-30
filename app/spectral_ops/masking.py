@@ -338,9 +338,16 @@ def hough_line_connection(mask):
     result = mask.copy()
     
     if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            cv2.line(result, (x1, y1), (x2, y2), 1, 2)  # Draw with value 1, not 255
+        
+        for x1, y1, x2, y2 in np.asarray(lines).reshape(-1, 4):
+            cv2.line(
+            result,
+            (int(x1), int(y1)),
+            (int(x2), int(y2)),
+            1,
+            2,
+        )
+            
     
     return result
 
