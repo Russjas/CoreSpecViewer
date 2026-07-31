@@ -153,6 +153,7 @@ class ProcessedObject:
         return obj
 
 
+
     @classmethod
     def load_post_processed_envi(cls, head_path, data_path, meta_path = None,  mask_path = None, smoothed = True):
         """
@@ -191,6 +192,7 @@ class ProcessedObject:
         data, metadata = io.load_envi(head_path, data_path)
         if meta_path is not None:
             metadata = metadata | io.parse_lumo_metadata(meta_path)
+        metadata["spatial_downhole_units"] = config.spatial_units
         
         band_key, bands = io.find_bands(metadata, data)
         
@@ -326,6 +328,32 @@ class ProcessedObject:
     def clear_temps(self):
         """Remove all temporary datasets."""
         self.temp_datasets.clear()
+
+    def get_units(self):
+        """Spatial downhole units for this box.
+
+        New boxes are stamped with the active default (config.spatial_units) at
+        Process time, so a box with *no* stored key predates the feature and is
+        metres by definition. Resolve to "m" here without mutating metadata; the
+        'Change depth units' toggle overrides per box.
+        """
+        unit = self.metadata.get("spatial_downhole_units")
+        return unit if unit in ("m", "ft") else "m"
+    
+    def get_depth_params_in_m(self):
+        """collects start stop and anchor depths from the po
+        then checks units and returns values in m always"""
+        
+        DEPTH_UNIT_TO_M = {"m": 1.0, "ft": 0.3048}
+        def to_metres(value, unit):
+            return float(value) * DEPTH_UNIT_TO_M.get(unit, 1.0)
+        
+        unit = self.get_units()     # legacy → metres
+        start = to_metres(float(self.metadata["core depth start"]), unit)
+        stop  = to_metres(float(self.metadata["core depth stop"]),  unit)
+        anchors = [{**a, "depth": to_metres(float(a["depth"]), unit)}   # keep x,y; convert depth
+                for a in (self.metadata.get("anchors") or [])]
+        return start, stop, anchors
 
     @property
     def is_raw(self) -> bool:

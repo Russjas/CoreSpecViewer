@@ -694,6 +694,8 @@ class HoleControlPanel(QWidget):
         # Depth range from per-box metadata if present
         starts = []
         stops = []
+        units = list({po.get_units() for po in self.cxt.ho})
+        unit = units[0] if len(units) == 1 else 'mixed units'
         for meta in self.cxt.ho.hole_meta.values():
             try:
                 s = float(meta.get("core depth start", "nan"))
@@ -711,7 +713,7 @@ class HoleControlPanel(QWidget):
         if starts and stops:
             dmin = min(starts)
             dmax = max(stops)
-            self.lbl_depth_range.setText(f"{dmin:.2f}–{dmax:.2f} m")
+            self.lbl_depth_range.setText(f"{dmin:.2f}–{dmax:.2f} {unit}")
         else:
             self.lbl_depth_range.setText("—")
 

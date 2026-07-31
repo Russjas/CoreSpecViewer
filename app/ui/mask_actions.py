@@ -42,10 +42,40 @@ class MaskActions(BaseActions):
             ("button", "Unmask region", lambda: self.act_mask_rect(unmask=True), "Unmasks a rectangle in existing mask", "Ctrl+Shift+R"),
             ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),
             ("button", "re-generate thumbs (slow)", self.re_thumb, 'Regenerates all thumbnail images. Slow process, but shouldnt be needed often'),
-            ("button", "Rim", self.rim_mask, "Apply a rim to the mask", "Ctrl+Alt+R")
+            ("button", "Rim", self.rim_mask, "Apply a rim to the mask", "Ctrl+Alt+R"),
+            ("button", "Change depth units", self.depth_unit_change, "Change the depth units for this box, default is m")
         ])
     
     # -------- MASK actions --------
+    
+    def depth_unit_change(self):
+        logger.info("Button clicked: Depth unit change")
+
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Depth units", msg)
+            return
+
+        current_u = self.cxt.current.get_units()
+        units = ["m", "ft"]
+
+        current_index = units.index(current_u) if current_u in units else 0
+
+        unit, ok = QInputDialog.getItem(
+            self.controller,
+            "Depth units",
+            "Depth units:",
+            units,
+            current_index,
+            False,
+        )
+        if not ok:
+            return
+        metadata = dict(self.cxt.current.metadata)
+        metadata['spatial_downhole_units'] = unit
+        self.cxt.current.add_temp_dataset('metadata', metadata, ext='.json')
+        logger.info(f"Units updated to {unit} from {current_u}")
 
     def act_mask_rect(self, unmask = False):
         label = "Unmask Region" if unmask else "Mask Region"

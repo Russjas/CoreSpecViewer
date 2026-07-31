@@ -38,6 +38,7 @@ from PyQt5.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
+    QFormLayout,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -554,7 +555,7 @@ class MetadataDialog(QDialog):
     """
     def __init__(self, meta=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Specim Metadata")
+        self.setWindowTitle("Metadata")
 
         layout = QVBoxLayout(self)
 
@@ -997,6 +998,11 @@ class AutoSettingsDialog(QDialog):
                 combo.addItems(t.CONVENTION_DISPLAY.values())
                 combo.setCurrentText(t.CONVENTION_DISPLAY.get(str(v), str(v)))
                 self.tbl.setCellWidget(row, 1, combo)
+            elif k == "spatial_units":
+                combo_s = QComboBox()
+                combo_s.addItems(["m", "ft"])
+                combo_s.setCurrentText(v)
+                self.tbl.setCellWidget(row, 1, combo_s)
             else:
                 val_item = QTableWidgetItem(str(v))
                 self.tbl.setItem(row, 1, val_item)
@@ -1021,7 +1027,10 @@ class AutoSettingsDialog(QDialog):
             key = self.tbl.item(r, 0).text()
             widget = self.tbl.cellWidget(r, 1)
             if widget is not None:
-                val = self.CONVENTION_REVERSE[widget.currentText()]
+                if key == "box_convention":
+                    val = self.CONVENTION_REVERSE[widget.currentText()]
+                else:
+                    val = widget.currentText()
             else:
                 val = self.tbl.item(r, 1).text()
             t.modify_config(key, val)
@@ -1165,3 +1174,27 @@ class CustomFeatureDialog(QDialog):
             return dialog.get_feature_dict()
         return None
 
+class RGBBandDialog(QDialog):
+    def __init__(self, items, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("False colour bands")
+
+        self.combos = []
+
+        layout = QFormLayout(self)
+
+        for label in ("R", "G", "B"):
+            combo = QComboBox()
+            combo.addItems([f"{item:.2f}" for item in items])
+            layout.addRow(label, combo)
+            self.combos.append(combo)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+
+    def selected_indices(self):
+        return [combo.currentIndex() for combo in self.combos]

@@ -16,6 +16,7 @@ from ..spectral_ops import IO as io
 from ..spectral_ops.visualisation import get_false_colour
 from ..spectral_ops.processing import process
 from .processed_object import ProcessedObject
+from ..config import config
 
 logger = logging.getLogger(__name__)
 
@@ -471,6 +472,7 @@ class RawObject:
             self.get_reflectance()
         if getattr(self, "temp_reflectance", None) is not None:
             self.reflectance = self.temp_reflectance
+        self.metadata["spatial_downhole_units"] = config.spatial_units
         po = ProcessedObject.new(self.root_dir, self.basename)
         po.add_dataset('metadata', self.metadata, ext='.json')
         po.add_dataset('cropped', self.reflectance, ext='.npy')

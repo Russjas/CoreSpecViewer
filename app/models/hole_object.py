@@ -130,6 +130,7 @@ class HoleObject:
         if not self.check_for_all_keys('stats'):
             logger.warning("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
             raise ValueError("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
+        
         full_depths = None
         full_average = None
         try:
@@ -141,9 +142,8 @@ class HoleObject:
 # =============================================================================
             for po in self:
                 convention = po.metadata.get('box_convention', None)
-                anchors = po.metadata.get('anchors', None)
-                depth_start = float(po.metadata['core depth start'])
-                depth_stop = float(po.metadata['core depth stop'])
+                depth_start, depth_stop, anchors = po.get_depth_params_in_m()
+                
                 img, depths = unwrap_from_stats(po.mask, po.savgol, po.stats, po.segments,
                                         convention = convention,
                                         anchors = anchors,
@@ -228,6 +228,7 @@ class HoleObject:
         for po in self:
             convention = po.metadata.get('box_convention', None)
             seg, _ = unwrap_from_stats(po.mask, po.datasets[ind_key].data, po.stats, po.segments, convention = convention)
+
             fractions, dominant = compute_downhole_mineral_fractions(seg.data, seg.mask, 
                                                                      po.datasets[leg_key].data)
             if full_fractions is None:

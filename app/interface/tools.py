@@ -543,9 +543,7 @@ def unwrapped_output(obj):
     registration
     """
     convention = obj.metadata.get('box_convention', None)
-    anchors = obj.metadata.get('anchors', None)
-    depth_start = float(obj.metadata['core depth start'])
-    depth_stop = float(obj.metadata['core depth stop'])
+    depth_start, depth_stop, anchors = obj.get_depth_params_in_m()
     dhole_reflect, dhole_depths, dmap = unwrap_from_stats(obj.mask, obj.savgol, obj.stats, obj.segments, 
                                                     convention=convention,
                                                     anchors = anchors,
@@ -1060,4 +1058,22 @@ def band_math_interface(obj, name, expr, cr = False):
     obj.add_temp_dataset(clean_key, np.ma.masked_array(out, obj.mask), '.npz')
     return obj
 
-    
+def custom_false_colour(obj, bands: list):
+    """
+    Produce a custom 3-band false colour image, using the spectral library get_rgb call.
+    obj must be a processed object and bands must be a list of integers
+    """
+    if len(bands) != 3:
+        logger.warning(f"A list of three bands is required, {len(bands)} were provided")
+        return obj
+    if not all(isinstance(x, int) for x in bands):
+        logger.warning(f"A list of three integers is required but wrong types were provided")
+        return obj
+    if not all(0 <= x < obj.savgol.shape[2] for x in bands):
+        logger.warning(f"Band numbers must be between 0 and {obj.savgol.shape[2] - 1}")
+    data = obj.savgol
+    fc = get_false_colour(data, bands = bands)
+    fc[obj.mask == 1] = (0,0,0)
+    key = "-".join(f"{obj.bands[x]:.2f}" for x in bands)
+    obj.add_temp_dataset(key, fc, '.npy')
+    return obj

@@ -35,6 +35,9 @@ class AppConfig:
     fenix_slice_start: int = 20
     fenix_slice_stop: int = -20
 
+    #spatial downhole units
+    spatial_units: str = "m" 
+
     # Savitzky-Golay
     savgol_window: int = 11
     savgol_polyorder: int = 2

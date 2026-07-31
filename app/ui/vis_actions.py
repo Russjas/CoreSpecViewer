@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QInputDialog, QFileDialog, QDialog
 
 from ..interface import tools as t
 from .base_actions import BaseActions
-from . import busy_cursor, LibMetadataDialog, WavelengthRangeDialog, LibMetadataDialog
+from . import busy_cursor, LibMetadataDialog, WavelengthRangeDialog, LibMetadataDialog, RGBBandDialog
 from .band_math_dialogue import BandMathsDialog
 from ..config import feature_keys as FEATURE_KEYS
 from ..create_report.pdf_booklet import create_po_pdf_booklet
@@ -59,10 +59,34 @@ class VisActions(BaseActions):
     ("button", "Generate box report", self.create_report, "Generates full size images of all products and base datasets in an outputs folder"),
     ("button", "Export to ENVI", self.box_ops.export_envi, "Export this box to an ENVI file pair for use in external tools"),
     ("button", "View box downhole", self.act_view_downhole,
-     "Open a single-box downhole preview (requires unwrap stats; save the box first)")
+     "Open a single-box downhole preview (requires unwrap stats; save the box first)"),
+    ("button", "Create custom false colour", self.act_custom_fc, "Creates a custom 3-band false colour image product")
 ])
         
     # -------- VISUALISE actions --------
+    def act_custom_fc(self):
+        logger.info("Button clicked: Custom False Colour")
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)  
+        if not valid_state:
+            QMessageBox.information(self.controller, "Downhole preview", msg)
+            return
+
+        wvls = self.cxt.current.bands
+        dialog = RGBBandDialog(wvls, parent=self.controller)
+        dialog.combos[0].setCurrentIndex(0)
+        dialog.combos[1].setCurrentIndex(len(wvls)//2)
+        dialog.combos[2].setCurrentIndex(len(wvls)-1)
+        if dialog.exec_() == QDialog.Accepted:
+            bands = dialog.selected_indices()
+
+        try: 
+            self.cxt.current = t.custom_false_colour(self.cxt.current, bands)
+        except(TypeError, ValueError) as e:
+            self._show_error("Custom False Colour", str(e))
+            return
+        logger.info(f"{self.cxt.current.basename} Custom False Colour created")
+        self.controller.refresh()
+
     def act_view_downhole(self):
         logger.info("Button clicked: View box downhole")
         valid_state, msg = self.cxt.requires(self.cxt.UNWRAP)   # ('processed', 'has:stats')

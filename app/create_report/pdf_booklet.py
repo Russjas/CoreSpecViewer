@@ -190,6 +190,9 @@ def _build_title_page(c, hole, selected_keys):
     
     # Collect metadata
     starts, stops = [], []
+    units = list({po.get_units() for po in hole})
+    unit = units[0] if len(units) == 1 else ''
+
     for meta in hole.hole_meta.values():
         try:
             s = float(meta.get("core depth start", "nan"))
@@ -224,13 +227,13 @@ def _build_title_page(c, hole, selected_keys):
         c.setFont("Helvetica-Bold", 11)
         c.drawString(margin, y, "Depth Range:")
         c.setFont("Helvetica", 11)
-        c.drawString(margin + 100, y, f"{dmin:.2f}m to {dmax:.2f}m")
+        c.drawString(margin + 100, y, f"{dmin:.2f}{unit} to {dmax:.2f}{unit}")
         y -= 20
         
         c.setFont("Helvetica-Bold", 11)
         c.drawString(margin, y, "Total Depth:")
         c.setFont("Helvetica", 11)
-        c.drawString(margin + 100, y, f"{dmax - dmin:.2f}m")
+        c.drawString(margin + 100, y, f"{dmax - dmin:.2f}{unit}")
         y -= 20
     
     # Missing boxes
@@ -354,14 +357,14 @@ def _build_single_box_segment(c, po, key, x_margin, y_top, y_bottom, width, lege
     box_num = po.metadata.get('box number', 'Unknown')
     box_depth_start = po.metadata.get('core depth start', 'N/A')
     box_depth_stop = po.metadata.get('core depth stop', 'N/A')
-    
+    unit = po.get_units()
     # Heading at top of this section
     c.setFont("Helvetica-Bold", 10)
     c.drawString(x_margin, y_top - 15, f"Box {box_num} - {gen_display_text(key)}")
     
     # Metadata
     c.setFont("Helvetica", 8)
-    c.drawString(x_margin, y_top - 28, f"Depth: {box_depth_start}m to {box_depth_stop}m")
+    c.drawString(x_margin, y_top - 28, f"Depth: {box_depth_start}{unit} to {box_depth_stop}{unit}")
     
     # Image area
     try:
@@ -1013,7 +1016,7 @@ def _build_po_title_page(c, po, selected_keys):
     if metadata:
         depth_start = metadata.get("core depth start", "N/A")
         depth_stop = metadata.get("core depth stop", "N/A")
-        
+        unit = po.get_units()
         if depth_start != "N/A" and depth_stop != "N/A":
             try:
                 ds = float(depth_start)
@@ -1022,13 +1025,13 @@ def _build_po_title_page(c, po, selected_keys):
                 c.setFont("Helvetica-Bold", 11)
                 c.drawString(margin, y, "Depth Range:")
                 c.setFont("Helvetica", 11)
-                c.drawString(margin + 100, y, f"{ds:.2f}m to {de:.2f}m")
+                c.drawString(margin + 100, y, f"{ds:.2f}{unit} to {de:.2f}{unit}")
                 y -= 20
                 
                 c.setFont("Helvetica-Bold", 11)
                 c.drawString(margin, y, "Box Length:")
                 c.setFont("Helvetica", 11)
-                c.drawString(margin + 100, y, f"{de - ds:.2f}m")
+                c.drawString(margin + 100, y, f"{de - ds:.2f}{unit}")
                 y -= 20
             except (ValueError, TypeError):
                 pass

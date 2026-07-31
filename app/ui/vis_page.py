@@ -367,8 +367,9 @@ class VisualisePage(BasePage):
 
         if self.current_obj is not None and not self.current_obj.is_raw:
             try:
+                unit = self.current_obj.get_units()
                 table_title = f'{self.current_obj.metadata["borehole id"]} {self.current_obj.metadata["box number"]}'
-                first_row = f'{self.current_obj.metadata["core depth start"]}m - {self.current_obj.metadata["core depth stop"]}m'
+                first_row = f'{self.current_obj.metadata["core depth start"]}{unit} - {self.current_obj.metadata["core depth stop"]}{unit}'
             except KeyError:
                 table_title = 'Cached products'
                 first_row = ""

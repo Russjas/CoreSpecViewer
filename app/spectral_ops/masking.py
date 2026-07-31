@@ -170,7 +170,7 @@ def detect_slice_rectangles(img_eq,
             continue
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, approx_eps_frac * peri, True)
- 
+        
         if len(approx) == 4 and cv2.isContourConvex(approx):
             x, y, w, h = cv2.boundingRect(approx)
             rects_xywh.append((x, y, w, h))
