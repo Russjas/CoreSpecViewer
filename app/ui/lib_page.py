@@ -124,7 +124,7 @@ class LibraryPage(BasePage):
         sel.blockSignals(True)
         sel.clear()
         sel.addItem("Opened database")
-        for name in sorted(self.cxt.library.collections.keys()):
+        for name in self.cxt.library.list_collections():
             sel.addItem(name)
         # try to preserve previous choice if still valid
         idx = sel.findText(current)
@@ -427,7 +427,7 @@ class LibraryPage(BasePage):
 
 
     def _choose_existing_collection(self, title="Select collection"):
-        names = sorted(self.cxt.library.collections.keys())
+        names = self.cxt.library.list_collections()
         if not names:
             QMessageBox.information(self, "No collections", "Create a collection first via 'Add Selected → Collection'.")
             return None
@@ -437,7 +437,7 @@ class LibraryPage(BasePage):
         return name if ok else None
 
     def _prompt_collection_name(self, title="Collection name", allow_new=True):
-        names = sorted(self.cxt.library.collections.keys())
+        names = self.cxt.library.list_collections()
         if names and allow_new:
             # Let user pick existing or type new
             name, ok = QInputDialog.getItem(self, title, "Choose collection (or type a new name):",
@@ -466,7 +466,7 @@ class LibraryPage(BasePage):
     def _on_view_changed(self, text: str):
        if text == "Opened database":
            self._proxy.set_allowed_ids(None)
-       elif text in self.cxt.library.collections.keys():
+       elif text in self.cxt.library.list_collections():
            self._proxy.set_allowed_ids(self.cxt.library.collections.get(text))
        else:
            self._proxy.set_allowed_ids(None)
@@ -555,7 +555,7 @@ class LibraryPage(BasePage):
         if QMessageBox.question(self, "Confirm delete",
                                 f"Delete collection '{name}'? This cannot be undone.") != QMessageBox.Yes:
             return
-        self.cxt.library.collections.pop(name, None)
+        self.cxt.library.clear_collection(name)
         logger.info(f"Collection '{name}' removed.")
         QMessageBox.information(self, "Deleted", f"Collection '{name}' removed.")
         self._refresh_collection_selector()

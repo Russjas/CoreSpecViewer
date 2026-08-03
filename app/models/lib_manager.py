@@ -185,6 +185,7 @@ class LibraryManager:
     def set_collection_ids(self, name: str, ids: Iterable[int]) -> None:
         """Replace collection contents with the given SampleIDs."""
         self.collections[name] = set(int(v) for v in ids)
+        self._invalidate_exemplars(name)   
 
     def add_to_collection(self, name: str, ids: Iterable[int]) -> Tuple[int, int]:
         """
@@ -201,15 +202,27 @@ class LibraryManager:
         before = len(coll)
         coll.update(int(v) for v in ids)
         added = len(coll) - before
+        self._invalidate_exemplars(name)   
         return added, len(coll)
 
     def clear_collection(self, name: str) -> None:
         """Remove a collection by name (no-op if not present)."""
         self.collections.pop(name, None)
+        self._invalidate_exemplars(name)   
 
     # ------------------------------------------------------------------
     # Exemplars
     # ------------------------------------------------------------------
+
+    def _invalidate_exemplars(self, name: str | None = None) -> None:      # NEW (line 213)
+        """Drop cached exemplars for one collection, or all if name is None."""
+        if name is None:
+            self.exemplars_by_collection.clear()
+        else:
+            self.exemplars_by_collection.pop(name, None)
+
+
+
     def get_collection_exemplars(
         self,
         name: str
@@ -701,6 +714,7 @@ class LibraryManager:
             
             for collection in self.collections.values():
                 collection.discard(sample_id)
+            self._invalidate_exemplars()   
             
             if self.model:
                 self.model.select()
