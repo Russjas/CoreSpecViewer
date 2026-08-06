@@ -23,6 +23,7 @@ Toolbar hierarchy:
 
 import logging
 import uuid
+from weakref import WeakKeyDictionary
 
 import matplotlib
 matplotlib.rcParams['savefig.dpi'] = 600
@@ -85,16 +86,23 @@ _SHAPE_COLOURS = {
 
 def spatial_display(func):
         def wrapper(self, *args, **kwargs):
-            self.toolbar._ann_btn.setEnabled(True)   # 1. enable button
-            result = func(self, *args, **kwargs)      # 2. ax.clear(), imshow(), canvas.draw()
-            #self.fig.tight_layout() 
-            self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)  
-            if self._show_annotations:               # 3. after canvas.draw() has fired
+            cl = kwargs.pop('lims', None)          # None -> home, (xlim, ylim) -> restore, 'keep' -> hold live
+            print(cl, "Keep lims value passed through update display")
+            lims = None
+            if not cl and self.ax.images:
+                lims = (self.ax.get_xlim(), self.ax.get_ylim())
+            self.toolbar._ann_btn.setEnabled(True)
+            result = func(self, *args, **kwargs)      # ax.clear(), imshow()
+            self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
+            if self._show_annotations:
                 self.draw_annotations(self._last_annotations)
-            else:
-                self.canvas.draw_idle()
+            if lims is not None:                      # restore AFTER annotations, so nothing re-autoscales it
+                self.ax.set_xlim(lims[0])
+                self.ax.set_ylim(lims[1])
+            self.canvas.draw_idle()
             return result
         return wrapper
+
 
 def chart_display(func):
     def wrapper(self, *args, **kwargs):
@@ -117,9 +125,11 @@ class BaseCanvasToolbar(NavigationTool):
     Extends the matplotlib navigation toolbar with an annotation toggle button.
     Wired to parent.`_toggle_annotations` — parent must be a BaseMatplotlibCanvas.
     """
+    _nav_group = None   # set by the page when this toolbar joins a sync group if required
 
     def __init__(self, canvas, parent):
         super().__init__(canvas, parent)
+        self._host = parent          # the BaseMatplotlibCanvas that owns this toolbar
         self.addSeparator()
         self._ann_btn = QPushButton("Annotations", self)
         self._ann_btn.setToolTip("Toggle annotation overlay")
@@ -138,6 +148,43 @@ class BaseCanvasToolbar(NavigationTool):
         self._ann_btn.clicked.connect(parent._toggle_annotations)
         self.addWidget(self._ann_btn)
 
+    # --- shared navigation history (group-aware) --------------------------
+    def push_current(self):
+        grp = self._nav_group
+        if grp is None:
+            return super().push_current()          # ungrouped: stock matplotlib
+        view = self._host.ax._get_view()           # this canvas's view, replicated
+        entry = WeakKeyDictionary()
+        for c in grp.sync_members():
+            ax = getattr(c, "ax", None)
+            if ax is None:
+                continue
+            entry[ax] = (view,
+                         (ax.get_position(True).frozen(),
+                          ax.get_position().frozen()))
+        self._nav_stack.push(entry)                # the shared, page-owned stack
+        self.set_history_buttons()
+
+    def _update_view(self):
+        super()._update_view()                      # applies entry to every stored axes
+        grp = self._nav_group
+        if grp is None:
+            return
+        for c in grp.sync_members():                # base draws only self; draw peers too
+            cv = getattr(c, "canvas", None)
+            if cv is not None:
+                cv.draw_idle()
+        members = list(grp.sync_members())
+        if not members:
+            return
+        source_ax = members[0].ax
+        xlim = source_ax.get_xlim()
+        ylim = source_ax.get_ylim()
+
+        for member in members:
+            member.ax.set_xlim(xlim)
+            member.ax.set_ylim(ylim)
+            member.canvas.draw_idle()
 
 class SpectralCanvasToolbar(BaseCanvasToolbar):
     """

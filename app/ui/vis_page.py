@@ -6,6 +6,7 @@ and provides pixel inspection tools.
 """
 import logging
 
+from matplotlib.cbook import _Stack
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QCursor
 from PyQt5.QtWidgets import QTableWidgetItem, QMenu
@@ -46,7 +47,8 @@ class VisualisePage(BasePage):
         
         # Track all canvases for synchronization (including closable ones)
         self._sync_canvases = [self.left_canvas, mask_canvas]
-        
+        # Track wether to default to keeping displayed extent
+        self.change_display_lims = True
         tbl = RightClick_TableWidget(0, 1, self)
         tbl.setHorizontalHeaderLabels(["Cached Products"])
         tbl.horizontalHeader().setStretchLastSection(True)
@@ -63,6 +65,7 @@ class VisualisePage(BasePage):
 
         self._mpl_cids = []  # store mpl connection ids
         self._sync_lock = False
+        self._view_stack = _Stack()
 
     def activate(self):
         super().activate()
@@ -96,10 +99,11 @@ class VisualisePage(BasePage):
                 self.spec_win.plot_spectrum(self.current_obj.bands, spec, title=title, label=f"({y}, {x})")
             self.dispatcher.set_double_click(_double_click, temporary=False) 
 
-            self.refresh_cache_table()
+            
 
     def teardown(self):
         super().teardown()
+        self._view_stack.clear()
         # Disconnect any mpl events
         if self._mpl_cids:
             for cv, cid in self._mpl_cids:
@@ -130,7 +134,8 @@ class VisualisePage(BasePage):
             )
         mask_canvas.mask_flag = True
         self._sync_canvases = [self.left_canvas, mask_canvas]
-        
+        self._view_stack.clear()
+
         self.cache.clear()
         self.table.setRowCount(0)
         self.table.setHorizontalHeaderItem(0, QTableWidgetItem("Cached Products"))
@@ -181,6 +186,12 @@ class VisualisePage(BasePage):
 
         self.dispatcher.add_canvas(canvas)
 
+        # add to the shared navigation stack group
+        tb = getattr(canvas, "toolbar", None)
+        if tb is not None:
+            tb._nav_stack = self._view_stack
+            tb._nav_group = self
+
         # Bind sync events if we're active
         if not hasattr(canvas, 'canvas'):
             return
@@ -215,23 +226,75 @@ class VisualisePage(BasePage):
         self._bind_mpl(canvas.canvas, "scroll_event", _sync_from_event)
         self._bind_mpl(canvas.canvas, "key_release_event", _sync_from_event)
 
+    def sync_members(self):
+        """Canvases sharing the view sync and the shared nav history."""
+        return list(self._sync_canvases)
+
+    def _seed_nav_home(self):
+        """Reset the shared history so Home == the current (full-extent) views."""
+        self._view_stack.clear()
+        members = self.sync_members()
+        if members and getattr(members[0], "toolbar", None) is not None:
+            members[0].toolbar.push_current()
+
+    def _add_to_view_group(self, canvas):
+        """Make a drawn canvas a full member: shared nav stack, current group
+        view, and a history entry. Call after the canvas has been drawn."""
+        if canvas not in self._sync_canvases or not hasattr(canvas, "ax"):
+            return
+        tb = getattr(canvas, "toolbar", None)
+        if tb is not None:
+            tb._nav_stack = self._view_stack
+            tb._nav_group = self
+        ref = next((c for c in self._sync_canvases
+                    if c is not canvas and hasattr(c, "ax")), None)
+        if ref is not None:                       # adopt the group's live view
+            self._sync_lock = True
+            try:
+                canvas.ax.set_xlim(ref.ax.get_xlim())
+                canvas.ax.set_ylim(ref.ax.get_ylim())
+                canvas.canvas.draw_idle()
+            finally:
+                self._sync_lock = False
+        if tb is not None:
+            tb.push_current()                     # combined entry now includes it
+
     def update_display(self, key='mask'):
         if self.current_obj is None:
             return
         if self.current_obj.is_raw:
             return
-                
+        #To manage retaining zoom position if the dataset has not changed.
+        images = self.left_canvas.ax.images
+        displayed_shape  = images[-1].get_array().shape if images else (0,0)
+        same_dims = (self.current_obj.display.shape[:2]==displayed_shape[:2])
+        header_item = self.table.horizontalHeaderItem(0)
+        displayed_header = header_item.text() if header_item else ""
+        current_header = (
+                f'{self.current_obj.metadata["borehole id"]} '
+                f'{self.current_obj.metadata["box number"]}'
+                        )
+        same_box = current_header == displayed_header
+        if same_dims and same_box:
+            self.change_display_lims = False
+            
+        else:
+            self.change_display_lims = True
+            
+        #end of zoom management set up
+
         ann = self.current_obj['annotations'].data if self.current_obj.has('annotations') else {}
-        self.left_canvas.show_rgb_direct(self.current_obj.display, annotations=ann)
+        self.left_canvas.show_rgb_direct(self.current_obj.display, annotations=ann, lims = self.change_display_lims)
         
         self.refresh_cache_table()
         
         for canvas in list(self._sync_canvases):
             if hasattr(canvas, "product_flag"):
                 self._display_product_in_canvas(canvas, canvas.product_flag)
-            
-        
-        
+                
+        if self.change_display_lims:
+            self._seed_nav_home()
+
 
     def _on_row_activated(self, row: int, col: int):
         """
@@ -264,6 +327,8 @@ class VisualisePage(BasePage):
         # Display the product
         self._display_product_in_canvas(canvas, key)
         logger.info(f"{key} displayed in vis page.")
+        self._add_to_view_group(canvas)
+
 
     def _display_product_in_canvas(self, canvas, key):
         """
@@ -283,7 +348,7 @@ class VisualisePage(BasePage):
 
                 if index is not None and getattr(index, "ndim", 0) == 2:
                     canvas.set_annotations(ann)
-                    canvas._show_index_with_legend(index, self.current_obj.mask, legend)
+                    canvas._show_index_with_legend(index, self.current_obj.mask, legend, lims = self.change_display_lims)
                     return
             except KeyError:
                 wrapper = canvas.parent()
@@ -301,8 +366,7 @@ class VisualisePage(BasePage):
             return
         canvas.set_annotations(ann)
         stretch = self.current_obj.get_stretch_values(key)
-        canvas.show_rgb(disp_data, stretch = stretch)
-        
+        canvas.show_rgb(disp_data, stretch = stretch, lims = self.change_display_lims)
 
 
     def _create_flagged_canvas(self, product_key):
@@ -316,6 +380,7 @@ class VisualisePage(BasePage):
         if key in self.cache:
             self.cache.discard(key)
             self.refresh_cache_table()
+
 
     def refresh_cache_table(self):
         """
