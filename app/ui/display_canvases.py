@@ -86,8 +86,8 @@ _SHAPE_COLOURS = {
 
 def spatial_display(func):
         def wrapper(self, *args, **kwargs):
-            cl = kwargs.pop('lims', None)          # None -> home, (xlim, ylim) -> restore, 'keep' -> hold live
-            print(cl, "Keep lims value passed through update display")
+            cl = kwargs.pop('lims', True) 
+            
             lims = None
             if not cl and self.ax.images:
                 lims = (self.ax.get_xlim(), self.ax.get_ylim())
@@ -199,17 +199,17 @@ class SpectralCanvasToolbar(BaseCanvasToolbar):
 
         contrast_btn = QPushButton("Contrast+", self)
         contrast_btn.setToolTip("Increase image contrast (2-98 percentile stretch) (Alt+C)")
-        contrast_btn.clicked.connect(lambda: parent.increase_contrast())
+        contrast_btn.clicked.connect(lambda: parent.increase_contrast(lims = False))
         self.addWidget(contrast_btn)
 
         hist_btn = QPushButton("Equalize", self)
         hist_btn.setToolTip("Histogram equalization (enhance detail) (Alt+E)")
-        hist_btn.clicked.connect(lambda: parent.equalize_histogram())
+        hist_btn.clicked.connect(lambda: parent.equalize_histogram(lims = False))
         self.addWidget(hist_btn)
 
         reset_btn = QPushButton("Reset", self)
         reset_btn.setToolTip("Reset to original image")
-        reset_btn.clicked.connect(lambda: parent.reset_display())
+        reset_btn.clicked.connect(lambda: parent.reset_display(lims = False))
         self.addWidget(reset_btn)
 
 
@@ -1043,11 +1043,11 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
 
         #Shortcuts for visual display changes
         QShortcut(QKeySequence("Alt+E"), self,
-          activated=self.equalize_histogram,
+          activated=lambda: self.equalize_histogram(lims = False),
           context=Qt.ApplicationShortcut)
 
         QShortcut(QKeySequence("Alt+C"), self,
-                activated=self.increase_contrast,
+                activated=lambda: self.increase_contrast(lims = False),
                 context=Qt.ApplicationShortcut)
 
     # ------------------------------------------------------------------
