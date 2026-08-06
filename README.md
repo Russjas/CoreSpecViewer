@@ -72,6 +72,7 @@ In the Miniforge/Miniconda/Anaconda prompt:
 
 ```bash
 # Clone the repository
+conda install git  
 git clone https://github.com/Russjas/CoreSpecViewer.git
 cd CoreSpecViewer
 
