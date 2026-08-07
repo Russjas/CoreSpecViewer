@@ -512,14 +512,7 @@ def build_ephemeral_hole(po: "ProcessedObject") -> "HoleObject":
     ho.add_box(po)                 # root already set -> add_box keeps scratch
     ho.create_base_datasets()      # depths/AvSpectra land in scratch, not box dir
     ho.step = 0.005 # at the box scale a large step in not required, half a cm default
-    if "depths" not in ho.base_datasets:
-        # create_base_datasets swallows internal failures and returns self;
-        # surface a clear error instead of failing later on a missing key.
-        raise ValueError(
-            "Failed to build base datasets for the box (check box metadata: "
-            "core depth start/stop, anchors, convention)."
-        )
- 
+     
     logger.info(f"Built ephemeral one-box hole {ho.hole_id} in {scratch}")
     return ho
 

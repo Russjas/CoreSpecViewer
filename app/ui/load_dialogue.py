@@ -688,7 +688,14 @@ class LoadDialogue(QDialog):
             self._warn("Failed to open hole directory", str(e))
             logger.error(f"Failed to open hole directory from {dp}", exc_info=True)
             return
-
+        if hole.rejected_boxes:
+            QMessageBox.warning(
+                    self,
+                    "Band mismatch",
+                    "The following boxes were excluded because their wavelength band centres "
+                    "do not match the hole:\n\n"
+                    + "\n".join(hole.rejected_boxes)
+                )
         # cxt.po, ro and current are not affected by ho update
         self.cxt.ho = hole
         self.view_flag = "hol"
@@ -850,6 +857,14 @@ class LoadDialogue(QDialog):
             self._warn("Failed to load hole archive", str(e))
             logger.error(f"Failed to hydrate hole archive from {path}", exc_info=True)
             return
+        if hole.rejected_boxes:
+            QMessageBox.warning(
+                        self,
+                        "Band mismatch",
+                        "The following boxes were excluded because their wavelength band centres "
+                        "do not match the hole:\n\n"
+                        + "\n".join(hole.rejected_boxes)
+                    )
         self.cxt.ho = hole
         self.view_flag = "hol"
         logger.info(f"loaded hole archive {self.cxt.ho.hole_id}")

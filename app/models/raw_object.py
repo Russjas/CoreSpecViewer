@@ -471,13 +471,17 @@ class RawObject:
         if not hasattr(self, "reflectance") or self.reflectance is None:
             self.get_reflectance()
         if getattr(self, "temp_reflectance", None) is not None:
-            self.reflectance = self.temp_reflectance
+            source = (
+                    self.temp_reflectance
+                    if self.temp_reflectance is not None
+                    else self.reflectance
+                )
         self.metadata["spatial_downhole_units"] = config.spatial_units
         po = ProcessedObject.new(self.root_dir, self.basename)
         po.add_dataset('metadata', self.metadata, ext='.json')
-        po.add_dataset('cropped', self.reflectance, ext='.npy')
+        po.add_dataset('cropped', source, ext='.npy')
         po.add_dataset('bands', self.bands, ext='.npy')
-        savgol, savgol_cr, mask = process(self.reflectance)
+        savgol, savgol_cr, mask = process(source)
         po.add_dataset('savgol', savgol, ext='.npy')
         po.add_dataset('savgol_cr', savgol_cr, ext='.npy')
         po.add_dataset('mask', mask, ext='.npy')

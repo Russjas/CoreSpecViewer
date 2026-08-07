@@ -217,7 +217,6 @@ def parse_lumo_metadata(xml_file):
         k for k in _BRUTE_TARGETS
         if not out.get(k, '').strip()
     ]
-    print(f"TEMP PRINT MISSING {missing}")
     if missing:
         logger.warning(
             f"parse_lumo_metadata structured parse missing {missing} — falling back to brute force for {xml_file}"

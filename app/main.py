@@ -465,6 +465,15 @@ class MainRibbonController(QMainWindow):
                 
                 try:
                     hole = HoleObject.build_from_parent_dir(path)
+                    if hole.rejected_boxes:
+                        QMessageBox.warning(
+                            self,
+                            "Band mismatch",
+                            "The following boxes were excluded because their wavelength band centres "
+                            "do not match the hole:\n\n"
+                            + "\n".join(hole.rejected_boxes)
+                        )
+
                     
                     self.cxt.ho = hole
                     self._distribute_context()
@@ -684,9 +693,19 @@ class MainRibbonController(QMainWindow):
         lines = []
 
         # Check po for temp datasets
-        if self.cxt.po is not None and self.cxt.po.has_temps:
-            keys = ", ".join(self.cxt.po.temp_datasets.keys())
-            lines.append(f"  {self.cxt.po.basename}: {keys}")
+        if self.cxt.po is not None: 
+            if self.cxt.po.has_temps:
+                keys = ", ".join(self.cxt.po.temp_datasets.keys())
+                lines.append(f"  {self.cxt.po.basename}: {keys}")
+            unsaved_box = [
+                                k for k, ds in self.cxt.po.datasets.items()
+                                if not ds.path.exists()
+                            ]
+            if unsaved_box:
+                lines.append(
+                    f"  {self.cxt.po.basename}: {', '.join(unsaved_box)}"
+    )
+
 
         # Check ho: any box with temps, or any unsaved hole product datasets
         if self.cxt.ho is not None:

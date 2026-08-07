@@ -22,6 +22,13 @@ from .processed_object import ProcessedObject
 from .dataset import Dataset
 
 logger = logging.getLogger(__name__)
+
+
+class BandMismatchError(Exception):
+    """Unique exception for a box's band centres not matching the hole bands centres"""
+    pass
+
+
 def combine_timestamp(meta: dict) -> datetime | None:
     """
     Combine 'time' and 'date' fields in metadata into a datetime object.
@@ -47,10 +54,13 @@ class HoleObject:
     first_box: int
     last_box: int
     hole_meta: dict[int, dict] = field(default_factory=dict)
+    bands: np.ndarray | None = None
     boxes: dict[int, "ProcessedObject"] = field(default_factory=dict)
     base_datasets: dict = field(default_factory=dict)
     product_datasets: dict = field(default_factory=dict)
     step: float = 0.05
+
+    rejected_boxes: list[str] = field(default_factory=list)
     
     
     #==================fullhole dataset operations=============================
@@ -133,14 +143,13 @@ class HoleObject:
         
         full_depths = None
         full_average = None
-        try:
-            import time
-            start = time.perf_counter()
-            full_depths_list = []
-            full_average_list = []
-            
+                   
+        full_depths_list = []
+        full_average_list = []
+        
 # =============================================================================
-            for po in self:
+        for po in self:
+            try:
                 convention = po.metadata.get('box_convention', None)
                 depth_start, depth_stop, anchors = po.get_depth_params_in_m()
                 
@@ -149,30 +158,26 @@ class HoleObject:
                                         anchors = anchors,
                                         depth_start = depth_start,
                                         depth_stop = depth_stop)
-                checkpoint_1 = time.perf_counter()
-                logger.debug(f"Unwrapped {po.datasets['metadata'].data['box number']}: {checkpoint_1 - start:.4f}s")
+                
                 full_depths_list.append(depths)
                 full_average_list.append(np.ma.mean(img, axis=1))
-                checkpoint_2 = time.perf_counter()
-                logger.debug(f"appended results {checkpoint_2 - checkpoint_1:.4f}s")
+                
                 po.save_all()
-                checkpoint_3 = time.perf_counter()
-                logger.debug(f"saved all {checkpoint_3 - checkpoint_2:.4f}s")
+                
                 po.reload_all()
-                checkpoint_4 = time.perf_counter()
-                logger.debug(f"Reloaded all {checkpoint_4 - checkpoint_3:.4f}s")
+                
                 logger.info(f"Processed {self.hole_id} box number {po.metadata['box number']}")
 
-        
-        except Exception as e:
-            logger.error(f'many, many things could have gone wrong', exc_info=True)
-            return self
+    
+            except Exception as e:
+                logger.error(f'Create datasets failed during iterative loop at box {po.box_number}', exc_info=True)
+                raise ValueError("failed to create base datasets") from e
+                
         
         
         full_depths = np.concatenate(full_depths_list)
         full_average = np.ma.vstack(full_average_list)
-        checkpoint_final = time.perf_counter()
-        logger.debug(f"Total for {self.num_box}: {checkpoint_final - start:.4f}s")
+        
         self.base_datasets['depths'] = Dataset(base=self.hole_id, 
                                           key="depths", 
                                           path=self.root_dir / f"{self.hole_id}_depths.npy", 
@@ -431,6 +436,7 @@ class HoleObject:
         hole = cls.new(hole_id=hole_id, root_dir=root)
 
         # ---- PASS 2: load only boxes; add_box will filter by hole_id & update counters
+        
         for fp in sorted(root.glob("*_metadata.json")):
             try:
                 po = ProcessedObject.from_path(fp)  # may memmap; acceptable for matching ones
@@ -440,6 +446,9 @@ class HoleObject:
                 logger.error(f"mismatched hole_id or bad metadata -> skipped {fp}", exc_info=True)
                 # mismatched hole_id or bad metadata -> skip
                 continue
+            except BandMismatchError:
+                logger.error(f"Band mismatch between band centres of box {fp} and hole bands")
+                hole.rejected_boxes.append(str(fp))
             except Exception:
                 logger.error(f"Load error", exc_info=True)
                 continue
@@ -473,6 +482,7 @@ class HoleObject:
         if not isinstance(obj, ProcessedObject):
             obj = ProcessedObject.from_path(obj)
 
+        #pull box details for validation against hole
         try:
             meta = obj.metadata
             box_hole_id = meta["borehole id"]
@@ -489,6 +499,15 @@ class HoleObject:
             raise ValueError(
                 f"Box hole_id '{box_hole_id}' does not match HoleObject.hole_id '{self.hole_id}'"
             )
+        # initialise / validate band centres
+        if self.bands is None:
+            self.bands = obj.bands
+        else:
+            band_match = np.array_equal(self.bands, obj.bands)
+            if not band_match:
+                logger.error(f"Box band centres do not match hole bands")
+                raise BandMismatchError(f"Box band centres do not match hole bands")
+
 
         # initialise root_dir if empty
         if not getattr(self, "root_dir", None) or str(self.root_dir) == ".":
@@ -518,12 +537,6 @@ class HoleObject:
 
         return box_num
 
-    def get_bands(self):
-        """Returns the band centres of the first box of the hole
-        Boxes are checked for band consistency on load"""
-        if self.first_box is None:
-            raise ValueError("No boxes available in HoleObject")
-        return self[self.first_box].bands
     
     def save_hole_archive(self, archive_dir: Path | str = None) -> Path:
         """
@@ -784,16 +797,35 @@ class HoleObject:
                 po = ProcessedObject.hydrate_from_archive(box_archive, self.root_dir)
                 po.save_all()
                 po.reload_all()
-                self.add_box(po)
-                logger.info(f"added box {po.metadata['box number']} to {self.hole_id}")
+                try:
+                    self.add_box(po)
+                    logger.info(f"added box {po.metadata['box number']} to {self.hole_id}")
+                except ValueError:
+                    logger.error(f"mismatched hole_id or bad metadata -> skipped {po.basename}", exc_info=True)
+                    # mismatched hole_id or bad metadata -> skip
+                    continue
+                except BandMismatchError:
+                    logger.error(f"Band mismatch between band centres of box {po.basename} and hole bands")
+                    self.rejected_boxes.append(str(po.basename))
+                    continue
+                except Exception:
+                    logger.error(f"Load error", exc_info=True)
+                    continue  
         else:
             logger.warning(f"No boxes/ directory found in {archive_dir}")
             raise ValueError(f"No boxes/ directory found in {archive_dir}")
-                
-            
-    
-    
-    
+
+  
+    def get_bands(self):
+        """Returns the band centres of the hole if present else 
+        bands of the first box of the hole.
+        """
+        if self.bands is not None:
+            return self.bands
+        if self.first_box is None:
+            raise ValueError("No boxes available in HoleObject")
+        return self[self.first_box].bands
+
     
     def check_for_all_keys(self, key):
         for i in self:

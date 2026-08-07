@@ -967,6 +967,8 @@ class EnviExportDialog(QDialog):
                   title=title or "Export to ENVI")
         if dlg.exec_() == QDialog.Accepted:
             out_dir, smoothed, masked, smooth_params = dlg.values()
+            if out_dir is None:
+                 return False, None, None, None, None
             return True, out_dir, smoothed, masked, smooth_params
         return False, None, None, None, None
 

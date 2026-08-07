@@ -143,7 +143,7 @@ def crop(obj, y_min, y_max, x_min, x_max):
         # Ensure mask is processed first for thumbnail generation
         ordered_keys = ['mask'] if 'mask' in keys else []
         ordered_keys.extend([k for k in keys if k != 'mask'])
-        
+        base_uncropped_shape = obj.savgol.shape[:2]
         total_crop_time = 0
         for key in ordered_keys:
             key_start = time.perf_counter()
@@ -152,7 +152,7 @@ def crop(obj, y_min, y_max, x_min, x_max):
             # choose source: prefer temp if present
             src = obj.temp_datasets[key].data if obj.has_temp(key) else obj.datasets[key].data
             
-            if isinstance(src, np.ndarray) and src.ndim > 1:
+            if isinstance(src, np.ndarray) and src.shape[:2] == base_uncropped_shape:
                 array_copy_start = time.perf_counter()
                 sliced = src[y_min:y_max, x_min:x_max, ...]
                 cropped_copy = sliced.copy()
