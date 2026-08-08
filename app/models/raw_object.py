@@ -470,8 +470,7 @@ class RawObject:
         """
         if not hasattr(self, "reflectance") or self.reflectance is None:
             self.get_reflectance()
-        if getattr(self, "temp_reflectance", None) is not None:
-            source = (
+        source = (
                     self.temp_reflectance
                     if self.temp_reflectance is not None
                     else self.reflectance

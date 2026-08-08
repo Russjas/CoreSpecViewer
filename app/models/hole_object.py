@@ -221,7 +221,7 @@ class HoleObject:
             ind_key = key.replace("LEGEND", "INDEX")
             
         #check all legends are the same, not working with different versions
-        dicts = [po.datasets[leg_key].data for po in self]
+        dicts = [po[leg_key].data for po in self]
         if not all(d == dicts[0] for d in dicts[1:]):
             logger.warning(f"Boxes with {key} have different Legend entries")
             raise ValueError(f"Boxes with {key} have different Legend entries")
@@ -232,10 +232,10 @@ class HoleObject:
         
         for po in self:
             convention = po.metadata.get('box_convention', None)
-            seg, _ = unwrap_from_stats(po.mask, po.datasets[ind_key].data, po.stats, po.segments, convention = convention)
+            seg, _ = unwrap_from_stats(po.mask, po[ind_key].data, po.stats, po.segments, convention = convention)
 
             fractions, dominant = compute_downhole_mineral_fractions(seg.data, seg.mask, 
-                                                                     po.datasets[leg_key].data)
+                                                                     po[leg_key].data)
             if full_fractions is None:
                 # First box → just take it as-is
                 full_fractions = fractions      # shape (H_box, K+1)
@@ -269,11 +269,13 @@ class HoleObject:
             raise ValueError("Missing 'stats' data for one or more boxes in the hole. Calculate stats before calling this method.")
         full_feature = None    # will become (H_total, )
         for po in self:
-            if po.datasets[key].ext != ".npz":
+            ds = po[key]
+
+            if ds.ext != ".npz":
                 logger.warning(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
                 raise ValueError(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
             convention = po.metadata.get('box_convention', None)
-            seg, _ = unwrap_from_stats(po.datasets[key].data.mask, po.datasets[key].data.data, po.stats, po.segments, convention = convention)
+            seg, _ = unwrap_from_stats(ds.data.mask, ds.data.data, po.stats, po.segments, convention = convention)
             min_valid_px = int(np.ceil(0.15 * seg.shape[1])) # minimum fraction of valid pixels relative to approximate core width per box
             
             valid_per_row = np.ma.count(seg, axis=1)          #(H,) as 2-D
@@ -362,10 +364,14 @@ class HoleObject:
         
         # Get thumbnail for each box
         for po in self:
-            ds = po.temp_datasets.get(key) or po.datasets.get(key)
-            if ds is None or ds.thumb is None:
+            if not po.has(key):
                 logger.warning(f"Skipping box {po.basename} - no thumbnail for key '{key}'")
                 continue
+
+            ds = po[key]
+            if ds.thumb is None:
+                logger.warning(f"Skipping box {po.basename} - no thumbnail for key '{key}'")
+                
             images.append(ds.thumb)
         
         if not images:
@@ -828,9 +834,8 @@ class HoleObject:
 
     
     def check_for_all_keys(self, key):
-        for i in self:
-            tst = i.datasets.get(key)
-            if not tst:
+        for po in self:
+            if not po.has(key):
                 return False
         return True
 

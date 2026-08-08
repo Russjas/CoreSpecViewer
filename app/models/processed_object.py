@@ -52,15 +52,7 @@ class ProcessedObject:
 
 
 
-    # ---- convenience attribute passthrough ----
-    def __getattr__(self, name):
-        """Convenience passthrough for accessing `.data` via attribute syntax."""
-        if name in self.temp_datasets:
-            return self.temp_datasets[name].data
-        elif name in self.datasets:
-            return self.datasets[name].data
-        logger.error(f"{name} not found in datasets or attributes")
-        raise AttributeError(f"{name} not found in datasets or attributes")
+#==================== Constructors and loaders ====================================================
 
     # ---- internal: parse a stem into (basename, key) with a special-case for 'savgol_cr' ----
     @staticmethod
@@ -87,6 +79,11 @@ class ProcessedObject:
             # No underscore -> cannot infer
             return None, None
         return base, key
+
+    @classmethod
+    def new(cls, root_dir, basename):
+        """Factory for a brand-new ProcessedObject (no files yet)."""
+        return cls(basename=basename, root_dir=Path(root_dir))
 
     @classmethod
     def from_path(cls, path):
@@ -131,7 +128,8 @@ class ProcessedObject:
             b, key = cls._parse_stem_with_exception(s)
             if b is None or b != basename:
                 continue  # not part of this basename group
-            if key.endswith('thumb'):                continue
+            if key.endswith('thumb'):                
+                continue
 
             ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
 
@@ -145,9 +143,9 @@ class ProcessedObject:
                     raise ValueError(f'Required dataset {key} failed to load for box {basename}')
             datasets[key] = ds
         obj = cls(basename=basename, root_dir=root, datasets=datasets)
-        if 'display' not in obj.datasets:
+        if not obj.has('display'):
             obj._generate_display()
-            obj.datasets['display'].save_dataset()
+            obj['display'].save_dataset()
             obj.reload_all()  # Drop back to memmaps   
 
         return obj
@@ -228,7 +226,10 @@ class ProcessedObject:
         po._generate_display()
         po.build_all_thumbs()
         return po
-        
+    
+#=====================================================================================================================
+#==============direct display dataset manipulation====================================================================
+
     def _generate_display(self):
         """Generate RGB display dataset from savgol"""
         logger.info(f"Generating display dataset for {self.basename}")
@@ -255,36 +256,14 @@ class ProcessedObject:
         self.build_thumb('display')
         logger.debug(f"display regenerated for {self.basename}")
 
-    # ---- disk I/O helpers ----
+#=====================================================================================================================
+#================disk I/O helpers=====================================================================================
     def save_all(self, new=False):
         """Save all registered datasets to disk."""
         for dataset in self.datasets.values():
             dataset.save_dataset(new=new)
             dataset.save_thumb()
 
-    @classmethod
-    def new(cls, root_dir, basename):
-        """Factory for a brand-new ProcessedObject (no files yet)."""
-        return cls(basename=basename, root_dir=Path(root_dir))
-
-    def add_dataset(self, key, data, ext=".npy"):
-        """Attach an in-memory dataset; not written until save_all()."""
-        path = self.root_dir / f"{self.basename}_{key}{ext}"
-        ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
-        self.datasets[key] = ds
-
-
-    def add_temp_dataset(self, key, data=None, ext=".npy"):
-        """Attach an in-memory dataset; not written until save_all()."""
-        if key in self.datasets.keys():
-            self.temp_datasets[key] = self.datasets[key].copy(data=data)
-            self.build_thumb(key)
-            return
-        path = self.root_dir / f"{self.basename}_{key}{ext}"
-        ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
-        self.temp_datasets[key] = ds
-        
-        self.build_thumb(key)
 
     def update_root_dir(self, path):
         """
@@ -305,6 +284,29 @@ class ProcessedObject:
                 filename = f"{self.basename}_{ds.key}{ds.ext}"
                 ds.path = new_root.joinpath(filename)
 
+#=====================================================================================================================
+#================dataset management=====================================================================================
+
+    def add_dataset(self, key, data, ext=".npy"):
+        """Attach an in-memory dataset; not written until save_all()."""
+        path = self.root_dir / f"{self.basename}_{key}{ext}"
+        ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
+        self.datasets[key] = ds
+
+
+    def add_temp_dataset(self, key, data=None, ext=".npy"):
+        """Attach an in-memory dataset; not written until save_all()."""
+        if key in self.datasets.keys():
+            self.temp_datasets[key] = self.datasets[key].copy(data=data)
+            self.build_thumb(key)
+            return
+        path = self.root_dir / f"{self.basename}_{key}{ext}"
+        ds = Dataset(base=self.basename, key=key, path=path, suffix=key, ext=ext, data=data)
+        self.temp_datasets[key] = ds
+        
+        self.build_thumb(key)
+
+    # TODO: check delete okay, this shouldnt be called everything should go through temp dataset
     def update_dataset(self, key, data):
         """Replace the in-memory data for a given dataset key."""
         self.datasets[key].data = data
@@ -325,10 +327,71 @@ class ProcessedObject:
 
         self.clear_temps()
 
+
     def clear_temps(self):
         """Remove all temporary datasets."""
         self.temp_datasets.clear()
 
+
+    def reload_dataset(self, key):
+        """Reload a single dataset from disk."""
+        self.datasets[key].load_dataset()
+
+
+    def reload_all(self):
+        """Reload all datasets from disk."""
+        for ds in self.datasets.values():
+            ds.load_dataset()
+
+    #TODO: make decisions about how this is handled
+    def delete_dataset(self, key):
+        
+        """
+        Remove a dataset from the object and optionally delete from disk.
+        
+        Parameters
+        ----------
+        key : str
+            Dataset key to delete (e.g., 'mask', 'savgol_cr').
+           
+        Raises
+        ------
+        KeyError
+            If the dataset key doesn't exist.
+        
+        Examples
+        --------
+        >>> po.delete_dataset('old_product')  # Delete file and remove from memory
+        >>> po.delete_dataset('temp_data', from_disk=False)  # Remove from memory only
+        """
+        if key in base_datasets:
+            return #You dont want to delete these datasets.
+        
+        # Check both permanent and temporary datasets
+        if key in self.datasets:
+            ds = self.datasets[key]
+            location = self.datasets
+        elif key in self.temp_datasets:
+            ds = self.temp_datasets[key]
+            location = self.temp_datasets
+        else:
+            raise KeyError(f"Dataset '{key}' not found in object")
+        
+        if key.endswith("INDEX"):
+            try:
+                self.delete_dataset(key.replace("INDEX", "LEGEND"))
+            except (KeyError, FileNotFoundError):
+                pass #not in keys or already deleted
+        try:
+            ds.delete()
+        except FileNotFoundError:
+            # File already gone, that's fine
+            pass
+               
+        del location[key]
+
+#======================================================================================================
+# ================================Public API ==========================================================
     def get_units(self):
         """Spatial downhole units for this box.
 
@@ -367,10 +430,12 @@ class ProcessedObject:
     # ---- registry API ----
     def keys(self):
         """Return a sorted list of all dataset keys (base + temp)."""
+        
         return sorted(self.datasets.keys()|self.temp_datasets.keys())
 
     def has(self, key: str):
         """Return True if the dataset key exists (with valid ndarray data)."""
+        
         return (key in self.temp_datasets) or (key in self.datasets)
 
     def has_temp(self, key):
@@ -383,32 +448,33 @@ class ProcessedObject:
             return self.temp_datasets[key]
         return self.datasets[key]
 
+    def __getattr__(self, name):
+        """Convenience passthrough for accessing `.data` via attribute syntax."""
+        try:
+            return self[name].data
+        except KeyError:
+            logger.error(f"{name} not found in datasets or attributes")
+            raise AttributeError(
+                f"{name} not found in datasets or attributes"
+                    ) from None
+
+
     def get_data(self, key: str):
         """
-        Return the ndarray for a dataset key.
-        Respects temp-first when prefer_temp=True.
+        Return data for a dataset key.
         Raises KeyError if the key doesn't exist anywhere.
         """
-        if key in self.temp_datasets and isinstance(self.temp_datasets[key].data, np.ndarray):
-            return self.temp_datasets[key].data
-        if key in self.datasets and isinstance(self.datasets[key].data, np.ndarray):
-            return self.datasets[key].data
+        return self[key].data
+        
+        
 
-        raise KeyError(f"No dataset '{key}' in temps or base")
 
-    def reload_dataset(self, key):
-        """Reload a single dataset from disk."""
-        self.datasets[key].load_dataset()
-
-    def reload_all(self):
-        """Reload all datasets from disk."""
-        for ds in self.datasets.values():
-            ds.load_dataset()
-    
+#=============================================================================================
+#=============== Thumb and image management ==================================================
 
     def export_images(self):
         skip_keys = {'cropped', 'savgol', 'savgol_cr', 'stats'}
-        for key in self.datasets.keys()|self.temp_datasets.keys():
+        for key in self.keys():
             if key in skip_keys:
                 logger.debug(f"Skipping thumbnail for {key} (use display instead)")
                 continue
@@ -424,11 +490,8 @@ class ProcessedObject:
     def export_image(self, key):
         output_dir = Path(self.root_dir) / 'outputs'
         output_dir.mkdir(parents=True, exist_ok=True)
-        
-        ds = self.temp_datasets.get(key)
-        if ds is None:
-            ds = self.datasets.get(key)
-        if ds is None:
+
+        if not self.has(key):
             return
         final_path = output_dir / f'{self.basename}-{key}.jpg'  
         im = self.get_pil_image(key, resize= False)
@@ -442,14 +505,12 @@ class ProcessedObject:
         im = self.get_pil_image(key, resize=True)
         if im is None:
             return
-        ds = self.temp_datasets.get(key) or self.datasets.get(key)
-        if ds is not None:
-            ds.thumb = im
+        self[key].thumb = im
 
     def build_all_thumbs(self, force=False):
         """Build thumbnails for all thumbnail-able datasets."""
         skip_keys = {'cropped', 'savgol', 'savgol_cr', 'stats'}
-        for key in self.datasets.keys()|self.temp_datasets.keys():
+        for key in self.keys():
             if not force:
                 if key in skip_keys:
                     logger.debug(f"Skipping thumbnail for {key} (use display instead)")
@@ -463,13 +524,10 @@ class ProcessedObject:
     def get_pil_image(self, key, resize):
         "generate a pil image. Shared logic for build thumb and generate images"
         
-        if key == "stats":
+        if key == "stats" or not self.has(key):
             return
-        ds = self.temp_datasets.get(key)
-        if ds is None:
-            ds = self.datasets.get(key)
-        if ds is None:
-            return
+
+        ds = self[key]
         stretch = self.get_stretch_values(key)
         try:
             if ds.ext == ".npy" and getattr(ds.data, "ndim", 0) > 1:
@@ -527,8 +585,10 @@ class ProcessedObject:
                     self.datasets[key].thumb = img.copy()
             else:
                 self.build_thumb(key)
-    
-    
+
+    #====================================================================================================
+    # ====================== export methods ============================================================
+  
     def write_to_envi(self, out_dir, smoothed=True, masked=True,
                   smooth_params=None, force=False):
         """
@@ -916,7 +976,7 @@ class ProcessedObject:
                     logger.info(f"Loaded {len(products)} products from archive")
                 
                 # Build thumbnails and save all datasets
-                if "display" not in po.datasets.keys():
+                if not po.has('display'):
                     po._generate_display()
                 po.build_all_thumbs()
                                
@@ -930,49 +990,5 @@ class ProcessedObject:
     
     
     
-    def delete_dataset(self, key):
-        
-        """
-        Remove a dataset from the object and optionally delete from disk.
-        
-        Parameters
-        ----------
-        key : str
-            Dataset key to delete (e.g., 'mask', 'savgol_cr').
-           
-        Raises
-        ------
-        KeyError
-            If the dataset key doesn't exist.
-        
-        Examples
-        --------
-        >>> po.delete_dataset('old_product')  # Delete file and remove from memory
-        >>> po.delete_dataset('temp_data', from_disk=False)  # Remove from memory only
-        """
-        if key in base_datasets:
-            return #You dont want to delete these datasets.
-        
-        # Check both permanent and temporary datasets
-        if key in self.datasets:
-            ds = self.datasets[key]
-            location = self.datasets
-        elif key in self.temp_datasets:
-            ds = self.temp_datasets[key]
-            location = self.temp_datasets
-        else:
-            raise KeyError(f"Dataset '{key}' not found in object")
-        
-        if key.endswith("INDEX"):
-            try:
-                self.delete_dataset(key.replace("INDEX", "LEGEND"))
-            except (KeyError, FileNotFoundError):
-                pass #not in keys or already deleted
-        try:
-            ds.delete()
-        except FileNotFoundError:
-            # File already gone, that's fine
-            pass
-               
-        del location[key]
+
         

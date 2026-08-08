@@ -208,7 +208,7 @@ class BoxOperations:
             logger.info(f"Correlation is using collection {name} in multi mode")
             with busy_cursor('correlation...', self.controller) as progress:
                 for po in self.cxt.ho:
-                    progress.set("SAM with collection {name} for {po.basename}")
+                    progress.set(f"SAM with collection {name} for {po.basename}")
                     t.wta_min_map_SAM(po, exemplars, name)
                     po.commit_temps()
                     po.save_all()

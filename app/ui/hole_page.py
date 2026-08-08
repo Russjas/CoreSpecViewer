@@ -616,7 +616,7 @@ class HoleControlPanel(QWidget):
         try:
             if self.cxt.ho.boxes:
                 for box in self.cxt.ho:
-                    keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+                    keys.update(box.keys()) 
         except Exception:
             pass
         def add_header_item(combo, text):
@@ -880,7 +880,7 @@ class HoleControlPanel(QWidget):
         try:
             if self.cxt.ho.boxes:
                 for box in self.cxt.ho:
-                    keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+                    keys.update(box.keys()) 
         except Exception:
             logger.info(f"Key selection failed for {self.cxt.ho.hole_id}")
             return
@@ -1084,7 +1084,7 @@ class HoleControlPanel(QWidget):
             logger.info(f"Generate downhole features cancelled - hole has no boxes")
             return
         for box in self.cxt.ho:
-            keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+            keys.update(box.keys())
         
         suffixes = ("POS", "DEP")
         raw_names = [x for x in keys if x.endswith(suffixes)]
@@ -1127,7 +1127,7 @@ class HoleControlPanel(QWidget):
             logger.info(f"Generate downhole features cancelled - hole has no boxes")
             return
         for box in self.cxt.ho:
-            keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+            keys.update(box.keys())
         
         suffixes = ("INDEX",)
         raw_names = [x for x in keys
@@ -1574,7 +1574,7 @@ class HolePage(BasePage):
         try:
             if self.cxt.ho.boxes:
                 for box in self.cxt.ho:
-                    keys = keys | box.datasets.keys() | box.temp_datasets.keys()
+                    keys.update(box.keys())
 
         except Exception as e:
             pass # pass silently when no hole loaded

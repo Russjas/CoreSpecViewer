@@ -116,8 +116,7 @@ def crop(obj, y_min, y_max, x_min, x_max):
     - For RawObject → create temp_reflectance (preview).
     - For ProcessedObject → create temp datasets for all 2D/3D arrays.
     """
-    start_time = time.perf_counter()
-    
+        
     if isinstance(obj, RawObject):
         if not hasattr(obj, "reflectance") or obj.reflectance is None:
             refl_start = time.perf_counter()
@@ -129,16 +128,13 @@ def crop(obj, y_min, y_max, x_min, x_max):
         else:
             arr = obj.reflectance
 
-        crop_start = time.perf_counter()
         obj.temp_reflectance = arr[y_min:y_max, x_min:x_max]
-        logger.debug(f"RawObject crop took {time.perf_counter() - crop_start:.3f}s")
         
-        logger.debug(f"crop(RawObject) total: {time.perf_counter() - start_time:.3f}s")
         return obj
 
     elif isinstance(obj, ProcessedObject):
         # union of base + temps
-        keys = set(obj.datasets.keys()) | set(obj.temp_datasets.keys())
+        keys = obj.keys()
         
         # Ensure mask is processed first for thumbnail generation
         ordered_keys = ['mask'] if 'mask' in keys else []
@@ -149,28 +145,15 @@ def crop(obj, y_min, y_max, x_min, x_max):
             key_start = time.perf_counter()
             logger.info(f"cropping {obj.basename} {key} dataset")
             
-            # choose source: prefer temp if present
-            src = obj.temp_datasets[key].data if obj.has_temp(key) else obj.datasets[key].data
-            
+            # choose source: temp first enforced by PO API
+            src = obj.get_data(key)
+            ext = obj[key].ext
             if isinstance(src, np.ndarray) and src.shape[:2] == base_uncropped_shape:
                 array_copy_start = time.perf_counter()
                 sliced = src[y_min:y_max, x_min:x_max, ...]
                 cropped_copy = sliced.copy()
-                copy_time = time.perf_counter() - array_copy_start
-                
-                if obj.has_temp(key):
-                    obj.temp_datasets[key].data = cropped_copy
-                else:
-                    add_start = time.perf_counter()
-                    obj.add_temp_dataset(key, cropped_copy)
-                    add_time = time.perf_counter() - add_start
-                    logger.debug(f"  add_temp_dataset({key}) took {add_time:.3f}s")
-                
-                key_time = time.perf_counter() - key_start
-                total_crop_time += key_time
-                logger.debug(f"  {key}: copy={copy_time:.3f}s, total={key_time:.3f}s, shape={cropped_copy.shape}")
-        
-        logger.debug(f"crop(ProcessedObject) total: {time.perf_counter() - start_time:.3f}s ({len(ordered_keys)} datasets)")
+                obj.add_temp_dataset(key, cropped_copy, ext = ext)
+                    
         obj.regenerate_display()
         return obj
 
@@ -220,7 +203,7 @@ def crop_auto(obj,mode='references'):
             if img.ndim < 2 or 0 in img.shape:
                 return obj
             img = (img * 255).astype(np.uint8, copy=False)
-
+        base_uncropped_shape = img.shape[:2]
         cropped, slicer = sm.auto_crop(img, mode=mode)
         if slicer is None:
             return obj
@@ -232,7 +215,7 @@ def crop_auto(obj,mode='references'):
             return obj
         
         # slicer is valid → apply to all datasets
-        keys = set(obj.datasets.keys()) | set(obj.temp_datasets.keys())
+        keys = obj.keys()
         
         # Ensure mask is processed first for thumbnail generation
         ordered_keys = ['mask'] if 'mask' in keys else []
@@ -241,23 +224,18 @@ def crop_auto(obj,mode='references'):
         for key in ordered_keys:
             logger.info(f"auto-cropping {obj.basename} {key} dataset")
             
-            src = obj.temp_datasets[key].data if obj.has_temp(key) else obj.datasets[key].data
-            
-            if getattr(src, "ndim", 0) <= 1:
-                continue
-            try:
-                cropped = src[slicer]
-            except Exception:
-                continue
-            if 0 in cropped.shape:
-                continue
+            src = obj.get_data(key)
+            ext = obj[key].ext
+            if isinstance(src, np.ndarray) and src.shape[:2] == base_uncropped_shape:
+                try:
+                    cropped = src[slicer]
+                except Exception:
+                    continue
+                if 0 in cropped.shape:
+                    continue
 
-            cropped_copy = cropped.copy()
-
-            if obj.has_temp(key):
-                obj.temp_datasets[key].data = cropped_copy
-            else:
-                obj.add_temp_dataset(key, cropped_copy)
+                cropped_copy = cropped.copy()
+                obj.add_temp_dataset(key, cropped_copy, ext = ext)
         obj.regenerate_display()
         return obj
     
@@ -518,7 +496,10 @@ def calc_unwrap_stats(obj):
     #label_image = label_image / np.max(label_image)
     obj.add_temp_dataset('stats', stats, '.npy')
     obj.add_temp_dataset('segments', label_image, '.npy')
-    obj.metadata['box_convention'] = config.box_convention
+    metadata = obj.metadata.copy()
+    metadata['box_convention'] = config.box_convention
+    obj.add_temp_dataset('metadata', metadata, ext='.json')
+    
     logger.info(f"Box convention '{config.box_convention}' embedded in metadata for {obj.basename}")
 
     return obj
@@ -580,12 +561,13 @@ def run_feature_extraction(obj, key):
         Either a string key from the standard features (e.g., '2200W')
         OR a dict in format {feature_name: [wav_min, wav_max, cr_min, cr_max]}
     """
-    cache_available = ('feature-indices' in obj.datasets and 
-            'feature-heights' in obj.datasets)
+    cache_available = (obj.has('feature-indices') and
+                       obj.has('feature-heights')
+                       )
     if cache_available:
         cached_arrays = (
-            obj.datasets['feature-indices'].data,
-            obj.datasets['feature-heights'].data
+            obj.get_data('feature-indices'),
+            obj.get_data('feature-heights')
         )
     else:
         cached_arrays = None

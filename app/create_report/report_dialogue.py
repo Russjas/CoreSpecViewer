@@ -204,11 +204,11 @@ class PDFExportDialog(QDialog):
         
         # Start with keys from first box
         first_box = list(hole.boxes.values())[0]
-        all_keys = set(first_box.datasets.keys()) | set(first_box.temp_datasets.keys())
+        all_keys = set(first_box.keys())
         
         # Intersect with keys from all other boxes
         for po in hole:
-            box_keys = set(po.datasets.keys()) | set(po.temp_datasets.keys())
+            box_keys = set(po.keys())
             all_keys &= box_keys
         
         # Filter out un-needed keys

@@ -68,16 +68,17 @@ class VisActions(BaseActions):
         logger.info("Button clicked: Custom False Colour")
         valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)  
         if not valid_state:
-            QMessageBox.information(self.controller, "Downhole preview", msg)
+            logger.warning(msg)
+            self._show_error("False colour", msg)
             return
-
         wvls = self.cxt.current.bands
         dialog = RGBBandDialog(wvls, parent=self.controller)
         dialog.combos[0].setCurrentIndex(0)
         dialog.combos[1].setCurrentIndex(len(wvls)//2)
         dialog.combos[2].setCurrentIndex(len(wvls)-1)
-        if dialog.exec_() == QDialog.Accepted:
-            bands = dialog.selected_indices()
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        bands = dialog.selected_indices()
 
         try: 
             self.cxt.current = t.custom_false_colour(self.cxt.current, bands)
@@ -91,7 +92,8 @@ class VisActions(BaseActions):
         logger.info("Button clicked: View box downhole")
         valid_state, msg = self.cxt.requires(self.cxt.UNWRAP)   # ('processed', 'has:stats')
         if not valid_state:
-            QMessageBox.information(self.controller, "Downhole preview", msg)
+            logger.warning(msg)
+            self._show_error("Downhole preview", msg)
             return
 
         from ..ui.dhole_view import DholeView   # local import: pulls in hole_page, avoid cycle

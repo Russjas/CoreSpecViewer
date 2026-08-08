@@ -45,7 +45,7 @@ def process(cube):
     poly = config.savgol_polyorder
     savgol = sc.signal.savgol_filter(cube, win, poly)
     savgol_cr = remove_hull(savgol)
-    mask = np.zeros((cube.shape[0], cube.shape[1]))
+    mask = np.zeros((cube.shape[0], cube.shape[1])).astype(int)
     return savgol, savgol_cr, mask
 
 

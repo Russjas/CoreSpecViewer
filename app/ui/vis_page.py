@@ -396,7 +396,7 @@ class VisualisePage(BasePage):
         unwrapped = []
         products = []
         non_vis = []
-        self.cache = set(self.current_obj.datasets.keys()) | set(self.current_obj.temp_datasets.keys())
+        self.cache = set(self.current_obj.keys())
         def _insert_header(text: str):
             r = self.table.rowCount()
             self.table.insertRow(r)

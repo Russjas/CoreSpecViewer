@@ -99,7 +99,7 @@ def process_multibox(src, dest, *,
                 po.build_all_thumbs()
                 po.save_all_thumbs()
                 po.save_all()
-                out_meta = str(po.datasets['metadata'].path)
+                out_meta = str(po['metadata'].path)
                 msg = "processed ok"
 
         except ValueError as e:

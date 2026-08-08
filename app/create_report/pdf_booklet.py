@@ -393,11 +393,15 @@ def _build_single_box_segment(c, po, key, x_margin, y_top, y_bottom, width, lege
         # Draw legend or colorbar below the image
         if key.endswith("INDEX"):
             legend_key = key.replace("INDEX", "LEGEND")
-            legend_ds = po.temp_datasets.get(legend_key) or po.datasets.get(legend_key)
-            if legend_ds and legend_ds.data:
-                _draw_legend_compact(c, legend_ds.data, x, legend_top_y, display_width)
+            if po.has(legend_key):
+                legend_ds = po[legend_key]
+                if legend_ds.data:
+                    _draw_legend_compact(
+                        c, legend_ds.data, x, legend_top_y, display_width
+                    )
+
         else:
-            ds = po.temp_datasets.get(key) or po.datasets.get(key)
+            ds = po[key]
             stretch = po.get_stretch_values(key)
             if ds and ds.data is not None and ds.data.ndim==2:
                 _draw_colorbar_compact(c, ds.data, po.mask, x, legend_top_y, display_width, stretch = stretch)
@@ -444,14 +448,17 @@ def _build_overview_page(c, hole, key):
         if key.endswith("INDEX"):
             # Get legend from first box (they should all be the same)
             legend_key = key.replace("INDEX", "LEGEND")
-            first_box = list(hole.boxes.values())[0]
-            legend_ds = first_box.temp_datasets.get(legend_key) or first_box.datasets.get(legend_key)
-            if legend_ds and legend_ds.data:
-                _draw_legend(c, legend_ds.data, concat_img, x, y, display_width)
+            if first_box.has(legend_key):
+                legend_ds = first_box[legend_key]
+                if legend_ds.data:
+                    _draw_legend(
+                        c, legend_ds.data, concat_img,
+                        x, y, display_width
+                    )
         else:
             # For colorbar, get data from first box
             first_box = list(hole.boxes.values())[0]
-            ds = first_box.temp_datasets.get(key) or first_box.datasets.get(key)
+            ds = first_box[key]
             mask = first_box.mask if first_box.has('mask') else None
             stretch = first_box.get_stretch_values(key)
 
@@ -932,7 +939,7 @@ def create_po_pdf_booklet(
     """
     output_path = Path(output_path) / f"{po.basename}.pdf"
     exclude_keys = ["savgol", "cropped", "savgol_cr", "metadata", "stats", "bands", "display", "annotations"]
-    selected_keys = [key for key in po.datasets.keys() if key not in exclude_keys
+    selected_keys = [key for key in po.keys() if key not in exclude_keys
                      and not key.endswith("LEGEND")
                      and not key.endswith("CLUSTERS")
                      and not key.startswith('Dhole')]
@@ -1049,7 +1056,7 @@ def _build_po_title_page(c, po, selected_keys):
     c.setFont("Helvetica-Bold", 11)
     c.drawString(margin, y, "Available Datasets:")
     c.setFont("Helvetica", 11)
-    c.drawString(margin + 100, y, str(len(po.datasets) + len(po.temp_datasets)))
+    c.drawString(margin + 100, y, str(len(po.keys())))
     y -= 20
     
     # Report generation time

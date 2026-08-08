@@ -447,7 +447,7 @@ class MainRibbonController(QMainWindow):
             )
             if reply == QMessageBox.No:
                 return
-        with busy_cursor(self, 'Loading....'):
+        with busy_cursor('Loading....', self):
             try:
                 loaded_obj = t.load(path)
                 if loaded_obj.is_raw:
