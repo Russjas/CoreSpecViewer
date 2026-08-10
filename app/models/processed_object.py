@@ -296,6 +296,7 @@ class ProcessedObject:
 
     def add_temp_dataset(self, key, data=None, ext=".npy"):
         """Attach an in-memory dataset; not written until save_all()."""
+        
         if key in self.datasets.keys():
             self.temp_datasets[key] = self.datasets[key].copy(data=data)
             self.build_thumb(key)

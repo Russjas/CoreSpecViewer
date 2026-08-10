@@ -445,6 +445,8 @@ def _build_overview_page(c, hole, key):
         y = height - margin - 0.8*inch - display_height
 
         c.drawImage(ImageReader(img_buffer), x, y, width=display_width, height=display_height)
+        first_box = list(hole.boxes.values())[0]
+
         if key.endswith("INDEX"):
             # Get legend from first box (they should all be the same)
             legend_key = key.replace("INDEX", "LEGEND")
@@ -457,7 +459,7 @@ def _build_overview_page(c, hole, key):
                     )
         else:
             # For colorbar, get data from first box
-            first_box = list(hole.boxes.values())[0]
+            
             ds = first_box[key]
             mask = first_box.mask if first_box.has('mask') else None
             stretch = first_box.get_stretch_values(key)

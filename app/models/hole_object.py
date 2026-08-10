@@ -371,7 +371,7 @@ class HoleObject:
             ds = po[key]
             if ds.thumb is None:
                 logger.warning(f"Skipping box {po.basename} - no thumbnail for key '{key}'")
-                
+                continue
             images.append(ds.thumb)
         
         if not images:
