@@ -560,17 +560,7 @@ class MainRibbonController(QMainWindow):
             logger.warning(msg)
             QMessageBox.information(self, "Save", msg)
             return
-        if self.cxt.current.has_temps:
-            test = two_choice_box('Commit changes before saving?', 'yes', 'no')
-
-            if test == 'left':
-
-                self.cxt.po.commit_temps()
-                logger.info(f"Button clicked: Commit temps for {self.cxt.po.basename}")
-
-        wants_prompt = True
-        if self.cxt.current.datasets:
-            wants_prompt = not any(ds.path.exists() for ds in self.cxt.po.datasets.values())
+        wants_prompt = not any(ds.path.exists() for ds in self.cxt.po.datasets.values())
 
         if wants_prompt:
             dest = QFileDialog.getExistingDirectory(self, "Choose save folder", str(self.cxt.current.root_dir))
@@ -580,6 +570,7 @@ class MainRibbonController(QMainWindow):
             logger.info(f"Save location updated to {self.cxt.current.root_dir}")
         try:
             with busy_cursor('saving...', self):
+                self.cxt.current.commit_temps()
                 self.cxt.current.save_all()
                 self.cxt.current.reload_all()
                 self.cxt.current.load_thumbs()
@@ -695,12 +686,15 @@ class MainRibbonController(QMainWindow):
         # Check po for temp datasets
         if self.cxt.po is not None: 
             if self.cxt.po.has_temps:
-                keys = ", ".join(self.cxt.po.temp_datasets.keys())
+                box = self.cxt.po
+                temp_keys = [key for key in box.keys() if box.has_temp(key)]
+                keys = ", ".join(temp_keys)
                 lines.append(f"  {self.cxt.po.basename}: {keys}")
             unsaved_box = [
-                                k for k, ds in self.cxt.po.datasets.items()
-                                if not ds.path.exists()
-                            ]
+                    k for k in self.cxt.po.keys()
+                    if not self.cxt.po.has_temp(k)
+                    and not self.cxt.po[k].path.exists()
+                ]
             if unsaved_box:
                 lines.append(
                     f"  {self.cxt.po.basename}: {', '.join(unsaved_box)}"
@@ -711,7 +705,8 @@ class MainRibbonController(QMainWindow):
         if self.cxt.ho is not None:
             for po in self.cxt.ho:
                 if po.has_temps:
-                    keys = ", ".join(po.temp_datasets.keys())
+                    temp_keys = [key for key in po.keys() if po.has_temp(key)]
+                    keys = ", ".join(temp_keys)
                     lines.append(f"  {po.basename}: {keys}")
             unsaved_hole = [
                 k for k, ds in self.cxt.ho.product_datasets.items()
