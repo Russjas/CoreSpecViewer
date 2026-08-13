@@ -6,10 +6,12 @@ spectral maps) and supports temporary products, saving .npz outputs,
 and UI-friendly dataset access.
 """
 from dataclasses import dataclass, field
+from copy import deepcopy
 from pathlib import Path
 import logging
 import numpy as np
 from PIL import Image
+from xml.etree.ElementTree import ParseError
 
 from ..spectral_ops import IO as io
 from ..spectral_ops.processing import remove_cont, process
@@ -164,8 +166,11 @@ class ProcessedObject:
             Path to ENVI header file.
         data_path : str or Path
             Path to ENVI binary file.
-        name : str
-            name of the dataset (typically a holeID and box_number combination)
+        meta_path : str or Path, optional
+            Path to supplemental metadata XML.
+        mask_path : str or Path, optional
+            Path to a mask image.
+
 
         Returns
         -------
@@ -177,7 +182,7 @@ class ProcessedObject:
         Full post-processing has been performed:
             - Data is reflectance
             - Noisy edge bands have been sliced away
-            - Data has been smoothed
+            - If data provided is registered as unsmoothed, it will be smoothed using config params
 
         Raises
         ------
@@ -188,8 +193,12 @@ class ProcessedObject:
         root = path.parent
         name = path.stem
         data, metadata = io.load_envi(head_path, data_path)
+        
         if meta_path is not None:
-            metadata = metadata | io.parse_lumo_metadata(meta_path)
+            try: 
+                metadata = metadata | io.parse_lumo_metadata(meta_path)
+            except ParseError:
+                logger.warning("could not parse the metadata, expected xml formatting")
         metadata["spatial_downhole_units"] = config.spatial_units
         
         band_key, bands = io.find_bands(metadata, data)
@@ -200,21 +209,29 @@ class ProcessedObject:
        
         if smoothed:
             savgol = data
-            cropped = np.zeros_like(savgol)
+            cropped = savgol
             savgol_cr = remove_cont(savgol)
         else:
             cropped = data
             savgol, savgol_cr, _ = process(cropped)
-            
+
+        params_mask = {"Mask file": "not provided"}  
+        mask = np.zeros(savgol_cr.shape[:2], dtype=np.uint8)
         if mask_path is not None:
-            msk = 1 - np.array(Image.open(mask_path)).astype(np.uint8)
-            if msk.shape == savgol_cr.shape[:2]:
-                mask = msk
-            else:
-                logger.warning(f"Mask shape {msk.shape} does not match data shape {savgol_cr.shape[:2]}, ignoring mask")
-                mask = np.zeros(savgol_cr.shape[:2], dtype=np.uint8)
-        else:
-            mask = np.zeros(savgol_cr.shape[:2], dtype=np.uint8)
+            try:
+                msk = 1 - np.array(Image.open(mask_path)).astype(np.uint8)
+                if msk.shape == savgol_cr.shape[:2]:
+                    mask = msk
+                    params_mask["Mask file"] = Path(mask_path).name
+                    
+                else:
+                    logger.warning(f"Mask shape {msk.shape} does not match data shape {savgol_cr.shape[:2]}, ignoring mask")
+                    params_mask["Mask file"] = f"{Path(mask_path).name} rejected: shape mismatch"
+            except OSError:
+                logger.warning("Unable to open mask data provided")
+                
+                params_mask["Mask file"] = f"{Path(mask_path).name} rejected: unable to open"
+            
         mask[np.all(savgol == 0, axis=2)] = 1
         po = cls.new(root, name)
         po.add_dataset('metadata', metadata, ext='.json')
@@ -223,8 +240,22 @@ class ProcessedObject:
         po.add_dataset('savgol', savgol, ext='.npy')
         po.add_dataset('savgol_cr', savgol_cr, ext='.npy')
         po.add_dataset('mask', mask, ext='.npy')
+
+        params_head = {"File Header": Path(head_path).name}  
+        params_smoothed = {"smoothing method" : "savitzky-golay",
+                            "window" : config.savgol_window,
+                            "savgol polyorder" : config.savgol_polyorder} if not smoothed else {}
+        params_cr = {"continuum removal" : "gfit version 0.2"}
+
+        po.update_lineage(['cropped','bands'],[], params_head)
+        po.update_lineage('savgol','cropped', params_head|params_smoothed)
+        po.update_lineage('mask','savgol', params_head|params_mask)
+        po.update_lineage('savgol_cr','savgol', params_head|params_cr)
+        
         po._generate_display()
         po.build_all_thumbs()
+                
+        po.commit_temps()
         return po
     
 #=====================================================================================================================
@@ -987,9 +1018,67 @@ class ProcessedObject:
         except Exception as e:
             logger.error(f"Failed to hydrate from archive: {npz_path}", exc_info=True)
             raise
-    
-    
-    
+
+
+# ================= Lineage and version recording infractructure ==========================
+    def update_lineage(self, keys: list, inputs: list, params: dict):
+        """
+        Capture and record the provenance of new datasets, including input dataset
+        versions and processing parameters, to improve reproducibility.
+
+        This should always be called after the relevant add_temp_dataset() calls.
+
+        Parameters
+        ----------
+        keys : list of str, or str
+            Dataset keys produced by the tool.
+        inputs : list of str, or str
+            Dataset keys consumed by the tool.
+        params : dict
+            Parameters describing this execution.
+        """
+        if isinstance(keys, str):
+            keys = (keys,)
+
+        if isinstance(inputs, str):
+            inputs = (inputs,)
+
+
+        if not self.has_temp("metadata"):
+            self.add_temp_dataset("metadata")
+
+        lineage = self.metadata.setdefault("lineage", {})
+
+        input_versions = {}
+
+        for key in inputs:
+            history = lineage.get(key)
+
+            if not history:
+                logger.warning(
+                    f"{key} is a required input for {keys}, but has no lineage"
+                )
+                input_versions[key] = 0
+            else:
+                input_versions[key] = history[-1]["version"]
+
+        for key in keys:
+            history = lineage.get(key)
+
+            if not history:
+                version = 1
+            else:
+                version = history[-1]["version"] + 1
+
+            lineage.setdefault(key, []).append({
+                "version": version,
+                "inputs": input_versions.copy(),
+                "params": deepcopy(params),
+            })
+        logger.info(
+    f"Updated lineage for {keys}: "
+    f"{self.metadata['lineage'][keys[0] if len(keys) == 1 else keys[0]][-1]}"
+)
     
 
         

@@ -6,6 +6,7 @@ NumPy-based spectral datasets.
 """
 
 from dataclasses import dataclass
+from copy import deepcopy
 import gc
 import json
 from pathlib import Path
@@ -170,18 +171,19 @@ class Dataset:
     def copy(self, data=None):
         """
         Create a shallow copy of this Dataset, optionally replacing its data.
+
+        Dictionary data is deep-copied so nested metadata is independent.
         """
-        # Force conversion to regular array if memmap
         if data is None:
-            if isinstance(self.data, np.memmap):
-                new_data = np.array(self.data, copy=True)
-            else:
-                new_data = self.data.copy()
+            data = self.data
+
+        # Force conversion to regular array if memmap
+        if isinstance(data, np.memmap):
+            new_data = np.array(data, copy=True)
+        elif isinstance(data, dict):
+            new_data = deepcopy(data)
         else:
-            if isinstance(data, np.memmap):
-                new_data = np.array(data, copy=True)
-            else:
-                new_data = data.copy()
+            new_data = data.copy()
 
         return Dataset(
             base=self.base,
@@ -189,7 +191,7 @@ class Dataset:
             path=self.path,
             suffix=self.suffix,
             ext=self.ext,
-            data=new_data
+            data=new_data,
         )
 
 

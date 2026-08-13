@@ -317,6 +317,12 @@ def mask_by_cluster(obj, cluster_array, index):
     msk = np.array(obj.mask)
     msk[cluster_array == index] = 1
     obj.add_temp_dataset('mask', data = msk)
+    params = {
+    "masking type": "Mask by cluster",
+    "cluster index": int(index),
+    "comments": "Experimental procedure; cluster assignment is not preserved.",
+}
+    obj.update_lineage("mask", "mask", params )
     return obj
 
 # ===========Proven masking tools ============================================
@@ -329,6 +335,14 @@ def mask_rect(obj, ymin, ymax, xmin, xmax, unmask = False):
     msk = np.array(obj.mask)
     msk[ymin:ymax, xmin:xmax] = 0 if unmask else 1
     obj.add_temp_dataset('mask', data = msk)
+    params = {"masking type": "Rectangle", 
+              'ymin' : ymin,
+              'ymax' : ymax,
+              'xmin' : xmin,
+              'xmax' : xmax,
+              'mask inside' : not unmask
+              }
+    obj.update_lineage("mask", "mask", params )
     return obj
 
 
@@ -350,6 +364,11 @@ def mask_point(obj, mode, y, x):
         corr = sa.numpy_pearson(obj.savgol_cr, pixel_vec)
         msk[corr > 0.9] = 1
         obj.add_temp_dataset('mask', data = msk)
+        params = {"masking type": "New mask by point",
+                  'x': x,
+                  'y': y
+                  }
+        obj.update_lineage("mask", ["mask", "savgol_cr"], params)
         return obj
     if mode == 'enhance':
         msk = np.array(obj.mask)
@@ -357,11 +376,21 @@ def mask_point(obj, mode, y, x):
         corr = sa.numpy_pearson(obj.savgol_cr, pixel_vec)
         msk[corr > 0.9] = 1
         obj.add_temp_dataset('mask', data = msk)
+        params = {"masking type": "Enhance mask by point",
+                          'x': x,
+                          'y': y
+                          }
+        obj.update_lineage("mask", ["mask", "savgol_cr"], params)
         return obj
     if mode == 'line':
         msk = np.array(obj.mask)
         msk[:, x] = 1
         obj.add_temp_dataset('mask', data = msk)
+        params = {"masking type": "Mask column by point",
+                                  'x': x,
+                                  'y': y
+                                  }
+        obj.update_lineage("mask", "mask", params)
         return obj
 
 
@@ -401,8 +430,11 @@ def mask_polygon(obj, vertices_rc, mode = "mask outside"):
     elif mode == "unmask inside":
         msk = np.array(obj.mask)
         msk[inside] = 0
-
+    params = {"masking type": "Mask by polygon",
+              "mode" : mode,
+              "polygon" : f'{vertices_rc}'}
     obj.add_temp_dataset('mask', data = msk)
+    obj.update_lineage("mask", "mask", params)
     return obj
 
 
@@ -411,24 +443,31 @@ def improve_mask(obj, mode="vertical"):
     Heuristically thicken a mask column-wise using simple occupancy.
     Mask values follow the convention 0 = valid, 1 = masked.
     """
-    logger.info(f"improve_mask called with mode={mode}")  # ADD THIS
+    logger.info(f"improve_mask called with mode={mode}")
+    params = {"masking type": "CV heuristics"}
     if mode=="vertical":
-        logger.info("Running improve_mask_from_graph")  # ADD THIS
+        logger.info("Running improve_mask_from_graph")  
         msk = sm.improve_mask_from_graph(obj.mask) 
+        params["mode"] = "vertical"
     else:
-        logger.info("Running hough_line_connection")  # ADD THIS
+        logger.info("Running hough_line_connection")
         msk = sm.hough_line_connection(obj.mask)
+        params["mode"] = "hough line connection"
     obj.add_temp_dataset('mask', data = msk)
+    obj.update_lineage("mask", "mask", params)
+    
     return obj
 
 
 def despeckle_mask(obj):
     """
-    Heuristically thicken a mask column-wise using simple occupancy.
-    Mask values follow the convention 0 = valid, 1 = masked.
+    Despeckle the mask using CV techniques
     """
     msk = sm.despeckle_mask(obj.mask)
+    params = {"masking type": "CV heuristics",
+              "mode" : "despeckle"}
     obj.add_temp_dataset('mask', data = msk)
+    obj.update_lineage("mask", "mask", params)
     return obj
 
 
@@ -442,6 +481,8 @@ def mask_all(obj):
     H, W = obj.savgol.shape[:2]
     msk = np.ones((H, W), dtype=np.uint8)
     obj.add_temp_dataset('mask', data=msk)
+    params = {"masking type": "Mask all"}
+    obj.update_lineage("mask", "mask", params)
     return obj
 
 def invert_mask(obj):
@@ -453,6 +494,8 @@ def invert_mask(obj):
         return obj
     msk = (~obj.mask.astype(bool)).astype(np.uint8)
     obj.add_temp_dataset('mask', data=msk)
+    params = {"masking type": "Logical inversion of mask"}
+    obj.update_lineage("mask", "mask", params)
     return obj
 
 def rim(obj):
@@ -481,6 +524,9 @@ def rim(obj):
     msk[:, -rim_px:] = 1   # right
 
     obj.add_temp_dataset('mask', data = msk)
+    params = {"masking type": "Mask rim of image",
+              "Rim width" : rim_px}
+    obj.update_lineage("mask", "mask", params)
     logger.info(f"rim: applied {rim_px}px background rim to mask")
     return obj
 

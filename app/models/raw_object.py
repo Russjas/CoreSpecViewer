@@ -484,8 +484,36 @@ class RawObject:
         po.add_dataset('savgol', savgol, ext='.npy')
         po.add_dataset('savgol_cr', savgol_cr, ext='.npy')
         po.add_dataset('mask', mask, ext='.npy')
+
+        #======= collect parameters for provenance and lineage =========
+        params_source = {
+            role: Path(self.files[role]).name
+            for role in self.files
+        } 
+        params_source["Sensor type"] = self.sensor
+        slicer = io._slice_from_sensor(self.sensor)
+        params_source["Band slice"] = {
+                    "start band index": slicer.start,
+                    "stop band index (exclusive)": slicer.stop,
+                }
+
+        params_source["Original spatial shape"] = list(self.reflectance.shape[:2])
+        params_source["Processed spatial shape"] = list(po.cropped.shape[:2])
+        
+        params_smoothed = {"smoothing method" : "savitzky-golay",
+                            "window" : config.savgol_window,
+                            "savgol polyorder" : config.savgol_polyorder}
+        params_cr = {"continuum removal" : "gfit version 0.2"}
+        params_mask = {"Mask file" : "created blank"}
+
+        po.update_lineage(['cropped','bands'],[], params_source)
+        po.update_lineage('savgol','cropped', params_smoothed)
+        po.update_lineage('mask','savgol', params_mask)
+        po.update_lineage('savgol_cr','savgol', params_cr)
+
         po._generate_display()
         po.build_all_thumbs()
+        po.commit_temps()
         return po
 
     def add_temp_reflectance(self, array):

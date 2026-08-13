@@ -53,7 +53,7 @@ def _slice_from_sensor(sensor_type: str):
     """
     Derive the edge bands to slice out using the config dict
     """
-    s = sensor_type or ""
+    s = (sensor_type or "").upper()
     logger.info(f"Sensor type {s}")
     if "SWIR" in s:
         start, stop = config.swir_slice_start, config.swir_slice_stop
@@ -67,6 +67,7 @@ def _slice_from_sensor(sensor_type: str):
         start, stop = config.default_slice_start, config.default_slice_stop
     
     return slice(start, stop, None)
+
 
 def read_envi_header(file):
     """
