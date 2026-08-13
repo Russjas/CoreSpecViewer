@@ -900,8 +900,6 @@ class LoadDialogue(QDialog):
     
         missing = self._meta_missing(meta)
         if not missing:
-            # already good
-            obj.metadata = meta
             return True
     
         # prompt, prefilled with what we have
@@ -927,8 +925,10 @@ class LoadDialogue(QDialog):
             )
             logger.info(f"Metadata check | Metadata fields not added")
             return False
-    
-        obj.metadata = meta
+        if obj.is_raw:
+            obj.metadata = meta
+        else:
+            obj.add_temp_dataset("metadata", meta, ext = ".json")
         logger.info(f"Metadata validation: fields_added={missing}")
         return True
         
