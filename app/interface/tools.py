@@ -1242,6 +1242,16 @@ def kmeans_caller(obj, clusters = 5, iters = 50):
 
     obj.add_temp_dataset(f'kmeans-{clusters}-{iters}INDEX', clustered_map.astype(np.int16), '.npy')
     obj.add_temp_dataset(f'kmeans-{clusters}-{iters}CLUSTERS', classes, '.npy')
+    params = {"Clustering" : "k-means",
+              "Implementation": "spectral.kmeans",
+              "Clusters" : clusters,
+              "Max Iterations": iters,
+              "Hardcoded parameters" : {"Distance metric": "L2",
+                                        "Initial centres": "evenly spaced along data bounding-box diagonal",
+                                        "Valid pixels": "unmasked spectra containing only finite values",}}
+    obj.update_lineage([f'kmeans-{clusters}-{iters}INDEX', f'kmeans-{clusters}-{iters}CLUSTERS'],
+                       ["savgol_cr", "mask"],
+                       params)
     return obj
 
 
@@ -1265,14 +1275,21 @@ def band_math_interface(obj, name, expr, cr = False):
     submodule to parse and evaluate the expression on reflectance data. Optionally 
     evaluate the expression on continuum removed data.
     """
+    params = {"Operation" : "Band mathematics"}
     if not cr:
         cube = obj.savgol
+        params["Inference on"] = "reflectance"
     else:
         cube = obj.savgol_cr
+        params["Inference on"] = "continuum removed reflectance"
     
     out = bm.evaluate_expression(expr, cube, obj.bands)
     clean_key = re.sub(r'[\\/:*?"<>|_]', '-', name)
     obj.add_temp_dataset(clean_key, np.ma.masked_array(out, obj.mask), '.npz')
+    params["expression"] = str(expr)
+    obj.update_lineage(clean_key,
+                       ["savgol" if not cr else "savgol_cr", "mask", "bands"],
+                       params)
     return obj
 
 def custom_false_colour(obj, bands: list):
@@ -1293,4 +1310,14 @@ def custom_false_colour(obj, bands: list):
     fc[obj.mask == 1] = (0,0,0)
     key = "-".join(f"{obj.bands[x]:.2f}" for x in bands)
     obj.add_temp_dataset(key, fc, '.npy')
+    params = {"Operation" : "Custom false colour",
+              "Bands used" : {"R" : [bands[0], float(obj.bands[bands[0]])],
+                              "G" : [bands[1], float(obj.bands[bands[1]])],
+                              "B" : [bands[2], float(obj.bands[bands[2]])]}
+              }
+    obj.update_lineage(
+                    key,
+                    ["savgol", "bands", "mask"],
+                    params,
+                )
     return obj
