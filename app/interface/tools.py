@@ -10,7 +10,7 @@ import time
 from matplotlib.path import Path as mpl_path
 import numpy as np
 
-from ..config import config, VALID_CONVENTIONS, CONVENTION_DISPLAY
+from ..config import config, VALID_CONVENTIONS, CONVENTION_DISPLAY, FEATURE_BOUNDS
 from ..models import ProcessedObject, RawObject
 from ..spectral_ops.visualisation import get_false_colour
 from ..spectral_ops.processing import resample_spectrum, unwrap_from_stats, remove_cont
@@ -100,14 +100,9 @@ def discover_lumo_directories(root_dir: Path) -> list[Path]:
     except PermissionError:
         pass
 
-
     return sorted(set(dirs))
 
-
 #======= Cropping and reset functions for RO or PO data =======================
-
-
-
 
 def crop(obj, y_min, y_max, x_min, x_max):
     """
@@ -153,6 +148,14 @@ def crop(obj, y_min, y_max, x_min, x_max):
                 sliced = src[y_min:y_max, x_min:x_max, ...]
                 cropped_copy = sliced.copy()
                 obj.add_temp_dataset(key, cropped_copy, ext = ext)
+                params = {"Spatial Crop" : "Manual",
+                          "bounds": {
+                        'y_min' : y_min,
+                        'y_max' : y_max,
+                        'x_min' : x_min,
+                        'x_max' : x_max,
+                        }}
+                obj.update_lineage(key, key, params)
                     
         obj.regenerate_display()
         return obj
@@ -236,6 +239,18 @@ def crop_auto(obj,mode='references'):
 
                 cropped_copy = cropped.copy()
                 obj.add_temp_dataset(key, cropped_copy, ext = ext)
+                params = {"Spatial Crop" : "Auto",
+                          "Mode" : mode,}
+                y_slice, x_slice = slicer
+                params["bounds"] = {
+                "y_min": y_slice.start,
+                "y_max": y_slice.stop,
+                "x_min": x_slice.start,
+                "x_max": x_slice.stop,
+                }
+                obj.update_lineage(key, key, params)
+            
+                
         obj.regenerate_display()
         return obj
     
@@ -485,6 +500,7 @@ def mask_all(obj):
     obj.update_lineage("mask", "mask", params)
     return obj
 
+
 def invert_mask(obj):
     """
     Flip mask values: 0 → 1, 1 → 0.
@@ -497,6 +513,7 @@ def invert_mask(obj):
     params = {"masking type": "Logical inversion of mask"}
     obj.update_lineage("mask", "mask", params)
     return obj
+
 
 def rim(obj):
     """
@@ -547,6 +564,12 @@ def calc_unwrap_stats(obj):
     obj.add_temp_dataset('metadata', metadata, ext='.json')
     
     logger.info(f"Box convention '{config.box_convention}' embedded in metadata for {obj.basename}")
+    params = {"Operation" : "calculate stats for unwrapping",
+              "Hard-coded defaults" : {"Erosion iterations": 2,
+                                        "Erosion kernel": [3, 3],
+                                        "Erosion anchor": [0, 0],
+                                        "Connectivity": 8}}
+    obj.update_lineage(["stats", "segments"], "mask", params)
 
     return obj
 
@@ -579,13 +602,35 @@ def unwrapped_output(obj):
                                                     return_map=True)
     dmask = dhole_reflect.mask[:,:,0]
 
-    obj.add_temp_dataset('DholeAverage', dhole_reflect.data, '.npy')
     obj.add_temp_dataset('DholeMask', dmask, '.npy')
+    obj.add_temp_dataset('DholeAverage', dhole_reflect.data, '.npy')
     obj.add_temp_dataset('DholeDepths', dhole_depths, '.npy')
     if dmap is not None:
         obj.add_temp_dataset('DepthMap', dmap, '.npz')
     
-    
+    params = {"Unwrapping" : "Image previews",
+              "Anchors": anchors,
+              "Box start depth" : depth_start,
+              "Box end depth" : depth_stop,
+              "Output depth units": "m",
+              "Source depth units": obj.get_units(),
+              "Box convention": convention or "rl_tb",
+              "MIN_AREA" : config.min_seg_area,
+              "MIN_WIDTH" : config.min_seg_width,
+              "Hard-coded defaults": {
+                        "Lane gap minimum": 10,
+                        "Lane gap width proportion": 0.25,
+                        "Lane gap fallback": 25,
+                        "Depth interpolation": "linear",
+                        "Segment padding": "centred",
+                    }}
+    output_keys = ['DholeAverage', 'DholeMask', 'DholeDepths']
+    if dmap is not None:
+        output_keys.append('DepthMap')
+    obj.update_lineage(output_keys,
+                       ["mask", "savgol", "stats", "segments"],
+                       params
+                        )
     return obj
 
 
@@ -607,6 +652,24 @@ def run_feature_extraction(obj, key):
         Either a string key from the standard features (e.g., '2200W')
         OR a dict in format {feature_name: [wav_min, wav_max, cr_min, cr_max]}
     """
+    if isinstance(key, dict):
+        if len(key) != 1:
+            logger.warning("Custom feature definition must contain exactly one feature")
+            return obj
+        feature_name, feature_bounds = next(iter(key.items()))
+        feature_definition = {
+            feature_name: list(feature_bounds)
+        }
+        feature_type = "custom"
+    else:
+        feature_name = key
+        feature_definition = {
+            feature_name: list(FEATURE_BOUNDS[key])
+        }
+        feature_type = "standard"
+    
+    inputs = ["savgol", "savgol_cr", "mask", "bands"]
+
     cache_available = (obj.has('feature-indices') and
                        obj.has('feature-heights')
                        )
@@ -615,19 +678,39 @@ def run_feature_extraction(obj, key):
             obj.get_data('feature-indices'),
             obj.get_data('feature-heights')
         )
+        inputs.extend(["feature-indices", "feature-heights"])
+        extraction_method = "cached feature detection"
     else:
         cached_arrays = None
+        extraction_method = "direct feature detection"
+
     try:
-        if isinstance(key, dict):
-            # Custom feature - extract the name for dataset keys
-            feature_name = list(key.keys())[0]
-            pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique='POLY', cached_arrays=cached_arrays)
-            obj.add_temp_dataset(f'{feature_name}POS', np.ma.masked_array(pos, mask=feat_mask), '.npz')
-            obj.add_temp_dataset(f'{feature_name}DEP', np.ma.masked_array(dep, mask=feat_mask), '.npz')
-        else:
-            pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique = 'POLY', cached_arrays=cached_arrays)
-            obj.add_temp_dataset(f'{key}POS', np.ma.masked_array(pos, mask = feat_mask), '.npz')
-            obj.add_temp_dataset(f'{key}DEP', np.ma.masked_array(dep, mask = feat_mask), '.npz')
+        pos, dep, feat_mask = sa.Combined_MWL(obj.savgol, obj.savgol_cr, obj.mask, obj.bands, key, technique='POLY', cached_arrays=cached_arrays)
+        pos_key = f'{feature_name}POS'
+        dep_key = f'{feature_name}DEP'
+        obj.add_temp_dataset(pos_key, np.ma.masked_array(pos, mask=feat_mask), '.npz')
+        obj.add_temp_dataset(dep_key, np.ma.masked_array(dep, mask=feat_mask), '.npz')
+        params = {
+                    "Operation": "minimum wavelength feature extraction",
+                    "Feature type": feature_type,
+                    "Feature definition": feature_definition,
+                    "Feature extraction method": extraction_method,
+                    "Fitting technique": "POLY",
+                    "Feature detection threshold": config.feature_detection_threshold,
+                    "Width filtering": False,
+                }
+        
+        if not cache_available:
+            params["Hard-coded defaults"] = {
+                "Peak detection tolerance": 11,
+            }
+
+        obj.update_lineage(
+            [pos_key, dep_key],
+            inputs,
+            params,
+        )
+
     except AssertionError as e:
         logger.warning(f"hylite error: {e}")
     except ValueError as e:
@@ -655,8 +738,21 @@ def cache_feature_map(obj, max_feats=20):
     obj.add_temp_dataset('feature-heights', feature_heights, ext='.npy')
     obj.add_temp_dataset('feature-counts', np.ma.masked_array(feature_counts, mask=obj.mask), ext='.npz')
 
+    params = {"Operation" : "Detected features caching",
+              "Feature detection threshold" : config.feature_detection_threshold,
+              "Maximum number of features" : max_feats,
+              "Feature ordering": "descending absorption depth",
+              "Peak detection": "scipy.signal.find_peaks",}
+    obj.update_lineage(['feature-indices', 'feature-heights'],
+                       "savgol_cr",
+                       params)
+    obj.update_lineage('feature-counts',
+                       ["savgol_cr", "mask"],
+                       params)
+
     # Store position and depth for top 3 features as displayable datasets
-    for k, label in enumerate(['deepest', 'second-deepest', 'third-deepest']):
+    three_keys = ['deepest', 'second-deepest', 'third-deepest']
+    for k, label in enumerate(three_keys):
         idx_slice = feature_indices[:, :, k].astype(float)
         idx_slice[idx_slice < 0] = 0  # avoid invalid index into bands
         pos = bands[idx_slice.astype(int)]
@@ -673,13 +769,17 @@ def cache_feature_map(obj, max_feats=20):
             np.ma.masked_array(dep, mask=obj.mask),
             ext='.npz'
         )
-
+        params_ind = {"Operation" : "Indexed cached features",
+                      "Feature indexed" : label}
+        obj.update_lineage([f'{label}-featurePOS',  f'{label}-featureDEP'],
+                           ["feature-indices", "feature-heights", "bands", "mask"],
+                           params_ind)
     return obj
     
     
 
 
-def quick_corr(obj, x, y, key):
+def quick_corr(obj, x, y, key, ids = None):
     """
     Runs a pearson correlation of a user selected spectum against the objects
     continuum removed dataset.
@@ -689,6 +789,7 @@ def quick_corr(obj, x, y, key):
     it needs to be sanitised.
     The clean key is returned in addion to the processed object, so the caller has reference
     the generated dataset.
+
     """
     clean_key = re.sub(r'[\\/:*?"<>|_]', '-', key)
     if obj.is_raw:
@@ -696,6 +797,12 @@ def quick_corr(obj, x, y, key):
     res_y = resample_spectrum(x, y, obj.bands)
     corr = np.ma.masked_array(sa.numpy_pearson(obj.savgol_cr, remove_cont(res_y)), mask = obj.mask)
     obj.add_temp_dataset(clean_key, corr, '.npz')
+    params = {"Operation" : "Single mineral correlation",
+              "Correlation method" : "Pearson",
+              "Library used" : config.library_path,
+              "Exemplar spectra" : key,
+              "Exemplar processing": "resampled to object bands and continuum removed"}
+    obj.update_lineage(clean_key, ["savgol_cr", "mask", "bands"], params)
     return obj, clean_key
 
 
@@ -722,7 +829,29 @@ def wta_multi_range_minmap(obj, exemplars, coll_name, mode='pearson'):
     obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
     obj.add_temp_dataset(f'{key_prefix}CONF', best_score, '.npy',)
     obj.add_temp_dataset(f'{key_prefix}WINDOW', best_window, '.npy')
-    
+    params = {"Correlation" : "Multi-range",
+                "Mode" : mode,
+                "Library used" : config.library_path,
+                "Collection name" : coll_name,
+                "Collection IDs" : {
+                            str(sample_id): str(label)
+                            for sample_id, (label, _, _) in exemplars.items()
+                        },
+                "Exemplar processing": "resampled to object bands continuum removed independently within each window",
+                "Continuum removal" : "gfit 0.2", 
+                "Hardcoded parameters" : {"Windows": [(1350, 1500),
+                                                    (1850, 2000), 
+                                                    (2140, 2230), 
+                                                    (2230, 2320), 
+                                                    (2305, 2500)],
+                                        "Pearson minimum score": 0.70,
+                                        "MSAM minimum score": 0.70,
+                                        "SAM maximum angle (degrees)": 8.0,}
+                        }
+    obj.update_lineage([f"{key_prefix}INDEX", f"{key_prefix}LEGEND", f'{key_prefix}CONF', f'{key_prefix}WINDOW'],
+                       ["savgol", "bands"], 
+                       params
+                       )
     return obj
 
 
@@ -732,7 +861,7 @@ def wta_min_map_user_defined(obj, exemplars, coll_name, ranges, mode='pearson'):
 
     Parameters
     ----------
-    obj : ProcessedObject   (needs .savgol_cr (H,W,B) and .bands (B,))
+    obj : ProcessedObject   (needs .savgol (H,W,B) and .bands (B,))
     exemplars : dict[int, (label:str, x_nm:1D, y:1D)]
         Usually from LibraryPage.get_collection_exemplars().
     coll_name : str text name of the collection passed
@@ -743,12 +872,12 @@ def wta_min_map_user_defined(obj, exemplars, coll_name, ranges, mode='pearson'):
     """
     coll_name = coll_name.replace('_', '')
     key_prefix = f"MinMap-{ranges[0]}-{ranges[1]}-{mode}-{coll_name}"
-    data = obj.savgol_cr
+    data = obj.savgol
     bands_nm = obj.bands
     labels, bank = [], []
     for _, (label, x_nm, y) in exemplars.items():
         y_res = resample_spectrum(np.asarray(x_nm, float), np.asarray(y, float), bands_nm)
-        y_res = remove_cont(y_res[np.newaxis, :])[0]
+        
         labels.append(str(label))
         bank.append(y_res.astype(np.float32))
     if not bank:
@@ -760,7 +889,25 @@ def wta_min_map_user_defined(obj, exemplars, coll_name, ranges, mode='pearson'):
     obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
     obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
     obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
-
+    params = {"Correlation" : "Custom band range - winner takes all",
+                    "Mode" : mode,
+                    "Library used" : config.library_path,
+                    "Collection name" : coll_name,
+                    "Collection IDs" : {
+                                str(sample_id): str(label)
+                                for sample_id, (label, _, _) in exemplars.items()
+                            },
+                    "Custom band range": [float(x) for x in ranges],
+                    "Exemplar processing": "array and exemplars sliced to custom range before continuum removal",
+                    "Continuum removal" : "gfit 0.2", 
+                    "Hardcoded parameters" : {"Pearson minimum score": 0.70,
+                                            "MSAM minimum score": 0.70,
+                                            "SAM maximum angle (degrees)": 8.0,}
+                            }
+    obj.update_lineage([f"{key_prefix}INDEX", f"{key_prefix}LEGEND", f'{key_prefix}CONF'],
+                           ["savgol", "bands"], 
+                           params
+                           )
     return obj
 
 
@@ -800,7 +947,21 @@ def wta_min_map_MSAM(obj, exemplars, coll_name, mode='numpy'):
     obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
     obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
     obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
-
+    params = {"Correlation" : "Modified Spectral Angle Mapping - winner takes all",
+                        "Library used" : config.library_path,
+                        "Collection name" : coll_name,
+                        "Collection IDs" : {
+                                    str(sample_id): str(label)
+                                    for sample_id, (label, _, _) in exemplars.items()
+                                },
+                        "Exemplar processing": "resampled to bands and continuum removed",
+                        "Continuum removal" : "gfit 0.2", 
+                        "Hardcoded parameters" : {"MSAM minimum score": 0.70,}
+                                }
+    obj.update_lineage([f"{key_prefix}INDEX", f"{key_prefix}LEGEND", f'{key_prefix}CONF'],
+                               ["savgol_cr", "bands"], 
+                               params
+                               )
     return obj
 
 
@@ -874,7 +1035,21 @@ def wta_min_map_SAM(obj, exemplars, coll_name, mode='numpy'):
     obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
     obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
     obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
-
+    params = {"Correlation" : "Spectral Angle Mapping - winner takes all",
+                            "Library used" : config.library_path,
+                            "Collection name" : coll_name,
+                            "Collection IDs" : {
+                                        str(sample_id): str(label)
+                                        for sample_id, (label, _, _) in exemplars.items()
+                                    },
+                            "Exemplar processing": "resampled to bands and continuum removed",
+                            "Continuum removal" : "gfit 0.2", 
+                            "Hardcoded parameters" : {"SAM maximum angle (degrees)": 8.0,}
+                                    }
+    obj.update_lineage([f"{key_prefix}INDEX", f"{key_prefix}LEGEND", f'{key_prefix}CONF'],
+                                   ["savgol_cr", "bands"], 
+                                   params
+                                   )
     return obj
 
 
@@ -948,7 +1123,21 @@ def wta_min_map(obj, exemplars, coll_name, mode='numpy'):
     obj.add_temp_dataset(f"{key_prefix}INDEX", index.astype(np.int16),  ".npy")
     obj.add_temp_dataset(f"{key_prefix}LEGEND", legend, ".json")
     obj.add_temp_dataset(f'{key_prefix}CONF', confidence, '.npy',)
-
+    params = {"Correlation" : "Pearson Correlation - winner takes all",
+                                "Library used" : config.library_path,
+                                "Collection name" : coll_name,
+                                "Collection IDs" : {
+                                            str(sample_id): str(label)
+                                            for sample_id, (label, _, _) in exemplars.items()
+                                        },
+                                "Exemplar processing": "resampled to bands and continuum removed",
+                                "Continuum removal" : "gfit 0.2", 
+                                "Hardcoded parameters" : {"Pearson minimum score": 0.70}
+                                        }
+    obj.update_lineage([f"{key_prefix}INDEX", f"{key_prefix}LEGEND", f'{key_prefix}CONF'],
+                                       ["savgol_cr", "bands"], 
+                                       params
+                                       )
     return obj
 
 

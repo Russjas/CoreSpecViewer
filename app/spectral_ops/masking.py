@@ -215,7 +215,7 @@ def detect_slice_rectangles(img_eq,
     areas = np.array([cv2.contourArea(p) for p in rects_poly])
     x, y, w, h = rects_xywh[np.argmax(areas)]
     return (slice(y, y + h), slice(x, x + w))
- 
+
 
 def auto_crop(image, mode='references'):
     """

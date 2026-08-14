@@ -7,11 +7,14 @@ and UI-friendly dataset access.
 """
 from dataclasses import dataclass, field
 from copy import deepcopy
+from uuid import uuid4
 from pathlib import Path
 import logging
+from xml.etree.ElementTree import ParseError
+import json
+
 import numpy as np
 from PIL import Image
-from xml.etree.ElementTree import ParseError
 
 from ..spectral_ops import IO as io
 from ..spectral_ops.processing import remove_cont, process
@@ -51,7 +54,8 @@ class ProcessedObject:
     root_dir: Path
     datasets: dict = field(default_factory=dict)
     temp_datasets: dict = field(default_factory=dict)
-
+    current_history: list = field(default_factory=list)
+    temp_history: list = field(default_factory=list)
 
 
 #==================== Constructors and loaders ====================================================
@@ -123,6 +127,8 @@ class ProcessedObject:
         datasets = {}
         for fp in root.iterdir():
             if not fp.is_file():
+                continue
+            if fp.suffix.lower() == ".history":
                 continue
             s = fp.stem
 
@@ -294,6 +300,7 @@ class ProcessedObject:
         for dataset in self.datasets.values():
             dataset.save_dataset(new=new)
             dataset.save_thumb()
+        self.write_history()
 
 
     def update_root_dir(self, path):
@@ -305,6 +312,7 @@ class ProcessedObject:
         path : str or Path
             New directory to assign as the root.
         """
+        old_root = Path(self.root_dir)
         new_root = Path(path)
         self.root_dir = new_root
         for ds in self.datasets.values():
@@ -315,7 +323,15 @@ class ProcessedObject:
                 filename = f"{self.basename}_{ds.key}{ds.ext}"
                 ds.path = new_root.joinpath(filename)
 
-#=====================================================================================================================
+        if old_root != new_root:
+            self.current_history.append({
+                "uuid_operation": str(uuid4()),
+                "operation": "root directory changed",
+                "previous root": str(old_root),
+                "new root": str(new_root),
+            })
+
+
 #================dataset management=====================================================================================
 
     def add_dataset(self, key, data, ext=".npy"):
@@ -349,21 +365,20 @@ class ProcessedObject:
         for key in self.temp_datasets.keys():
             # Close old memmap handle before replacing
             if key in self.datasets:
-
                 self.datasets[key].close_handle()
                 self.datasets[key]._memmap_ref = None
                 self.datasets[key].data = None
                 del self.datasets[key]
 
             self.datasets[key] = self.temp_datasets[key]
-
+        self.current_history.extend(self.temp_history)
         self.clear_temps()
 
 
     def clear_temps(self):
         """Remove all temporary datasets."""
         self.temp_datasets.clear()
-
+        self.temp_history.clear()
 
     def reload_dataset(self, key):
         """Reload a single dataset from disk."""
@@ -1021,64 +1036,103 @@ class ProcessedObject:
 
 
 # ================= Lineage and version recording infractructure ==========================
+
+
     def update_lineage(self, keys: list, inputs: list, params: dict):
         """
-        Capture and record the provenance of new datasets, including input dataset
-        versions and processing parameters, to improve reproducibility.
+        Record the current provenance of produced datasets and stage the complete
+        operation for appending to the external history file.
 
         This should always be called after the relevant add_temp_dataset() calls.
-
-        Parameters
-        ----------
-        keys : list of str, or str
-            Dataset keys produced by the tool.
-        inputs : list of str, or str
-            Dataset keys consumed by the tool.
-        params : dict
-            Parameters describing this execution.
         """
+        NO_LINEAGE_KEYS = {"display", "metadata"}
+
         if isinstance(keys, str):
             keys = (keys,)
 
+        keys = tuple(key for key in keys if key not in NO_LINEAGE_KEYS)
+        if not keys:
+            logger.debug(
+                "update_lineage only received datasets excluded from lineage"
+            )
+            return
+
         if isinstance(inputs, str):
             inputs = (inputs,)
-
 
         if not self.has_temp("metadata"):
             self.add_temp_dataset("metadata")
 
         lineage = self.metadata.setdefault("lineage", {})
 
+        def current_version(key):
+            """Read either the new current-state format or the old list format."""
+            record = lineage.get(key)
+
+            if not record:
+                return 0
+
+            # Temporary backwards compatibility with the original lineage schema.
+            if isinstance(record, list):
+                return record[-1]["version"]
+
+            return record["version"]
+
+        # Capture inputs before replacing any output records. This matters for
+        # operations such as crop where a dataset is both input and output.
         input_versions = {}
 
         for key in inputs:
-            history = lineage.get(key)
+            version = current_version(key)
 
-            if not history:
+            if version == 0:
                 logger.warning(
                     f"{key} is a required input for {keys}, but has no lineage"
                 )
-                input_versions[key] = 0
-            else:
-                input_versions[key] = history[-1]["version"]
 
-        for key in keys:
-            history = lineage.get(key)
+            input_versions[key] = version
 
-            if not history:
-                version = 1
-            else:
-                version = history[-1]["version"] + 1
+        operation_uuid = str(uuid4())
 
-            lineage.setdefault(key, []).append({
+        output_versions = {
+            key: current_version(key) + 1
+            for key in keys
+        }
+
+        operation = {
+            "uuid_operation": operation_uuid,
+            "inputs": input_versions,
+            "outputs": output_versions,
+            "params": params,
+        }
+
+        self.temp_history.append(operation)
+
+        # Metadata contains only the current state and a reference to the complete
+        # operation held in the external history file.
+        for key, version in output_versions.items():
+            lineage[key] = {
                 "version": version,
-                "inputs": input_versions.copy(),
-                "params": deepcopy(params),
-            })
-        logger.info(
-    f"Updated lineage for {keys}: "
-    f"{self.metadata['lineage'][keys[0] if len(keys) == 1 else keys[0]][-1]}"
-)
-    
+                "uuid_operation": operation_uuid,
+                "parameters" : params
+            }
 
-        
+        logger.info(f"Updated lineage: {operation}")
+
+
+    def write_history(self):
+        if not self.current_history:
+            return
+
+        history_path = self.root_dir / f"{self.basename}.history"
+        try:
+            with history_path.open("a", encoding="utf-8") as f:
+                for operation in self.current_history:
+                    f.write(json.dumps(operation, separators=(",", ":")))
+                    f.write("\n")
+
+            self.current_history.clear()
+        except Exception as e:
+            #History and provenance recording should never interfere with actually working with the data
+            logger.error("Failed to update history on disk. Record will be incomplete", exc_info=True)
+

@@ -25,6 +25,8 @@ import numpy as np
 from PyQt5.QtCore import QByteArray
 from PyQt5.QtSql import QSqlDatabase, QSqlQuery, QSqlTableModel
 
+from ..config import config
+
 # Mirror the constants you currently have in lib_page.py
 SAMPLE_TABLE_NAME = "Samples"
 SPECTRA_TABLE_NAME = "Spectra"
@@ -135,7 +137,9 @@ class LibraryManager:
         self.collection_ids.clear()
         self.collections.clear()
         self.exemplars_by_collection.clear()
-        
+
+        config.set("library_path", str(self.db_path))
+        config.save()
         return model
 
     def close_database(self) -> None:

@@ -310,7 +310,7 @@ def mineral_map_subrange(cube: np.ndarray,            # (H, W, B_data)
     ranges: list,  # [wmin, wmax]
     mode: str = "pearson",       # "pearson", "sam", "msam"
     invalid_value: int = -999,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     selected-range winner-takes-all mineral map.
     """
@@ -323,14 +323,16 @@ def mineral_map_subrange(cube: np.ndarray,            # (H, W, B_data)
             stop = np.argmin(np.abs(wl_data - ranges[0]))
         cube = cube[..., start:stop + 1]
         exemplar_stack = exemplar_stack[..., start:stop + 1]
+        cube = remove_cont(cube)
+        exemplar_stack = remove_cont(exemplar_stack)
     except IndexError:
         raise ValueError("range selection failed on this data")
     if mode =='pearson' :  
-        index, confidence = mineral_map_wta_strict(cube, exemplar_stack)
+        index, confidence = mineral_map_wta_strict(cube, exemplar_stack, invalid_value=invalid_value)
     elif mode == "sam":
-        index, confidence = mineral_map_wta_sam_strict(cube, exemplar_stack)
+        index, confidence = mineral_map_wta_sam_strict(cube, exemplar_stack, invalid_value=invalid_value)
     elif mode == "msam":
-        index, confidence = mineral_map_wta_msam_strict(cube, exemplar_stack)
+        index, confidence = mineral_map_wta_msam_strict(cube, exemplar_stack, invalid_value=invalid_value)
     else:
         raise ValueError(f"Unknown mode {mode!r}; expected 'pearson', 'sam' or 'msam'")
     return index, confidence

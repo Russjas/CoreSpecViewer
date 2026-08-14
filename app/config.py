@@ -55,9 +55,18 @@ class AppConfig:
     min_seg_width: int = 10
     min_seg_area: int = 300
 
-    def as_dict(self) -> dict:
-        """Return all settings as a dict. For GUI table population."""
+    # Hidden fields not to be displayed
+
+    library_path: str = ""
+
+    def as_complete_dict(self) -> dict:
+        """Return config as a dict for persistance"""
         return {f.name: getattr(self, f.name) for f in fields(self)}
+    
+    def as_dict(self) -> dict:
+        """Return all viewable settings as a dict. For GUI table population."""
+        hidden_keys = {"library_path"}
+        return {f.name: getattr(self, f.name) for f in fields(self) if f.name not in hidden_keys}
 
     def set(self, key: str, value) -> None:
         """Type-safe setter for GUI edits. Raises KeyError for unknown keys."""
@@ -74,7 +83,7 @@ class AppConfig:
         """Persist current settings to disk."""
         try:
             _CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            _CONFIG_PATH.write_text(json.dumps(self.as_dict(), indent=2), encoding="utf-8")
+            _CONFIG_PATH.write_text(json.dumps(self.as_complete_dict(), indent=2), encoding="utf-8")
             logger.info(f"Config saved to {_CONFIG_PATH}")
         except Exception as e:
             logger.warning(f"Failed to save config to {_CONFIG_PATH}: {e}")
