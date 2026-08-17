@@ -86,10 +86,12 @@ class ProcessedObject:
             return None, None
         return base, key
 
+
     @classmethod
     def new(cls, root_dir, basename):
         """Factory for a brand-new ProcessedObject (no files yet)."""
         return cls(basename=basename, root_dir=Path(root_dir))
+
 
     @classmethod
     def from_path(cls, path):
@@ -157,7 +159,6 @@ class ProcessedObject:
             obj.reload_all()  # Drop back to memmaps   
 
         return obj
-
 
 
     @classmethod
@@ -277,6 +278,7 @@ class ProcessedObject:
         self.add_dataset("display", rgb_uint8, ext=".npy") 
         self.build_thumb("display")
 
+
     def regenerate_display(self):
         """
         Regenerate the 'display' dataset from the current savgol (resolves
@@ -295,6 +297,7 @@ class ProcessedObject:
 
 #=====================================================================================================================
 #================disk I/O helpers=====================================================================================
+
     def save_all(self, new=False):
         """Save all registered datasets to disk."""
         for dataset in self.datasets.values():
@@ -315,6 +318,7 @@ class ProcessedObject:
         old_root = Path(self.root_dir)
         new_root = Path(path)
         self.root_dir = new_root
+
         for ds in self.datasets.values():
             filename = f"{self.basename}_{ds.key}{ds.ext}"
             ds.path = new_root.joinpath(filename)
@@ -333,6 +337,45 @@ class ProcessedObject:
 
 
 #================dataset management=====================================================================================
+
+    def _invalidate_dataset(self,key):
+        """create a null dataset in temp datasets"""
+        if not self.has(key):
+            return
+
+        source = self[key]
+        self.temp_datasets[key] = Dataset(
+            base=source.base,
+            key=source.key,
+            path=source.path,
+            suffix=source.suffix,
+            ext=source.ext,
+            data=None,
+            null=True,
+        )
+
+
+    def _check_and_invalidate(self, changed_keys):
+        """
+        Stats, segments and depth anchors can be rendered invalid by cropping operation or mask adjustments.
+        These datasets must be unavailable to downstream unwrapping operations or they will operate on incompatible products
+        This system stages them as temp datasets internally but absent outside of PO itself
+        """
+        changed = set(changed_keys)
+        if  "mask" not in changed and "cropped" not in changed:
+            return False
+        
+        # If the mask has changed the stats and segements are no longer valid for unwrapping
+        if "mask" in changed:
+            self._invalidate_dataset("stats")
+            self._invalidate_dataset("segments")
+        # only a cropping operation can change a base dataset, so the geometry has changed and depth anchors are invalid.
+        # CoreSpecViewer will invalidate and not re-project    
+        if "cropped" in changed:
+            self.clear_depth_anchors()
+
+        return True
+
 
     def add_dataset(self, key, data, ext=".npy"):
         """Attach an in-memory dataset; not written until save_all()."""
@@ -354,23 +397,24 @@ class ProcessedObject:
         
         self.build_thumb(key)
 
-    # TODO: check delete okay, this shouldnt be called everything should go through temp dataset
-    def update_dataset(self, key, data):
-        """Replace the in-memory data for a given dataset key."""
-        self.datasets[key].data = data
-
 
     def commit_temps(self):
-        """Promote all temporary datasets to permanent and clear temp cache."""
-        for key in self.temp_datasets.keys():
-            # Close old memmap handle before replacing
+        """Commit replacements and apply staged invalidations."""
+        for key, temp_ds in list(self.temp_datasets.items()):
+
+            if temp_ds.null:
+                if key in self.datasets:
+                    self.datasets[key].delete()
+                    del self.datasets[key]
+                continue
+            # Normal temp promotion
             if key in self.datasets:
                 self.datasets[key].close_handle()
-                self.datasets[key]._memmap_ref = None
                 self.datasets[key].data = None
                 del self.datasets[key]
 
-            self.datasets[key] = self.temp_datasets[key]
+            self.datasets[key] = temp_ds
+
         self.current_history.extend(self.temp_history)
         self.clear_temps()
 
@@ -379,6 +423,7 @@ class ProcessedObject:
         """Remove all temporary datasets."""
         self.temp_datasets.clear()
         self.temp_history.clear()
+
 
     def reload_dataset(self, key):
         """Reload a single dataset from disk."""
@@ -474,26 +519,44 @@ class ProcessedObject:
     def has_temps(self):
         """Whether the object currently holds temporary datasets."""
         return bool(self.temp_datasets)
+    
     # ---- registry API ----
     def keys(self):
         """Return a sorted list of all dataset keys (base + temp)."""
+        all_keys = self.datasets.keys() | self.temp_datasets.keys()
+
+        return sorted(key for key in all_keys
+                        if self.has(key)
+                        )
         
-        return sorted(self.datasets.keys()|self.temp_datasets.keys())
 
     def has(self, key: str):
-        """Return True if the dataset key exists (with valid ndarray data)."""
-        
-        return (key in self.temp_datasets) or (key in self.datasets)
+        """Return True if the dataset key exists."""
+        try:
+            self[key]
+        except KeyError:
+            return False
+        return True
+    
 
     def has_temp(self, key):
         """Check if a temporary dataset exists for the specified key."""
+
         return key in self.temp_datasets
+
 
     def __getitem__(self, key):
         """Return the Dataset object for the given key."""
         if key in self.temp_datasets:
-            return self.temp_datasets[key]
-        return self.datasets[key]
+            dataset = self.temp_datasets[key]
+        else:
+            dataset = self.datasets[key]
+
+        if dataset.null:
+            raise KeyError(f"Dataset '{key}' is invalidated")
+
+        return dataset
+
 
     def __getattr__(self, name):
         """Convenience passthrough for accessing `.data` via attribute syntax."""
@@ -547,12 +610,14 @@ class ProcessedObject:
             logger.info(f"Exported {self.basename} {key}")
         else:
             return
-    
+
+
     def build_thumb(self, key):
         im = self.get_pil_image(key, resize=True)
         if im is None:
             return
         self[key].thumb = im
+
 
     def build_all_thumbs(self, force=False):
         """Build thumbnails for all thumbnail-able datasets."""
@@ -602,8 +667,6 @@ class ProcessedObject:
         return im
 
 
-
-
     def get_stretch_values(self, key):
         """Return (vmin, vmax) for displaying a 2D continuous product, or None for local stretch."""
         if key.endswith("POS") and key.replace("POS", "") in DISPLAY_RANGE:
@@ -619,11 +682,13 @@ class ProcessedObject:
             if ds.thumb is not None:
                 ds.save_thumb()
 
+
     def load_thumbs(self):
         for key, ds in self.datasets.items():
             if Path(str(ds.path)[:-len(ds.ext)]+'thumb.jpg').is_file():
                 with Image.open(str(ds.path)[:-len(ds.ext)]+'thumb.jpg') as img:
                     self.datasets[key].thumb = img.copy()
+
 
     def load_or_build_thumbs(self):
         for key, ds in self.datasets.items():
@@ -724,8 +789,7 @@ class ProcessedObject:
     
         return io.write_envi(arr, header, str(head_path),
                              interleave="bil", byteorder=0, force=force)
-    
-    
+       
     
     def save_archive_file(self, output_dir: Path | str = None, 
                   include_products: bool = False) -> Path:
@@ -1037,20 +1101,21 @@ class ProcessedObject:
 
 # ================= Lineage and version recording infractructure ==========================
 
-
     def update_lineage(self, keys: list, inputs: list, params: dict):
         """
         Record the current provenance of produced datasets and stage the complete
         operation for appending to the external history file.
 
-        This should always be called after the relevant add_temp_dataset() calls.
+        This must be called after all relevant add_temp_dataset() calls.
         """
         NO_LINEAGE_KEYS = {"display", "metadata"}
+        INVALIDATABLE_KEYS = {"stats", "segments"}
 
         if isinstance(keys, str):
             keys = (keys,)
 
         keys = tuple(key for key in keys if key not in NO_LINEAGE_KEYS)
+
         if not keys:
             logger.debug(
                 "update_lineage only received datasets excluded from lineage"
@@ -1066,20 +1131,20 @@ class ProcessedObject:
         lineage = self.metadata.setdefault("lineage", {})
 
         def current_version(key):
-            """Read either the new current-state format or the old list format."""
+            """Read either the current-state format or the old list format."""
             record = lineage.get(key)
 
             if not record:
                 return 0
 
-            # Temporary backwards compatibility with the original lineage schema.
+            # Temporary backwards compatibility with the original schema.
             if isinstance(record, list):
                 return record[-1]["version"]
 
             return record["version"]
 
-        # Capture inputs before replacing any output records. This matters for
-        # operations such as crop where a dataset is both input and output.
+        # Capture inputs before invalidation or output replacement. This matters
+        # when a dataset is both an input and output, as happens during crop.
         input_versions = {}
 
         for key in inputs:
@@ -1091,6 +1156,25 @@ class ProcessedObject:
                 )
 
             input_versions[key] = version
+
+        stats_invalidated = self._check_and_invalidate(keys)
+
+        # clear_depth_anchors() may have replaced the staged metadata dataset,
+        # so reacquire its lineage dictionary.
+        lineage = self.metadata.setdefault("lineage", {})
+
+        if stats_invalidated:
+            # A spatially cropped segments array is not a valid replacement for
+            # stats/segments calculated together from the current mask.
+            keys = tuple(
+                key for key in keys
+                if key not in INVALIDATABLE_KEYS
+            )
+
+            # The staged current-state metadata must not advertise lineage for
+            # datasets which will disappear when the nulls are committed.
+            for key in INVALIDATABLE_KEYS:
+                lineage.pop(key, None)
 
         operation_uuid = str(uuid4())
 
@@ -1106,19 +1190,21 @@ class ProcessedObject:
             "params": params,
         }
 
+        if stats_invalidated:
+            operation["invalidated"] = ["stats", "segments"]
+
         self.temp_history.append(operation)
 
-        # Metadata contains only the current state and a reference to the complete
-        # operation held in the external history file.
+        # Metadata holds only the current state and a reference to the complete
+        # operation stored in the external history file.
         for key, version in output_versions.items():
             lineage[key] = {
                 "version": version,
                 "uuid_operation": operation_uuid,
-                "parameters" : params
+                "parameters": params,
             }
 
-        logger.info(f"Updated lineage: {operation}")
-
+        logger.debug(f"Updated lineage: {operation}")
 
     def write_history(self):
         if not self.current_history:
@@ -1136,3 +1222,56 @@ class ProcessedObject:
             #History and provenance recording should never interfere with actually working with the data
             logger.error("Failed to update history on disk. Record will be incomplete", exc_info=True)
 
+
+# ================== depth anchors ====================================================================
+
+    def add_depth_anchor(self, x, y, depth):
+        metadata = dict(self.metadata)
+        anchors = list(metadata.get("anchors") or [])
+
+        anchor = {
+            "x": int(x),
+            "y": int(y),
+            "depth": float(depth),
+        }
+        anchors.append(anchor)
+        metadata["anchors"] = anchors
+
+        self.add_temp_dataset("metadata", metadata, ext=".json")
+
+        annotations = (
+            dict(self["annotations"].data)
+            if self.has("annotations")
+            else {}
+        )
+
+        annotation_id = f"ann_{uuid4().hex[:8]}"
+        annotations[annotation_id] = {
+            "shape": "point",
+            "x": int(x),
+            "y": int(y),
+            "label": f"Depth Anchor: {depth:.3f}m",
+            "depth_anchor": True,
+        }
+
+        self.add_temp_dataset("annotations", annotations, ext=".json")
+
+
+    def clear_depth_anchors(self):
+        metadata = dict(self.metadata)
+        metadata["anchors"] = []
+        self.add_temp_dataset("metadata", metadata, ext=".json")
+
+        if self.has("annotations"):
+            annotations = dict(self["annotations"].data)
+
+            annotations = {
+                key: value
+                for key, value in annotations.items()
+                if not (
+                    value.get("depth_anchor", False)
+                    or "depth anchor" in value.get("label", "").lower()
+                )
+            }
+
+            self.add_temp_dataset("annotations", annotations, ext=".json")

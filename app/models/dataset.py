@@ -58,7 +58,10 @@ class Dataset:
     ext: str
     data: object = None
     thumb: Image.Image = None
+    null: bool = False
     _memmap_ref: object = None
+
+
     def __post_init__(self):
         """Normalize the path and automatically load data if the file exists."""
         self.path = Path(self.path)
@@ -66,7 +69,7 @@ class Dataset:
             self.ext = '.' + self.ext
 
         # Auto-load only if file already exists
-        if self.path.is_file() and self.data is None:
+        if not self.null and self.path.is_file() and self.data is None:
             self.load_dataset()
 
     def close_handle(self) -> None:
@@ -81,6 +84,7 @@ class Dataset:
         gc.collect()
         self._memmap_ref = None
 
+
     def load_dataset(self):
         """
         Load the dataset from disk into memory based on its extension.
@@ -90,6 +94,11 @@ class Dataset:
         ValueError
             If the file type is not recognized or unsupported.
         """
+        
+        if self.null:
+            logger.error("Cannot load a null dataset. Should not have been invoked, upstream problem")
+            raise ValueError("Cannot load a null dataset.")
+
         if self.ext not in ['.npy', '.json', '.jpg', '.npz']:
             logger.error(f"Cannot open {self.path} with {self.ext}, this is an invalid file type")
             raise ValueError(f"Cannot open {self.ext}, this is an invalid file type")
@@ -132,6 +141,11 @@ class Dataset:
         ValueError
             If no data is loaded or the file type is unsupported.
         """
+        
+        if self.null:
+            logger.error("Cannot save a null dataset. Should not have been invoked, upstream problem")
+            raise ValueError("Cannot save a null dataset.")
+
         if self.data is None:
             logger.error("No data loaded or assigned; nothing to save.")
             raise ValueError("No data loaded or assigned; nothing to save.")
@@ -168,12 +182,14 @@ class Dataset:
             logger.error(f"Cannot save {self.path} with {self.ext}, this is an invalid file type")
             raise ValueError(f"Cannot save unsupported file type: {self.ext}")
 
+
     def copy(self, data=None):
         """
         Create a shallow copy of this Dataset, optionally replacing its data.
 
         Dictionary data is deep-copied so nested metadata is independent.
         """
+        
         if data is None:
             data = self.data
 
@@ -195,15 +211,12 @@ class Dataset:
         )
 
 
-
-
     def save_thumb(self):
 
         if self.thumb is not None:
             self.thumb.save(str(self.path)[:-len(self.ext)]+'thumb.jpg')
             
-            
-            
+                 
     def delete(self) -> None:
         """
         Delete the dataset file from disk and clear in-memory data.
@@ -219,7 +232,9 @@ class Dataset:
         """
         
         self.close_handle()
-        
+        self.data = None
+        self.thumb = None
+        gc.collect()
         
         if self.path.exists():
             self.path.unlink()
@@ -228,10 +243,6 @@ class Dataset:
         thumb_path = Path(str(self.path)[:-len(self.ext)] + 'thumb.jpg')
         if thumb_path.exists():
             thumb_path.unlink()
-        
-        self.data = None
-        self.thumb = None
-        self._memmap_ref = None
-        gc.collect()
+
     
     

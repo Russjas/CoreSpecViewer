@@ -216,17 +216,15 @@ class HoleBoxTable(QTableWidget):
     def _get_thumb_pixmap(self, po):
         po.load_thumbs()
         key = self.dataset_key
-        ds = getattr(po, "temp_datasets", {}).get(key)
-        if ds is None:
-            ds = getattr(po, "datasets", {}).get(key)
-            if ds is None:
-                return QPixmap()
+        if not po.has(key):
+            return QPixmap()
+
+        ds = po[key]
 
         if ds.thumb is None:
             try:
                 po.build_thumb(key)
             except Exception:
-                
                 return QPixmap()
 
         if ds.thumb is None:

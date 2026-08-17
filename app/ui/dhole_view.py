@@ -77,7 +77,7 @@ class DholeView(BasePage):
         self.setWindowTitle("Downhole preview")
         self.resize(1100, 800)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
-        logger.info(f"Parent = {parent}")
+        
     # ------------------------------------------------------------------
     # Factory
     # ------------------------------------------------------------------

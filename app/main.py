@@ -537,12 +537,24 @@ class MainRibbonController(QMainWindow):
                     logger.error(f"Failed to save temps before archiving", exc_info=True)
                     QMessageBox.warning(self, "Commit Error", f"Failed to upgrade datasets: {e}")
                     return
-        
+            elif choice == "right": # explicitly clear temps
+                try:
+                    self.cxt.po.clear_temps()
+                    logger.info(f"Cleared temporary datasets before archiving {self.cxt.current.basename}")
+                except Exception as e:
+                    logger.error(f"Failed to clear temps before archiving", exc_info=True)
+                    QMessageBox.warning(self, "Clear Error", f"Failed to clear temp datasets: {e}")
+                    return
+            else:
+                return
+
         dest = QFileDialog.getExistingDirectory(self, "Choose save folder", str(self.cxt.current.root_dir))
         if not dest:
             return
         
         test = two_choice_box('Save product datasets?', 'yes', 'no')
+        if test == "cancel":
+            return
         try:
             if test != 'left':
                 self.cxt.current.save_archive_file(dest)

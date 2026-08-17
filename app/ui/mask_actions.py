@@ -283,18 +283,7 @@ class MaskActions(BaseActions):
                 )
                 if not ok:
                     return
-                self.cxt.current = t.add_depth_anchor(self.cxt.current, x, y, depth)
-                
-                import uuid
-                ann = dict(self.cxt.current['annotations'].data) if self.cxt.current.has('annotations') else {}
-                ann[f"ann_{uuid.uuid4().hex[:8]}"] = {
-                    "shape": "point",
-                    "x": int(x),
-                    "y": int(y),
-                    "label": f"Depth Anchor: {depth:.3f}m"
-                }
-                self.cxt.current.add_temp_dataset('annotations', ann, ext='.json')
-
+                self.cxt.current.add_depth_anchor(x, y, depth)
                 self.controller.refresh()
             except Exception as e:
                 logger.error("Failed to add depth anchor", exc_info=True)
@@ -313,23 +302,9 @@ class MaskActions(BaseActions):
             self._show_error("Clear Depth Anchors", msg)
             return
 
-        if not self.cxt.current.metadata.get('anchors'):
-            return
-
         try:
             #Clear from metadata
-            metadata = dict(self.cxt.current.metadata)
-            metadata.pop('anchors', None)
-            self.cxt.current.add_temp_dataset('metadata', metadata, ext='.json')
-            logger.info(f"Depth anchors cleared for {self.cxt.current.basename}")
-            
-            # Clear from annotations
-            if self.cxt.current.has('annotations'):
-                ann = dict(self.cxt.current['annotations'].data)
-                ann = {k: v for k, v in ann.items() 
-                            if "depth anchor" not in v.get("label", "").lower()}
-                self.cxt.current.add_temp_dataset('annotations', ann, ext='.json')
-
+            self.cxt.current.clear_depth_anchors()
             self.controller.refresh()
         except Exception as e:
             logger.error("Failed to clear depth anchors", exc_info=True)

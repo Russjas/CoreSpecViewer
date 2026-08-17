@@ -135,28 +135,28 @@ def crop(obj, y_min, y_max, x_min, x_max):
         ordered_keys = ['mask'] if 'mask' in keys else []
         ordered_keys.extend([k for k in keys if k != 'mask'])
         base_uncropped_shape = obj.savgol.shape[:2]
-        total_crop_time = 0
+        changed_keys = []
+        params = {"Spatial Crop" : "Manual",
+                                  "bounds": {
+                                'y_min' : y_min,
+                                'y_max' : y_max,
+                                'x_min' : x_min,
+                                'x_max' : x_max,
+                                }}
         for key in ordered_keys:
-            key_start = time.perf_counter()
+            
             logger.info(f"cropping {obj.basename} {key} dataset")
             
             # choose source: temp first enforced by PO API
             src = obj.get_data(key)
             ext = obj[key].ext
             if isinstance(src, np.ndarray) and src.shape[:2] == base_uncropped_shape:
-                array_copy_start = time.perf_counter()
                 sliced = src[y_min:y_max, x_min:x_max, ...]
                 cropped_copy = sliced.copy()
                 obj.add_temp_dataset(key, cropped_copy, ext = ext)
-                params = {"Spatial Crop" : "Manual",
-                          "bounds": {
-                        'y_min' : y_min,
-                        'y_max' : y_max,
-                        'x_min' : x_min,
-                        'x_max' : x_max,
-                        }}
-                obj.update_lineage(key, key, params)
-                    
+                
+                changed_keys.append(key)
+        obj.update_lineage(changed_keys, changed_keys, params)
         obj.regenerate_display()
         return obj
 
@@ -218,12 +218,23 @@ def crop_auto(obj,mode='references'):
             return obj
         
         # slicer is valid → apply to all datasets
+        params = {"Spatial Crop" : "Auto",
+                                  "Mode" : mode,}
+        y_slice, x_slice = slicer
+        params["bounds"] = {
+                        "y_min": y_slice.start,
+                        "y_max": y_slice.stop,
+                        "x_min": x_slice.start,
+                        "x_max": x_slice.stop,
+                        }
+        
+        
         keys = obj.keys()
         
         # Ensure mask is processed first for thumbnail generation
         ordered_keys = ['mask'] if 'mask' in keys else []
         ordered_keys.extend([k for k in keys if k != 'mask'])
-        
+        changed_keys = []
         for key in ordered_keys:
             logger.info(f"auto-cropping {obj.basename} {key} dataset")
             
@@ -239,18 +250,9 @@ def crop_auto(obj,mode='references'):
 
                 cropped_copy = cropped.copy()
                 obj.add_temp_dataset(key, cropped_copy, ext = ext)
-                params = {"Spatial Crop" : "Auto",
-                          "Mode" : mode,}
-                y_slice, x_slice = slicer
-                params["bounds"] = {
-                "y_min": y_slice.start,
-                "y_max": y_slice.stop,
-                "x_min": x_slice.start,
-                "x_max": x_slice.stop,
-                }
-                obj.update_lineage(key, key, params)
-            
+                changed_keys.append(key)
                 
+        obj.update_lineage(changed_keys, changed_keys, params)
         obj.regenerate_display()
         return obj
     
@@ -574,16 +576,6 @@ def calc_unwrap_stats(obj):
     return obj
 
 
-def add_depth_anchor(obj, x, y, depth):
-    metadata = dict(obj.metadata)
-    anchors = list(metadata.get('anchors') or [])
-    anchors.append({'x': int(x), 'y': int(y), 'depth': float(depth)})
-    metadata['anchors'] = anchors
-    obj.add_temp_dataset('metadata', metadata, ext='.json')
-    logger.info(f"Depth anchor added to {obj.basename}: x={x}, y={y}, depth={depth}m "
-                f"({len(anchors)} total)")
-    return obj
-
 def unwrapped_output(obj):
     """
     Uses previously computed unwrap stats to produce a vertically concatenated
@@ -673,6 +665,13 @@ def run_feature_extraction(obj, key):
     cache_available = (obj.has('feature-indices') and
                        obj.has('feature-heights')
                        )
+
+    # I am no longer happy with using the cached feature look up for detection
+    # during feature extraction runs.
+    # Hard coded default False here while I consider further.
+    cache_available = False
+    # Comment out the above line should you wish to use the cache system.
+
     if cache_available:
         cached_arrays = (
             obj.get_data('feature-indices'),
