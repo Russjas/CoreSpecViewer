@@ -1151,7 +1151,7 @@ class ProcessedObject:
             version = current_version(key)
 
             if version == 0:
-                logger.warning(
+                logger.debug(
                     f"{key} is a required input for {keys}, but has no lineage"
                 )
 

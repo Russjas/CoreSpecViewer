@@ -60,8 +60,6 @@ class VisualisePage(BasePage):
 
         self.cache = set()
         self.table.cellActivated.connect(self._on_row_activated)
-        #self.table.cellDoubleClicked.connect(self._on_row_activated)
-        self.table.rightClicked.connect(self.tbl_right_click_handler)
 
         self._mpl_cids = []  # store mpl connection ids
         self._sync_lock = False
@@ -474,23 +472,6 @@ class VisualisePage(BasePage):
 
         self.table.resizeRowsToContents()
 
-    def tbl_right_click_handler(self, row, column):
-        if self.cxt.ho is not None:
-            return
-        it = self.table.item(row, 0)
-        if not it:
-            return
-        key = it.data(Qt.UserRole)
-        if not key:
-            return
-        menu = QMenu(self)
-        
-        act_delete = menu.addAction("Delete row")
-        action = menu.exec_(QCursor.pos())
-        
-        if action == act_delete:
-            self.current_obj.delete_dataset(key)
-        self.update_display()
 
     def _bind_mpl(self, canvas, event, handler):
         cid = canvas.mpl_connect(event, handler)
