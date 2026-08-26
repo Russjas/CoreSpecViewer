@@ -18,7 +18,8 @@ class MaskActions(BaseActions):
         """Define and register ribbon buttons"""
         
         self._register_group('Masking', [
-            ("button", "Auto-mask by cluster", self.act_mask_by_cluster, "Clusters image into 2 classes, then masks the selected class. New, and experimental.", "Ctrl+Alt+C"),
+            
+            ("button", "Auto-mask by cluster", self.act_mask_by_cluster, "Clusters image into 2 classes, then masks the selected class. New, and experimental."),
             ("button", "New mask", lambda: self.act_mask_point('new'), "Creates a blank mask,\n then masks by correlation with selected pixel.", "Ctrl+W"),
             ("button", "Enhance mask", lambda: self.act_mask_point('enhance'), "Adds to existing mask by correlation with selected pixel", "Ctrl+E"),
             ("button", "Mask region", self.act_mask_rect, "Adds a masked rectangle to existing mask", "Ctrl+R"),
@@ -43,10 +44,39 @@ class MaskActions(BaseActions):
             ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),
             ("button", "re-generate thumbs (slow)", self.re_thumb, 'Regenerates all thumbnail images. Slow process, but shouldnt be needed often'),
             ("button", "Rim", self.rim_mask, "Apply a rim to the mask", "Ctrl+Alt+R"),
-            ("button", "Change depth units", self.depth_unit_change, "Change the depth units for this box, default is m")
-        ])
+            ("button", "Change depth units", self.depth_unit_change, "Change the depth units for this box, default is m"),
+            ("button", "SAM click unmask", lambda: self.sam_experiment("unmask inside"), "NOT FOR RELEASE",  "Ctrl+Alt+U"),
+            ("button", "SAM click mask", lambda: self.sam_experiment("mask inside"), "NOT FOR RELEASE"),
+            ])
     
     # -------- MASK actions --------
+
+    
+
+    def sam_experiment(self, mode):
+        logger.info(f"Button clicked: SAM")
+        if not t.SAM_AVAILABLE:
+            return
+        valid_state, msg = self.cxt.requires(self.cxt.PROCESSED)
+        if not valid_state:
+            logger.warning(msg)
+            self._show_error("Masking", msg)
+            return
+        p = self.controller.active_page()
+        if not p or not p.dispatcher:
+            return
+
+        def handle_point_click(y, x):
+            try:
+                view = p.display_mode
+            except Exception:
+                view = "raw"
+            with busy_cursor('trying sam inference...', self.controller):
+                self.cxt.current = t.sam_test(self.cxt.current, y, x, mode = mode, view=view)
+                logger.info(f"SAM inference with {mode} using {view} on {self.cxt.current.basename}")
+                self.controller.refresh()
+            
+        p.dispatcher.set_single_click(handle_point_click)
     
     def depth_unit_change(self):
         logger.info("Button clicked: Depth unit change")

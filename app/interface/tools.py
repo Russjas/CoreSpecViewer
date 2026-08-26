@@ -22,6 +22,55 @@ from ..spectral_ops import band_maths as bm
 
 logger = logging.getLogger(__name__)
 
+
+
+
+#==========testing out some SAM, not to be released as managing inference deps is beyond me =================================
+SAM_AVAILABLE = True
+try:
+    from ..spectral_ops import private_sam_testing as sam
+    if not Path(sam.CHECKPOINT).is_file():
+        SAM_AVAILABLE = False
+except:
+    SAM_AVAILABLE = False
+
+
+def _sam_input(display, view):
+    """Build SAM's inference image from the raw false-colour display, matched to
+    the user's current view mode. Intentionally independent of the canvas'
+    display transforms — the two may diverge and that's fine. Returns H x W x 3 uint8.
+    """
+    img = np.asarray(display)
+    if view == "contrast":
+        lo, hi = np.percentile(img, (2, 98))
+        img = np.clip((img - lo) / max(hi - lo, 1e-6), 0, 1)
+        img = (img * 255).astype(np.uint8)
+    elif view == "equalize":
+        f = img.astype(np.float32) / 255.0
+        out = np.zeros_like(f)
+        for i in range(3):
+            ch = f[:, :, i]
+            hist, bins = np.histogram(ch.ravel(), bins=256, range=(0, 1))
+            cdf = hist.cumsum()
+            cdf = cdf / cdf[-1]
+            out[:, :, i] = np.interp(ch.ravel(), bins[:-1], cdf).reshape(ch.shape)
+        img = (out * 255).astype(np.uint8)
+    else:                                   # "raw"
+        img = img.astype(np.uint8, copy=False)
+    return np.ascontiguousarray(img)
+
+
+def sam_test(obj, y, x, mode="unmask inside", view = "raw"):
+    if not SAM_AVAILABLE:
+        return obj
+    image = _sam_input(obj.display, view)
+    vertices = sam.infer_polygon(image, (x, y))
+    obj = mask_polygon(obj, vertices, mode = mode)
+    return obj
+
+
+
+
 #======Getting and setting app configs ========================================
 
 

@@ -161,6 +161,12 @@ class BasePage(QWidget):
     def update_display(self, key='mask'):
         pass
     # --- accessors for the controller ---------------------------------------
+
+    @property
+    def display_mode(self) -> str:
+        """View mode of this page's spectral canvas, or 'raw' if it has none."""
+        return getattr(self._left, "display_mode", "raw")
+
     @property
     def left_canvas(self) -> SpectralImageCanvas:
         return self._left

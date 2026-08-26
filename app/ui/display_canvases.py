@@ -1040,7 +1040,7 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
 
         # current rgb for display enhancements
         self._current_rgb = None
-
+        self._display_mode = "raw"
         #Shortcuts for visual display changes
         QShortcut(QKeySequence("Alt+E"), self,
           activated=lambda: self.equalize_histogram(lims = False),
@@ -1053,14 +1053,50 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
     # ------------------------------------------------------------------
     # Display methods
     # ------------------------------------------------------------------
+    @staticmethod
+    def _stretch_contrast(rgb):
+        """2-98 percentile contrast stretch -> float RGB in [0, 1]."""
+        p_low, p_high = np.percentile(rgb, (2, 98))
+        return np.clip((rgb - p_low) / (p_high - p_low), 0, 1)
+
+    @staticmethod
+    def _equalize_hist(rgb):
+        """Per-channel histogram equalisation -> float RGB in [0, 1]."""
+        rgb = rgb.astype(np.float32) / 255.0
+        out = np.zeros_like(rgb)
+        for i in range(3):
+            channel = rgb[:, :, i]
+            hist, bins = np.histogram(channel.flatten(), bins=256, range=(0, 1))
+            cdf = hist.cumsum()
+            cdf = cdf / cdf[-1]
+            out[:, :, i] = np.interp(channel.flatten(), bins[:-1], cdf).reshape(channel.shape)
+        return out
+
+    def _draw_current(self):
+        """Draw _current_rgb through the active _display_mode.
+
+        Un-decorated on purpose: every caller is wrapped in @spatial_display,
+        which owns the zoom capture/restore and annotation redraw. This just
+        clears and imshows the right pixels for the current mode.
+        """
+        if self._current_rgb is None:
+            return
+        if self._display_mode == "contrast":
+            img = self._stretch_contrast(self._current_rgb)
+        elif self._display_mode == "equalize":
+            img = self._equalize_hist(self._current_rgb)
+        else:
+            img = self._current_rgb
+        self.ax.clear()
+        self.ax.imshow(img, origin="upper")
+        self.ax.set_axis_off()
+
+
     @spatial_display
     def show_rgb(self, cube):
         """Derive and display false colour from a hyperspectral cube."""
-        rgb = get_false_colour(cube)
-        self._current_rgb = rgb
-        self.ax.clear()
-        self.ax.imshow(rgb, origin="upper")
-        self.ax.set_axis_off()
+        self._current_rgb = get_false_colour(cube)
+        self._draw_current()
         
     @spatial_display
     def show_rgb_direct(self, rgb_array, annotations=None):
@@ -1073,50 +1109,37 @@ class SpectralImageCanvas(BaseMatplotlibCanvas):
         """
         self._current_rgb = rgb_array
         self._last_annotations = annotations if annotations is not None else {}
-        self.ax.clear()
-        self.ax.imshow(rgb_array, origin="upper")
-        self.ax.set_axis_off()
+        self._draw_current()
         
+
+    @property
+    def display_mode(self) -> str:
+        """View enhancement in effect: 'raw' | 'contrast' | 'equalize'.
+        Read by the SAM action to build a matching inference input."""
+        return self._display_mode
+    
 
     @spatial_display
     def increase_contrast(self):
         """Apply a 2–98 percentile contrast stretch to the current RGB."""
         if self._current_rgb is None:
             return
-        rgb = self._current_rgb
-        p_low, p_high = np.percentile(rgb, (2, 98))
-        rgb_contrast = np.clip((rgb - p_low) / (p_high - p_low), 0, 1)
-        self.ax.clear()
-        self.ax.imshow(rgb_contrast, origin="upper")
-        self.ax.set_axis_off()
+        self._display_mode = "contrast"
+        self._draw_current()
         
 
     @spatial_display
     def equalize_histogram(self):
         """Apply per-channel histogram equalisation to the current RGB."""
-        if self._current_rgb is None:
-            return
-        rgb = self._current_rgb.astype(np.float32) / 255.0
-        rgb_eq = np.zeros_like(rgb)
-        for i in range(3):
-            channel = rgb[:, :, i]
-            hist, bins = np.histogram(channel.flatten(), bins=256, range=(0, 1))
-            cdf = hist.cumsum()
-            cdf = cdf / cdf[-1]
-            rgb_eq[:, :, i] = np.interp(channel.flatten(), bins[:-1], cdf).reshape(channel.shape)
-        self.ax.clear()
-        self.ax.imshow(rgb_eq, origin="upper")
-        self.ax.set_axis_off()
+        self._display_mode = "equalize"
+        self._draw_current()
         
 
     @spatial_display
     def reset_display(self):
         """Reset to original un-adjusted RGB."""
-        if self._current_rgb is None:
-            return
-        self.ax.clear()
-        self.ax.imshow(self._current_rgb, origin="upper")
-        self.ax.set_axis_off()
+        self._display_mode = "raw"
+        self._draw_current()
         
 
     # ------------------------------------------------------------------
