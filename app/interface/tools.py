@@ -659,8 +659,8 @@ def unwrapped_output(obj):
               "MIN_AREA" : config.min_seg_area,
               "MIN_WIDTH" : config.min_seg_width,
               "Hard-coded defaults": {
-                        "Lane gap minimum": 10,
-                        "Lane gap width proportion": 0.25,
+                        "Lane gap minimum": 20,
+                        "Lane gap width proportion": 0.6,
                         "Lane gap fallback": 25,
                         "Depth interpolation": "linear",
                         "Segment padding": "centred",

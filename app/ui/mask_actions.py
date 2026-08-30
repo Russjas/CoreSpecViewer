@@ -39,7 +39,7 @@ class MaskActions(BaseActions):
             ("button", "Calc stats", self.act_mask_calc_stats, "Calculates connected components used for downhole unwrapping", "Ctrl+D"),
             ("button", "Mask line", lambda: self.act_mask_point('line'), "Adds a masked vertical line to existing mask"),
             ("button", "unwrap preview", self.unwrap, 'Produces "unwrapped" coreboxes by vertical concatenation, adjust convention in settings', "Ctrl+G"),
-            ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)"),
+            ("button", "Mask all", self.act_mask_all, "Masks all pixels (inverse workflow: unmask what you need)", "Ctrl+Alt+A"),
             ("button", "Unmask region", lambda: self.act_mask_rect(unmask=True), "Unmasks a rectangle in existing mask", "Ctrl+Shift+R"),
             ("button", "Invert mask", self.act_invert_mask, "Inverts mask: masked ↔ unmasked"),
             ("button", "re-generate thumbs (slow)", self.re_thumb, 'Regenerates all thumbnail images. Slow process, but shouldnt be needed often'),

@@ -126,8 +126,9 @@ def _sort_segments_by_runs(segments, convention="rl_tb"):
 
     #Calclate typical core run widths to threshold
     widths = [r["width"] for r in measured if r["width"] > 0]
-    lane_gap = max(10, 0.25 * np.median(widths)) if widths else 25
-
+    #lane_gap = max(10, 0.25 * np.median(widths)) if widths else 25
+    #Twiddling the lane gap for the non-happy path
+    lane_gap = max(20, 0.6 * np.median(widths)) if widths else 25
     # ---- build lanes from actual component x positions ----
     measured_by_x = sorted(measured, key=lambda r: r["median_x"])
 
