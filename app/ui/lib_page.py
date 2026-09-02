@@ -130,6 +130,7 @@ class LibraryPage(BasePage):
         idx = sel.findText(current)
         sel.setCurrentIndex(idx if idx >= 0 else 0)
         sel.blockSignals(False)
+        self._on_view_changed(sel.currentText())
     
     
     def create_blank(self):
@@ -473,7 +474,7 @@ class LibraryPage(BasePage):
            
     def filter_to_current_bands(self):
         """
-        Build/refresh a special in-memory collection '__filtered__' containing SampleIDs
+        Build/refresh a special in-memory collection 'in range' containing SampleIDs
         whose spectral XData fully covers the current_obj.bands range.
         Applies the proxy filter to show only those rows.
         """
@@ -491,13 +492,25 @@ class LibraryPage(BasePage):
             return
         
         ok_ids = self.cxt.library.filter_ids_covering_bands(bands_nm)
-
-        self.cxt.library.add_to_collection("in range", ok_ids)
-        self._refresh_collection_selector()
-        self._on_view_changed("in range")
-
-        count = len(ok_ids)
         rng = f"{np.nanmin(bands_nm):.1f}–{np.nanmax(bands_nm):.1f} nm"
+        if not ok_ids:
+            self.cxt.library.clear_collection("in range")
+            self._refresh_collection_selector()
+            self.view_selector.setCurrentText("Opened database")
+
+            
+            logger.info(f"No spectra cover {rng}. Showing the opened database.")
+            QMessageBox.information(
+                self,
+                "No matches",
+                f"No spectra cover {rng}. Showing the opened database."
+            )
+            return
+
+        self.cxt.library.set_collection_ids("in range", ok_ids)
+        self._refresh_collection_selector()
+        self.view_selector.setCurrentText("in range")
+        count = len(ok_ids)
         QMessageBox.information(self, "Filtered", f"{count} spectra cover {rng}.")  
         logger.info( f"{count} spectra cover {rng}.")
             
