@@ -65,124 +65,146 @@ def resample_spectrum(x_src_nm: np.ndarray, y_src: np.ndarray, x_tgt_nm: np.ndar
     return y
 
 
-
+# ================== unwrapping and depth registration =========================================
 def _sort_segments_by_runs(segments, convention="rl_tb"):
     """
-    Sort existing unwrap segments into a physical depth path.
+    Group connected-component segments into lanes and order those lanes
+    according to the box convention.
 
-    Input and output format is unchanged:
-        [((x, y), seg), ...]
+    Parameters
+    ----------
+    segments : list
+        Each item is ``((x, y), seg)``, where ``x`` and ``y`` are the
+        absolute image coordinates of the segment bounding-box origin and
+        ``seg`` is its masked bounding-box crop.
 
-    Logic:
-        1. Measure actual unmasked component pixels.
-        2. Group nearby x positions into lanes.
-        3. Sort lanes left/right by convention.
-        4. Sort segments within each lane top/bottom by convention.
+    convention : str
+        One of:
+            ``rl_tb`` : lanes right-to-left, rows top-to-bottom
+            ``lr_tb`` : lanes left-to-right, rows top-to-bottom
+            ``rl_bt`` : lanes right-to-left, rows bottom-to-top
+            ``lr_bt`` : lanes left-to-right, rows bottom-to-top
+
+    Returns
+    -------
+    lanes_sorted : list[list[tuple]]
+        Lanes in physical downhole order. Each segment is returned as::
+
+            ((x, y_start, y_stop), seg)
+
+        ``y_start`` and ``y_stop`` are absolute image-row coordinates;
+        ``y_stop`` is exclusive. Segments in the same lane therefore retain
+        enough spatial information to identify overlapping absolute y rows.
     """
-
     if not segments:
-        return [], []
+        return []
 
     convention = convention or "rl_tb"
 
-    right_to_left = convention in ("rl_tb", "rl_bt")
-    top_to_bottom = convention in ("rl_tb", "lr_tb")
+    if convention not in {"rl_tb", "lr_tb", "rl_bt", "lr_bt"}:
+        convention = "rl_tb"
+
+    right_to_left = convention.startswith("rl")
+    top_to_bottom = convention.endswith("tb")
 
     measured = []
 
-    for item in segments:
-        (x, y), seg = item
+    for (x, y), seg in segments:
+        spatial_mask = _spatial_mask(seg)
+        rows, cols = np.nonzero(~spatial_mask)
 
-        seg_mask = np.ma.getmaskarray(seg)
+        image_y_start = int(y)
+        image_y_stop = int(y + seg.shape[0])
 
-        # Collapse cube mask to spatial mask
-        if seg_mask.ndim > 2:
-            seg_mask = seg_mask.any(axis=2)
+        if rows.size == 0:
+            # Retain a degenerate segment using its bounding-box geometry.
+            median_x = float(x)
+            min_y = image_y_start
+            max_y = image_y_stop - 1
+            width = 0
+        else:
+            absolute_x = x + cols
+            absolute_y = y + rows
 
-        rr, cc = np.nonzero(~seg_mask)
+            median_x = float(np.median(absolute_x))
+            min_y = int(np.min(absolute_y))
+            max_y = int(np.max(absolute_y))
+            width = int(np.max(absolute_x) - np.min(absolute_x) + 1)
 
-        # Degenerate segment: keep it, but fall back to bbox origin
-        if rr.size == 0:
-            measured.append({
-                "item": item,
-                "median_x": float(x),
-                "min_y": int(y),
-                "max_y": int(y + seg.shape[0] - 1),
-                "width": 0
-            })
-            continue
+        measured.append((
+            median_x,
+            min_y,
+            max_y,
+            width,
+            int(x),
+            image_y_start,
+            image_y_stop,
+            seg,
+        ))
 
-        global_x = x + cc
-        global_y = y + rr
+    widths = [record[3] for record in measured if record[3] > 0]
 
-        measured.append({
-            "item": item,
-            "median_x": float(np.median(global_x)),
-            "min_y": int(np.min(global_y)),
-            "max_y": int(np.max(global_y)),
-            "width": int(np.max(global_x) - np.min(global_x) + 1)
-        })
-    
-
-    #Calclate typical core run widths to threshold
-    widths = [r["width"] for r in measured if r["width"] > 0]
-    #lane_gap = max(10, 0.25 * np.median(widths)) if widths else 25
-    #Twiddling the lane gap for the non-happy path
     lane_gap = max(20, 0.6 * np.median(widths)) if widths else 25
-    # ---- build lanes from actual component x positions ----
-    measured_by_x = sorted(measured, key=lambda r: r["median_x"])
 
+    measured.sort(key=lambda record: record[0])
+
+    # Each lane is stored temporarily as:
+    # [current_x_center, [measured records]]
     lanes = []
 
-    for rec in measured_by_x:
+    for record in measured:
+        median_x = record[0]
+
         if not lanes:
-            lanes.append({
-                "x_center": rec["median_x"],
-                "records": [rec],
-            })
+            lanes.append([median_x, [record]])
             continue
 
         nearest_lane = min(
             lanes,
-            key=lambda lane: abs(rec["median_x"] - lane["x_center"])
+            key=lambda lane: abs(median_x - lane[0]),
         )
 
-        if abs(rec["median_x"] - nearest_lane["x_center"]) <= lane_gap:
-            nearest_lane["records"].append(rec)
-            nearest_lane["x_center"] = float(np.median(
-                [r["median_x"] for r in nearest_lane["records"]]
-            ))
+        if abs(median_x - nearest_lane[0]) <= lane_gap:
+            nearest_lane[1].append(record)
+            nearest_lane[0] = float(np.median([
+                item[0]
+                for item in nearest_lane[1]
+            ]))
         else:
-            lanes.append({
-                "x_center": rec["median_x"],
-                "records": [rec],
-            })
+            lanes.append([median_x, [record]])
 
-    # ---- sort lanes according to convention ----
-    lanes = sorted(
-        lanes,
-        key=lambda lane: lane["x_center"],
-        reverse=right_to_left
+    # Put the lanes into physical downhole order.
+    lanes.sort(
+        key=lambda lane: lane[0],
+        reverse=right_to_left,
     )
 
-    # ---- sort inside each lane by y according to convention ----
-    sorted_segments = []
-    sorted_records = []
+    lanes_sorted = []
 
-    for lane_idx, lane in enumerate(lanes):
-        lane_records = sorted(
-            lane["records"],
-            key=lambda r: r["min_y"] if top_to_bottom else -r["max_y"]
-        )
-        for rec in lane_records:
-            rec["lane_index"] = lane_idx
-            rec["lane_center"] = lane["x_center"]
-            sorted_records.append(rec)
-            sorted_segments.append(rec["item"])
+    for _, lane_records in lanes:
+        if top_to_bottom:
+            lane_records.sort(key=lambda record: record[1])
+        else:
+            lane_records.sort(
+                key=lambda record: record[2],
+                reverse=True,
+            )
 
-        
+        lane_segments = [
+            (
+                (
+                    record[4],  # absolute x
+                    record[5],  # absolute y_start
+                    record[6],  # absolute y_stop, exclusive
+                ),
+                record[7],      # masked segment crop
+            )
+            for record in lane_records
+        ]
 
-    return sorted_segments, sorted_records
+        lanes_sorted.append(lane_segments)
+
+    return lanes_sorted
 
 def _spatial_mask(seg):
     """
@@ -196,292 +218,455 @@ def _spatial_mask(seg):
     return seg_mask
 
 
-def _anchor_hits_segment(ax, ay, item):
+
+def unwrap_from_stats(
+    mask,
+    image,
+    stats,
+    labels,
+    anchors=None,
+    convention=None,
+    depth_start=None,
+    depth_stop=None,
+    return_map=False,
+):
     """
-    True only if the anchor falls inside the segment bbox AND on an
-    unmasked component pixel.
-    """
-    (sx, sy), seg = item
-    sh, sw = seg.shape[:2]
+    Reconstruct connected components within their physical lanes and unwrap
+    those lanes into a vertically concatenated image.
 
-    if not (sx <= ax < sx + sw and sy <= ay < sy + sh):
-        return False
-
-    local_r = int(ay - sy)
-    local_c = int(ax - sx)
-
-    seg_mask = _spatial_mask(seg)
-
-    return not bool(seg_mask[local_r, local_c])
-
-
-def _y_distance_to_record(ay, rec):
-    """
-    Distance from anchor y to a segment's real vertical extent.
-    Zero if the anchor lies within that vertical range.
-    """
-    if rec["min_y"] <= ay <= rec["max_y"]:
-        return 0
-
-    return min(
-        abs(ay - rec["min_y"]),
-        abs(ay - rec["max_y"])
-    )
-
-def unwrap_from_stats(mask, image, stats, labels,
-                                anchors=None,
-                                convention=None, 
-                                depth_start = None,
-                                depth_stop = None,
-                                return_map = False
-                                ):
-    """
-    Extended unwrap_from_stats that resolves anchor (x, y) positions to
-    output row indices, then performs the standard unwrap.
-
-    
+    Components assigned to the same lane retain their absolute image-row
+    positions. Components sharing an absolute y-coordinate therefore share
+    an output row and registered depth.
 
     Parameters
     ----------
-    mask, image, stats : pre-requisite datasets 
-    labels : ndarray
-        Connected-component label image matching stats. Older normalised
-        segment images are accepted and reconstructed for compatibility.
+    mask : np.ndarray
+        Spatial mask matching ``image``. Non-zero values are invalid.
+
+    image : np.ndarray or np.ma.MaskedArray
+        Data to unwrap. May be a 2D image or a 3D spectral cube.
+
+    stats : np.ndarray
+        Connected-component statistics returned by
+        ``cv2.connectedComponentsWithStats``.
+
+    labels : np.ndarray
+        Connected-component label image corresponding to ``stats``.
+        Older normalised label images are accepted.
+
     anchors : list of dict or None
-        Each dict has keys 'x', 'y', 'depth' — pixel-space position of a
-        known depth point on the tray image.
+        Depth-control points in the original image coordinate system.
+        Each dictionary must contain ``x``, ``y`` and ``depth``.
+
     convention : str or None
-        Sort convention: 'rl_tb' (default), 'lr_tb', 'rl_bt', 'lr_bt'.
-    MIN_AREA, MIN_WIDTH : int
-        Filter thresholds, pulled from the config and user definable.
+        One of:
+            ``rl_tb`` : lanes right-to-left, rows top-to-bottom
+            ``lr_tb`` : lanes left-to-right, rows top-to-bottom
+            ``rl_bt`` : lanes right-to-left, rows bottom-to-top
+            ``lr_bt`` : lanes left-to-right, rows bottom-to-top
+
+    depth_start, depth_stop : float or None
+        Start and stop depths for the box.
+
+    return_map : bool
+        If True, also return a masked depth map in the original image space.
 
     Returns
     -------
     concatenated : np.ma.MaskedArray
-        Same stacked output as the original function.
-    resolved_anchors : list of dict
-        Each input anchor dict extended with:
-            'row'     : resolved output row index (int)
-            'snapped' : True if the point was outside every valid segment
-            'segment' : index of the owning segment in the sorted list
+        Lane-reconstructed and vertically concatenated image.
+
+    depths : np.ndarray or None
+        One registered depth per row of ``concatenated``.
+
+    depth_map : np.ma.MaskedArray, optional
+        Per-pixel registered depths in the original image coordinates.
     """
+    anchors = anchors or []
+    convention = convention or "rl_tb"
+
+    valid_conventions = {
+        "rl_tb",
+        "lr_tb",
+        "rl_bt",
+        "lr_bt",
+    }
+
+    if convention not in valid_conventions:
+        raise ValueError(
+            f"Unknown box convention {convention!r}. "
+            f"Expected one of {sorted(valid_conventions)}."
+        )
+
+    bottom_to_top = convention.endswith("bt")
+
     MIN_AREA = config.min_seg_area
     MIN_WIDTH = config.min_seg_width
-    _SORT_KEYS = {
-        'rl_tb': lambda s: ( round(-s[0][0] / 10),  s[0][1]),
-        'lr_tb': lambda s: ( round( s[0][0] / 10),  s[0][1]),
-        'rl_bt': lambda s: ( round(-s[0][0] / 10), -s[0][1]),
-        'lr_bt': lambda s: ( round( s[0][0] / 10), -s[0][1]),
-    }
-    sort_key = _SORT_KEYS.get(convention, _SORT_KEYS['rl_tb'])
 
-    anchors = anchors or []
-    
-    # Adjustments to the unwrapping code now requires originally label image
-    # to avoid mis-registration on overlapping bboxes
-    # For backwards compatibility old, normalised label images are accepted and sanitised here
-    # calc_unwrap_stats no longer normalises the label image
-
+    # ------------------------------------------------------------------
+    # Sanitise the connected-component label image.
+    #
+    # Current files contain integer component labels. Older files may
+    # contain the same labels normalised into the range 0–1.
+    # ------------------------------------------------------------------
     max_label = stats.shape[0] - 1
+
     if max_label <= 0:
         labels = np.zeros_like(labels, dtype=np.int32)
-    elif np.nanmax(labels) <= 1.0:
-        labels =  np.rint(labels * max_label).astype(np.int32)
-    else:
-        labels =  labels.astype(np.int32)
 
-    # ---- collect valid segments — stored as ((x, y), segment) matching
-    #      production tuple structure; w/h derived from segment.shape ----
+    elif np.nanmax(labels) <= 1.0:
+        labels = np.rint(
+            labels * max_label
+        ).astype(np.int32)
+
+    else:
+        labels = labels.astype(np.int32)
+
+    # ------------------------------------------------------------------
+    # Reconstruct retained connected components.
+    #
+    # Each item has the existing form:
+        #((absolute_x, absolute_y), masked_segment)
+    # ------------------------------------------------------------------
     segments = []
-    for i in range(1, stats.shape[0]):
-        x, y, w, h, area = stats[i]
+
+    for label_id in range(1, stats.shape[0]):
+        x, y, w, h, area = stats[label_id]
         if area < MIN_AREA or w < MIN_WIDTH:
             continue
         sub      = image[y:y+h, x:x+w]
-        seg_mask = (labels[y:y+h, x:x+w] != i) | mask[y:y+h, x:x+w].astype(bool)
+        seg_mask = (labels[y:y+h, x:x+w] != label_id) | mask[y:y+h, x:x+w].astype(bool)
         if sub.ndim > 2:                                  # broadcast across bands for a cube
             seg_mask = np.repeat(seg_mask[:, :, None], sub.shape[2], axis=2)
         seg = np.ma.masked_array(sub, mask=seg_mask)
         segments.append(((x, y), seg))
 
-    
-    segments_sorted, segment_records_sorted  = _sort_segments_by_runs(
-    segments,
-    convention=convention or "rl_tb")
+    if not segments:
+        raise ValueError(
+            "No connected components passed the configured area and "
+            "width thresholds."
+        )
 
-
-    # ---- cumulative row offsets — height from segment.shape[0] ----
-    cumulative_rows = []
-    running = 0
-    for (sx, sy), seg in segments_sorted:
-        cumulative_rows.append(running)
-        running += seg.shape[0]
-
-    
-    # ---- resolve each anchor to an output row ----
-    resolved_anchors = []
-
-    for anc in anchors:
-        ax, ay, adepth = anc["x"], anc["y"], anc["depth"]
-
-        result = dict(anc)
-        result["snapped"] = False
-
-        # First: exact hit test.
-        # The anchor must land on an unmasked component pixel.
-        hit_idx = None
-
-        for idx, item in enumerate(segments_sorted):
-            if _anchor_hits_segment(ax, ay, item):
-                hit_idx = idx
-                break
-
-        if hit_idx is not None:
-            (sx, sy), seg = segments_sorted[hit_idx]
-
-            within_row = int(ay - sy)
-
-            result["row"] = cumulative_rows[hit_idx] + within_row
-            result["segment"] = hit_idx
-
-        else:
-            # Lane-aware snapping:
-            # use the same lane model that determined segment order.
-            if not segment_records_sorted:
-                raise ValueError("Cannot snap anchor: no sorted segment records available.")
-
-            # Find nearest lane by x-position.
-            lane_centres = {}
-
-            for rec in segment_records_sorted:
-                lane_centres[rec["lane_index"]] = rec["lane_center"]
-
-            nearest_lane = min(
-                lane_centres,
-                key=lambda lane_idx: abs(ax - lane_centres[lane_idx])
-            )
-
-            # Restrict candidates to that lane.
-            candidates = [
-                (idx, rec)
-                for idx, rec in enumerate(segment_records_sorted)
-                if rec["lane_index"] == nearest_lane
-            ]
-
-            if not candidates:
-                raise ValueError("Cannot snap anchor: nearest lane contains no segments.")
-
-            # Pick the segment in that lane closest in y.
-            best_idx, best_rec = min(
-                candidates,
-                key=lambda pair: _y_distance_to_record(ay, pair[1])
-            )
-
-            (sx, sy), seg = segments_sorted[best_idx]
-            sh = seg.shape[0]
-
-            # Preserve the anchor's y-position where possible.
-            # If it lies above/below the chosen segment, clamp to top/bottom.
-            within_row = int(np.clip(ay - sy, 0, sh - 1))
-
-            result["row"] = cumulative_rows[best_idx] + within_row
-            result["segment"] = best_idx
-            result["snapped"] = True
-
-        resolved_anchors.append(result)
-
-    # ---- pad and stack ----
-    max_width = max(seg.shape[1] for _, seg in segments_sorted)
-    padded_segments = []
-
-    for _, seg in segments_sorted:
-        h, w      = seg.shape[:2]
-        pad_total = max_width - w
-
-        if pad_total > 0:
-            pad_left  = pad_total // 2
-            pad_right = pad_total - pad_left
-            pad_shape = ((0, 0), (pad_left, pad_right)) if seg.ndim == 2 \
-                        else ((0, 0), (pad_left, pad_right), (0, 0))
-            seg_pad   = np.pad(seg.data, pad_shape, mode='constant', constant_values=0)
-            seg_mask_ = np.pad(seg.mask, pad_shape, mode='constant', constant_values=1)
-            padded_segments.append(np.ma.masked_array(seg_pad, mask=seg_mask_))
-        else:
-            padded_segments.append(seg)
-
-    concatenated = np.ma.masked_array(
-        np.vstack([s.data for s in padded_segments]),
-        mask=np.vstack([s.mask for s in padded_segments])
+    # ------------------------------------------------------------------
+    # Assign components to lanes.
+    #
+    # The returned structure is:
+    #
+    # [
+    #     [
+    #         ((x, y_start, y_stop), seg),
+    #         ...
+    #     ],
+    #     ...
+    # ]
+    #
+    # The outer list is in physical downhole lane order. y_stop is
+    # exclusive.
+    # ------------------------------------------------------------------
+    lanes_sorted = _sort_segments_by_runs(
+        segments,
+        convention=convention,
     )
 
+    if not lanes_sorted:
+        raise ValueError(
+            "No lanes could be constructed from the retained segments."
+        )
+
+    # The reconstructed lane images and their corresponding absolute
+    # source-image y-coordinates.
+    lane_images = []
+    lane_source_rows = []
+
+    # ------------------------------------------------------------------
+    # Reconstruct each lane.
+    # ------------------------------------------------------------------
+    for lane in lanes_sorted:
+        # Produce one lane row for every unique absolute image y-position
+        # occupied by a segment in this lane.
+        source_rows = np.unique(
+            np.concatenate([
+                np.arange(
+                    y_start,
+                    y_stop,
+                    dtype=np.int32,
+                )
+                for (x, y_start, y_stop), seg in lane
+            ])
+        )
+
+        source_rows.sort()
+
+        # Preserve the original relative x-positions of every component.
+        lane_x_start = min(x for (x, y_start, y_stop), seg in lane)
+        lane_x_stop = max(x + seg.shape[1] for (x, y_start, y_stop), seg in lane)
+        lane_height = source_rows.size
+        lane_width = lane_x_stop - lane_x_start
+
+        if image.ndim == 2:
+            lane_shape = (lane_height, lane_width)
+        elif image.ndim == 3:
+            bands = image.shape[2]
+            lane_shape = (lane_height, lane_width, bands)
+        else:
+            raise ValueError(
+                f"Expected a 2D image or 3D cube, got shape {image.shape}"
+            )
+
+        lane_data = np.zeros(lane_shape, dtype=image.dtype,)
+        lane_mask = np.ones(lane_shape, dtype=bool,)
+
+        # Fast lookup from an absolute image y-coordinate to a row in the
+        # reconstructed lane.
+        output_row_for_y = np.full(image.shape[0], -1, dtype=np.int32,)
+        output_row_for_y[source_rows] = np.arange(lane_height, dtype=np.int32,)
+
+        for (x, y_start, y_stop), seg in lane:
+            destination_x_start = x - lane_x_start
+            destination_x_stop = (destination_x_start + seg.shape[1])
+
+            segment_data = np.ma.getdata(seg)
+            segment_mask = np.ma.getmaskarray(seg)
+
+            for local_row in range(seg.shape[0]):
+                absolute_y = y_start + local_row
+                destination_row = output_row_for_y[absolute_y]
+
+                target_data = lane_data[
+                    destination_row,
+                    destination_x_start:destination_x_stop,
+                    ...
+                ]
+
+                target_mask = lane_mask[
+                    destination_row,
+                    destination_x_start:destination_x_stop,
+                    ...
+                ]
+
+                source_data = segment_data[local_row]
+                source_mask = segment_mask[local_row]
+                source_valid = ~source_mask
+
+                # Copy only real component pixels. Masked bbox pixels must
+                # not overwrite pixels contributed by another component.
+                np.copyto(
+                    target_data,
+                    source_data,
+                    where=source_valid,
+                )
+
+                target_mask[source_valid] = False
+
+        lane_image = np.ma.masked_array(
+            lane_data,
+            mask=lane_mask,
+        )
+
+        # The lane was constructed in ascending original-image y order.
+        # Reverse both the image and its source-row mapping when the box
+        # convention runs bottom-to-top.
+        if bottom_to_top:
+            lane_image = lane_image[::-1]
+            source_rows = source_rows[::-1]
+
+        lane_images.append(lane_image)
+        lane_source_rows.append(source_rows)
+
+    # ------------------------------------------------------------------
+    # Pad complete lanes to a common width.
+    # ------------------------------------------------------------------
+    widest_lane = max(
+        lane.shape[1]
+        for lane in lane_images
+    )
+
+    padded_lanes = []
+
+    for lane in lane_images:
+        lane_height, lane_width = lane.shape[:2]
+
+        pad_total = widest_lane - lane_width
+        pad_left = pad_total // 2
+
+        padded_shape = (lane_height, widest_lane, *lane.shape[2:],)
+
+        padded = np.ma.masked_all(padded_shape, dtype=lane.dtype,)
+
+        padded[:, pad_left:pad_left + lane_width, ...] = lane
+
+        padded_lanes.append(padded)
+
+    # Stack complete lanes rather than individual components.
+    concatenated = np.ma.concatenate(
+        padded_lanes,
+        axis=0,
+    )
+
+    # Starting output row of every lane in the concatenated image.
+    lane_offsets = np.cumsum([0] + [source_rows.size
+            for source_rows in lane_source_rows
+        ]
+    )[:-1]
+
+    # ------------------------------------------------------------------
+    # Resolve depth anchors against lanes.
+    # ------------------------------------------------------------------
+    lane_centres = []
+
+    for lane in lanes_sorted:
+        segment_centres = []
+
+        for (x, y_start, y_stop), seg in lane:
+            segment_spatial_mask = _spatial_mask(seg)
+            rows, cols = np.nonzero(~segment_spatial_mask)
+
+            if cols.size:
+                segment_centres.append(float(np.median(x + cols)))
+            else:
+                segment_centres.append(float(x + (seg.shape[1] - 1) / 2))
+
+        lane_centres.append(float(np.median(segment_centres)))
+
+    resolved_anchors = []
+
+    for anchor in anchors:
+        ax = int(anchor["x"])
+        ay = int(anchor["y"])
+        adepth = float(anchor["depth"])
+
+        hit_lane = None
+
+        # First attempt an exact hit on a valid component pixel.
+        for lane_index, lane in enumerate(lanes_sorted):
+            for (x, y_start, y_stop), seg in lane:
+                segment_width = seg.shape[1]
+
+                if not (
+                    x <= ax < x + segment_width
+                    and y_start <= ay < y_stop
+                ):
+                    continue
+
+                local_row = ay - y_start
+                local_col = ax - x
+
+                segment_spatial_mask = _spatial_mask(seg)
+
+                if not segment_spatial_mask[
+                    local_row,
+                    local_col,
+                ]:
+                    hit_lane = lane_index
+                    break
+
+            if hit_lane is not None:
+                break
+
+        snapped = hit_lane is None
+
+        # If the point missed every component, select the nearest lane by
+        # its representative x-position.
+        if hit_lane is None:
+            hit_lane = min(
+                range(len(lane_centres)),
+                key=lambda lane_index: abs(
+                    ax - lane_centres[lane_index]
+                ),
+            )
+
+        source_rows = lane_source_rows[hit_lane]
+
+        # Exact hits find ay itself. Missed anchors retain ay when another
+        # fragment in that lane occupies the row, otherwise they snap to
+        # the nearest occupied source row.
+        local_lane_row = int(np.argmin(np.abs(source_rows - ay)))
+
+        resolved_source_y = int(source_rows[local_lane_row])
+
+        output_row = int(lane_offsets[hit_lane] + local_lane_row)
+
+        resolved_anchors.append({
+            **anchor,
+            "depth": adepth,
+            "row": output_row,
+            "lane": hit_lane,
+            "source_y": resolved_source_y,
+            "snapped": snapped,
+        })
+
+    # ------------------------------------------------------------------
+    # Register depths against concatenated lane rows.
+    # ------------------------------------------------------------------
     depths = None
+
     if depth_start is not None and depth_stop is not None:
         n_rows = concatenated.shape[0]
+
         if resolved_anchors:
-            anchor_rows   = [0]           + [r['row']   for r in resolved_anchors] + [n_rows - 1]
-            anchor_depths = [depth_start] + [r['depth'] for r in resolved_anchors] + [depth_stop]
-            order         = np.argsort(anchor_rows)
-            anchor_rows   = np.array(anchor_rows)[order]
-            anchor_depths = np.array(anchor_depths)[order]
-            depths        = np.interp(np.arange(n_rows), anchor_rows, anchor_depths)
+            control_rows = np.array( [0] + [anchor["row"] for anchor in resolved_anchors] + [n_rows - 1], dtype=int,)
+
+            control_depths = np.array([depth_start] + [anchor["depth"] for anchor in resolved_anchors]  + [depth_stop], dtype=float,)
+
+            order = np.argsort(control_rows, kind="stable", )
+
+            control_rows = control_rows[order]
+            control_depths = control_depths[order]
+
+            depths = np.interp(np.arange(n_rows), control_rows, control_depths,)
+
         else:
-            depths = np.linspace(depth_start, depth_stop, n_rows)
+            depths = np.linspace(depth_start,depth_stop, n_rows,)
 
     if not return_map:
         return concatenated, depths
 
-    depth_map = (build_depth_map(depths, segments_sorted, cumulative_rows, image.shape[:2])
-                if depths is not None else None)
+    # ------------------------------------------------------------------
+    # Paint the registered depths back into original image coordinates.
+    # ------------------------------------------------------------------
+    depth_map = None
+
+    if depths is not None:
+        depth_map = np.ma.masked_all(
+            image.shape[:2],
+            dtype=float,
+        )
+
+        for lane_index, lane in enumerate(lanes_sorted):
+            source_rows = lane_source_rows[lane_index]
+            lane_offset = lane_offsets[lane_index]
+            lane_height = source_rows.size
+
+            # Lookup from absolute source y to registered depth. The order
+            # of source_rows already reflects the tb/bt convention.
+            depth_for_source_y = np.ma.masked_all(
+                image.shape[0],
+                dtype=float,
+            )
+
+            depth_for_source_y[source_rows] = depths[
+                lane_offset:lane_offset + lane_height
+            ]
+
+            for (x, y_start, y_stop), seg in lane:
+                segment_spatial_mask = _spatial_mask(seg)
+
+                local_rows, local_cols = np.nonzero(
+                    ~segment_spatial_mask
+                )
+
+                absolute_rows = y_start + local_rows
+                absolute_cols = x + local_cols
+
+                depth_map[
+                    absolute_rows,
+                    absolute_cols,
+                ] = depth_for_source_y[absolute_rows]
+
     return concatenated, depths, depth_map
 
 
-def build_depth_map(depths, segments_sorted, cumulative_rows, out_shape):
-    """
-    Reverse the unwrap: give every original-image pixel its registered depth.
-
-    Built from the same segment geometry the forward pass used, so it is a
-    true inverse of *this* unwrap, not a re-derivation. The forward pass
-    assigns one depth per stacked row, i.e. per original row within a segment,
-    so depth is constant across a segment's width and every core pixel inherits
-    its row's depth.
-
-    Parameters
-    ----------
-    depths : np.ndarray, shape (n_rows,)
-        Per-stacked-row depths; n_rows == sum of segment heights.
-    segments_sorted : list of ((x, y), np.ma.MaskedArray)
-        Convention-sorted segments; value is the masked bbox crop, origin
-        (x, y) in original-image coordinates.
-    cumulative_rows : list of int
-        Starting stacked-row offset per segment, aligned with segments_sorted.
-    out_shape : tuple of int
-        (H, W) of the original (cropped) image being registered.
-
-    Returns
-    -------
-    np.ma.MaskedArray, shape (H, W), float
-        Per-pixel depth, masked wherever no kept-segment core pixel contributed.
-    """
-    H, W = out_shape
-    depth_map = np.ma.masked_all((H, W), dtype=float)
-
-    for i, ((sx, sy), seg) in enumerate(segments_sorted):
-        h, w = seg.shape[:2]
-        off = cumulative_rows[i]
-        row_depths = depths[off:off + h]                   # (h,) one depth per row
-
-        seg_mask = np.ma.getmaskarray(seg)                 # full bool, seg.shape
-        if seg_mask.ndim > 2:                              # cube: collapse bands
-            seg_mask = seg_mask.any(axis=tuple(range(2, seg_mask.ndim)))
-        core_r, core_c = np.nonzero(~seg_mask)             # local coords of core
-
-        depth_map[sy + core_r, sx + core_c] = row_depths[core_r]
-
-    
-    return depth_map
-
-
-
+# ==================================================================================================
 
 def compute_downhole_mineral_fractions(
     index_map: np.ndarray,

@@ -275,8 +275,11 @@ class HoleObject:
                 logger.warning(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
                 raise ValueError(f"Box {po.metadata['box number']} {key} dataset is not a masked array.")
             convention = po.metadata.get('box_convention', None)
-            seg, _ = unwrap_from_stats(ds.data.mask, ds.data.data, po.stats, po.segments, convention = convention)
-            min_valid_px = int(np.ceil(0.15 * seg.shape[1])) # minimum fraction of valid pixels relative to approximate core width per box
+            seg_data, _ = unwrap_from_stats(po.mask, ds.data.data, po.stats, po.segments, convention = convention)
+            seg_mask, _ = unwrap_from_stats(po.mask, ds.data.mask, po.stats, po.segments, convention = convention)
+            seg = np.ma.masked_array(seg_data.data, mask=np.ma.getmaskarray(seg_data) | seg_mask.data.astype(bool),)
+
+            min_valid_px = int(np.ceil(0.05 * seg.shape[1])) # minimum fraction of valid pixels relative to approximate core width per box
             
             valid_per_row = np.ma.count(seg, axis=1)          #(H,) as 2-D
             
