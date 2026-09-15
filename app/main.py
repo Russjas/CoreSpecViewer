@@ -713,19 +713,24 @@ class MainRibbonController(QMainWindow):
     )
 
 
-        # Check ho: any box with temps, or any unsaved hole product datasets
+        # Check ho: any box with temps, or any unsaved hole product or base datasets
         if self.cxt.ho is not None:
             for po in self.cxt.ho:
                 if po.has_temps:
                     temp_keys = [key for key in po.keys() if po.has_temp(key)]
                     keys = ", ".join(temp_keys)
                     lines.append(f"  {po.basename}: {keys}")
-            unsaved_hole = [
-                k for k, ds in self.cxt.ho.product_datasets.items()
-                if not ds.path.exists()
-            ]
-            if unsaved_hole:
-                lines.append(f"  Hole products: {', '.join(unsaved_hole)}")
+            unsaved_base = [k for k, ds in self.cxt.ho.base_datasets.items()
+                    if not ds.path.exists()]
+
+            unsaved_products = [k for k, ds in self.cxt.ho.product_datasets.items()
+                if not ds.path.exists()]
+
+            if unsaved_base:
+                lines.append(f"  Hole base datasets: {', '.join(unsaved_base)}")
+
+            if unsaved_products:
+                lines.append(f"  Hole products: {', '.join(unsaved_products)}")
 
         return lines
 

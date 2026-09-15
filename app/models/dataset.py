@@ -162,14 +162,12 @@ class Dataset:
 
         elif self.ext == '.npy':
             # If it's a memmap and we're not creating new, just return
-            
             if isinstance(self.data, np.memmap) and not new:
-                return
-
-            
-
+                source_path = Path(self.data.filename)
+                if self.path.exists() and source_path.samefile(self.path):
+                    return
+                
             np.save(self.path, self.data)
-
 
         elif self.ext == '.json':
             text = json.dumps(self.data, indent=2)

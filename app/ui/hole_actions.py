@@ -168,7 +168,7 @@ class HoleActions(BaseActions):
             self._show_error("Save hole", msg)
             return
         with busy_cursor('Saving.....', self.controller) as progress:
-            self.cxt.ho.save_product_datasets()
+            self.cxt.ho.save_all_datasets()
             
             for po in self.cxt.ho:
                 po.save_all_thumbs()

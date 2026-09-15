@@ -64,34 +64,7 @@ class HoleObject:
     
     
     #==================fullhole dataset operations=============================
-    """
-    Hole owned datasets will always have hole_id as the basename
-    path = self.root_dir / f"{self.hole_id}_{key}{ext}"
-    #ds = Dataset(base=self.hole_id, key=key, path=path, suffix=key, ext=ext, data=data)
-    """
-    def load_hole_datasets(self):
-        for fp in self.root_dir.iterdir():
-            if not fp.is_file():
-                continue
-            s = fp.stem
-            base, sep, key = s.rpartition("_")
-            
-            if base is None or base != self.hole_id:
-                continue  # not fullhole dataset
-            
-            ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
-            try:
-                ds = Dataset(base=self.hole_id, key=key, path=fp, suffix=key, ext=ext)
-            except ValueError:
-                logger.info(f"Skipping unsupported file type {ext}")
-                continue
-            base_keys = ["depths", "AvSpectra"]
-            if key in base_keys:
-                self.base_datasets[key] = ds
-            else:
-                self.product_datasets[key] = ds
-        return
-    
+      
     
     def add_product_dataset(self, key: str, data, ext: str = None):
         """
@@ -190,10 +163,12 @@ class HoleObject:
                                           suffix="AvSpectra", 
                                           ext=".npy", 
                                           data=full_average.data)
-        
-        
-        for ds in self.base_datasets.values():
-            ds.save_dataset()
+        self.base_datasets["bands"] = Dataset(base=self.hole_id, 
+                                          key="bands", 
+                                          path=self.root_dir / f"{self.hole_id}_bands.npy", 
+                                          suffix="bands", 
+                                          ext=".npy", 
+                                          data=self.bands)
         return self
         
     def create_dhole_minmap(self, key):
@@ -356,6 +331,14 @@ class HoleObject:
         for key in self.product_datasets.keys():
             self.product_datasets[key].save_dataset()
     
+    def save_base_datasets(self):
+        for key in self.base_datasets.keys():
+            self.base_datasets[key].save_dataset()
+
+    def save_all_datasets(self):
+        self.save_base_datasets()
+        self.save_product_datasets()
+
 
     def _generate_concatenated_overview(self, key: str) -> Image.Image:
         """
@@ -407,6 +390,36 @@ class HoleObject:
 #================box level functions ==========================================
     
     
+    def load_hole_datasets(self):
+        """
+        Hole owned datasets will always have hole_id as the basename
+        path = self.root_dir / f"{self.hole_id}_{key}{ext}"
+        #ds = Dataset(base=self.hole_id, key=key, path=path, suffix=key, ext=ext, data=data)
+        """
+        base_keys = {"depths", "AvSpectra", "bands"}
+        for fp in self.root_dir.iterdir():
+            if not fp.is_file():
+                continue
+            s = fp.stem
+            base, sep, key = s.rpartition("_")
+            
+            if base != self.hole_id:
+                continue  # not fullhole dataset
+            
+            ext = fp.suffix if fp.suffix.startswith(".") else fp.suffix
+            try:
+                ds = Dataset(base=self.hole_id, key=key, path=fp, suffix=key, ext=ext)
+            except ValueError:
+                logger.info(f"Skipping unsupported file type {ext}")
+                continue
+            
+            if key in base_keys:
+                self.base_datasets[key] = ds
+                if key == "bands":
+                    self.bands = ds.data
+            else:
+                self.product_datasets[key] = ds
+        return
 
     @classmethod
     def build_from_box(cls, obj):
@@ -443,7 +456,7 @@ class HoleObject:
 
         # fresh, empty hole; counters will be filled by add_box
         hole = cls.new(hole_id=hole_id, root_dir=root)
-
+        hole.load_hole_datasets()
         # ---- PASS 2: load only boxes; add_box will filter by hole_id & update counters
         
         for fp in sorted(root.glob("*_metadata.json")):
@@ -465,7 +478,7 @@ class HoleObject:
         if hole.num_box == 0:
             logger.error(f"No boxes in {root} matched borehole id '{hole_id}'.")
             raise ValueError(f"No boxes in {root} matched borehole id '{hole_id}'.")
-        hole.load_hole_datasets()
+        
         return hole
 
     @classmethod
@@ -663,6 +676,7 @@ class HoleObject:
         """
         archive_dir = Path(archive_dir)
         save_dir = Path(save_dir)
+        save_dir.mkdir(parents=True, exist_ok=True)
         boxes_dir = archive_dir / "boxes"
         if not boxes_dir.exists():
             boxes_dir = archive_dir
@@ -703,6 +717,8 @@ class HoleObject:
                 path = save_dir / f"{hole_id}_{key}.npy"
                 ds = Dataset(base=hole_id, key=key, path=path, suffix=key, ext='.npy', data=data)
                 ho.base_datasets[key] = ds
+                if key == "bands":
+                    ho.bands = ds.data
             
             # Restore product datasets
             handled = set()
@@ -742,7 +758,7 @@ class HoleObject:
                     logger.debug(f"Restored ndarray: {key}")
             
             logger.info(f"Restored {len(ho.base_datasets)} base datasets and {len(ho.product_datasets)} product datasets")
-            
+            ho.save_all_datasets()
         else:
             # ============================================================
             # MODE 2: Boxes-only archive (no hole products)
