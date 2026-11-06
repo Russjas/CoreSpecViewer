@@ -7,7 +7,7 @@
 
 ---  
 
-
+[![Mentioned in Awesome mineral exploration](https://awesome.re/mentioned-badge.svg)](https://github.com/XploraHub/awesome-mineral-exploration)
 
 ### *A desktop application for hyperspectral drill-core processing, visualisation, and analysis*
 

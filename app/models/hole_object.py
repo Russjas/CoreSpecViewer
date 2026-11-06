@@ -326,7 +326,6 @@ class HoleObject:
             return depths_s, values_s, None
 
 
-
     def save_product_datasets(self):
         for key in self.product_datasets.keys():
             self.product_datasets[key].save_dataset()
